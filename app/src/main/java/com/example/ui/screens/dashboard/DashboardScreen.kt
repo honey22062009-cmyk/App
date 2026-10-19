@@ -575,6 +575,7 @@ fun DashboardScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -632,7 +633,6 @@ fun DashboardMetricCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
-        }
         }
     }
 }
