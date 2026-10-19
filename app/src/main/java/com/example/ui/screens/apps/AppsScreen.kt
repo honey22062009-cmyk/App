@@ -128,13 +128,13 @@ fun AppsScreen(
             ) {
                 Column {
                     Text(
-                        text = "Installed Apps",
+                        text = "Apps",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "${installedApps.count { it.isManaged }} protected • ${installedApps.size} launchable total",
+                        text = "${installedApps.count { it.isManaged }} protected",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -366,13 +366,13 @@ fun AppItemCard(
     onOpenSchedule: () -> Unit
 ) {
     val cardBg = if (app.isManaged) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
     } else {
         MaterialTheme.colorScheme.surface
     }
 
     val cardBorder = if (app.isManaged) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     } else {
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     }
@@ -380,6 +380,7 @@ fun AppItemCard(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = app.isManaged && !app.isSystemCritical) { onOpenSchedule() }
             .testTag("app_item_${app.packageName}"),
         backgroundColor = cardBg,
         borderColor = cardBorder
@@ -390,20 +391,6 @@ fun AppItemCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox for batch selection
-            if (!app.isSystemCritical) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelected() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            } else {
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
             AppIconImage(packageName = app.packageName, size = 42.dp)
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -416,40 +403,9 @@ fun AppItemCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Text(
-                    text = app.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-
-                if (app.isSystemCritical) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    InfoChip(
-                        text = "System Core (Exempt)",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else if (app.isManaged) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    InfoChip(
-                        text = if (app.periodCount > 0) "${app.periodCount} allowed rules" else "Always Blocked",
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
 
             if (!app.isSystemCritical) {
-                if (app.isManaged) {
-                    IconButton(onClick = onOpenSchedule) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Edit Schedule",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
                 Switch(
                     checked = app.isManaged,
                     onCheckedChange = { onToggleManaged(it) },
