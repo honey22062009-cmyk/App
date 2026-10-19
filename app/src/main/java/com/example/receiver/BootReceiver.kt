@@ -21,6 +21,13 @@ class BootReceiver : BroadcastReceiver() {
 
                 // Reschedule all exact schedule transition alarms
                 AlarmScheduler.scheduleNextTransition(context)
+
+                // Resume adult content DNS filtering if configured
+                try {
+                    if (com.example.service.AdultFilterVpnService.isVpnConfigured(context)) {
+                        com.example.service.AdultFilterVpnService.start(context)
+                    }
+                } catch (_: Exception) {}
             }
         }
     }

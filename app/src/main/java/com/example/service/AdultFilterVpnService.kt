@@ -9,15 +9,27 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.core.evaluator.AdultContentEvaluator
+import com.example.data.repository.AppBlockerRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.nio.ByteBuffer
 
 /**
  * On-device DNS filtering VPN Service for device-wide 18+ adult content blocking.
@@ -25,7 +37,11 @@ import java.io.IOException
  * Configures the system network stack to resolve domain names through verified,
  * privacy-first adult-blocking DNS resolvers (CleanBrowsing Family, Cloudflare Families 1.1.1.3).
  *
- * Privacy Note: Does NOT inspect or decrypt HTTPS traffic, does NOT tunnel traffic
+ * Intercepts DNS queries on port 53 locally:
+ * - If domain is on the adult blocklist, responds with NXDOMAIN / 0.0.0.0 locally.
+ * - Otherwise forwards through Cloudflare Families (1.1.1.3) protected upstream.
+ *
+ * Privacy Note: Does NOT inspect or decrypt HTTPS traffic, does NOT tunnel non-DNS traffic
  * to any remote proxy, and maintains zero browsing logs or telemetry.
  */
 class AdultFilterVpnService : VpnService(), Runnable {
@@ -62,10 +78,19 @@ class AdultFilterVpnService : VpnService(), Runnable {
         }
     }
 
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var repository: AppBlockerRepository
+
     private var vpnInterface: ParcelFileDescriptor? = null
     private var vpnThread: Thread? = null
     @Volatile
     private var isRunning = false
+    private var udpSocket: DatagramSocket? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        repository = AppBlockerRepository(applicationContext)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -94,6 +119,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
     }
 
     override fun run() {
+        var inStream: FileInputStream? = null
+        var outStream: FileOutputStream? = null
+
         try {
             val builder = Builder()
                 .setSession("18 Blocker Adult Shield")
@@ -102,20 +130,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
                 // Cloudflare 1.1.1.3 (Malware + Adult Content Blocking)
                 .addDnsServer("1.1.1.3")
                 .addDnsServer("1.0.0.3")
-                // CleanBrowsing Family Filter (Strict Adult & SafeSearch DNS)
-                .addDnsServer("185.228.168.168")
-                .addDnsServer("185.228.169.168")
-                // AdGuard Family Protection DNS
-                .addDnsServer("94.140.14.15")
+                .addRoute("1.1.1.3", 32)
+                .addRoute("1.0.0.3", 32)
 
-            // Add DNS server IP routing so DNS queries route through the filtered resolvers
-            builder.addRoute("1.1.1.3", 32)
-            builder.addRoute("1.0.0.3", 32)
-            builder.addRoute("185.228.168.168", 32)
-            builder.addRoute("185.228.169.168", 32)
-            builder.addRoute("94.140.14.15", 32)
-
-            // Configure pending intent on notification tap
             val configIntent = Intent(this, MainActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
                 this, 0, configIntent,
@@ -123,21 +140,180 @@ class AdultFilterVpnService : VpnService(), Runnable {
             )
             builder.setConfigureIntent(pendingIntent)
 
-            vpnInterface = builder.establish()
+            vpnInterface = builder.establish() ?: return
+            inStream = FileInputStream(vpnInterface!!.fileDescriptor)
+            outStream = FileOutputStream(vpnInterface!!.fileDescriptor)
 
-            // Keep the thread active while VPN is running
+            val socket = DatagramSocket()
+            protect(socket)
+            socket.soTimeout = 2500
+            udpSocket = socket
+
+            val upstreamDns = InetAddress.getByName("1.1.1.3")
+            val buffer = ByteArray(32767)
+            val responseBuffer = ByteArray(4096)
+
             while (isRunning && vpnInterface != null) {
-                try {
-                    Thread.sleep(1000)
-                } catch (_: InterruptedException) {
+                val length = try {
+                    inStream.read(buffer)
+                } catch (_: Exception) {
                     break
+                }
+
+                if (length <= 0) continue
+
+                // Check for IPv4 UDP packet
+                val version = (buffer[0].toInt() and 0xF0) shr 4
+                if (version != 4 || length < 28) continue
+
+                val ihl = (buffer[0].toInt() and 0x0F) * 4
+                val protocol = buffer[9].toInt() and 0xFF
+                if (protocol != 17) continue // UDP is 17
+
+                val destPort = ((buffer[ihl + 2].toInt() and 0xFF) shl 8) or (buffer[ihl + 3].toInt() and 0xFF)
+                if (destPort != 53) continue // DNS is port 53
+
+                val udpLength = ((buffer[ihl + 4].toInt() and 0xFF) shl 8) or (buffer[ihl + 5].toInt() and 0xFF)
+                val dnsPayloadOffset = ihl + 8
+                val dnsPayloadLen = udpLength - 8
+
+                if (dnsPayloadOffset + dnsPayloadLen > length || dnsPayloadLen < 12) continue
+
+                val dnsPayload = ByteArray(dnsPayloadLen)
+                System.arraycopy(buffer, dnsPayloadOffset, dnsPayload, 0, dnsPayloadLen)
+
+                val queriedDomain = extractDomainFromDnsQuery(dnsPayload)
+
+                // Inspect queried domain with Adult Content Evaluator
+                if (queriedDomain.isNotBlank() && (AdultContentEvaluator.isAdultDomain(queriedDomain) ||
+                            AdultContentEvaluator.evaluateText(queriedDomain) is AdultContentEvaluator.EvaluationResult.Blocked)) {
+                    // Record interception asynchronously
+                    serviceScope.launch {
+                        repository.recordAdultBlockEvent("DNS Block: $queriedDomain")
+                    }
+
+                    // Return NXDOMAIN blocked response
+                    val forgedDns = buildNxDomainResponse(dnsPayload)
+                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, forgedDns)
+                    try {
+                        outStream.write(responsePacket)
+                    } catch (_: Exception) {}
+                    continue
+                }
+
+                // Forward clean query upstream to Cloudflare 1.1.1.3
+                try {
+                    val outPacket = DatagramPacket(dnsPayload, dnsPayloadLen, upstreamDns, 53)
+                    socket.send(outPacket)
+
+                    val inPacket = DatagramPacket(responseBuffer, responseBuffer.size)
+                    socket.receive(inPacket)
+
+                    val upstreamDnsPayload = ByteArray(inPacket.length)
+                    System.arraycopy(responseBuffer, 0, upstreamDnsPayload, 0, inPacket.length)
+
+                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, upstreamDnsPayload)
+                    outStream.write(responsePacket)
+                } catch (_: Exception) {
+                    // Upstream timeout or drop; fail gracefully
                 }
             }
         } catch (e: Exception) {
-            // Handle VPN establishment errors gracefully
+            Log.w("AdultFilterVpn", "VPN loop encountered error: ${e.message}")
         } finally {
+            try { inStream?.close() } catch (_: Exception) {}
+            try { outStream?.close() } catch (_: Exception) {}
             cleanup()
         }
+    }
+
+    private fun extractDomainFromDnsQuery(payload: ByteArray): String {
+        var idx = 12 // Skip DNS 12-byte header
+        val sb = StringBuilder()
+        while (idx < payload.size) {
+            val len = payload[idx].toInt() and 0xFF
+            if (len == 0) break
+            if ((len and 0xC0) == 0xC0) break // Compression offset
+            idx++
+            if (idx + len > payload.size) break
+            if (sb.isNotEmpty()) sb.append('.')
+            sb.append(String(payload, idx, len, Charsets.US_ASCII))
+            idx += len
+        }
+        return sb.toString().trim()
+    }
+
+    private fun buildNxDomainResponse(queryPayload: ByteArray): ByteArray {
+        val response = queryPayload.copyOf()
+        if (response.size >= 4) {
+            // Flags: Response flag (QR=1) + RCODE=3 (NXDOMAIN)
+            response[2] = (response[2].toInt() or 0x81).toByte()
+            response[3] = (response[3].toInt() or 0x83).toByte()
+        }
+        return response
+    }
+
+    private fun buildIpv4UdpPacket(origIpPacket: ByteArray, ihl: Int, dnsPayload: ByteArray): ByteArray {
+        val newUdpLength = 8 + dnsPayload.size
+        val newTotalLength = ihl + newUdpLength
+        val packet = ByteArray(newTotalLength)
+
+        // Copy IP Header
+        System.arraycopy(origIpPacket, 0, packet, 0, ihl)
+
+        // Swap Source and Destination IPs
+        // Orig Src: origIpPacket[12..15], Orig Dst: origIpPacket[16..19]
+        System.arraycopy(origIpPacket, 16, packet, 12, 4) // New Src = Orig Dst
+        System.arraycopy(origIpPacket, 12, packet, 16, 4) // New Dst = Orig Src
+
+        // Total Length in IP header
+        packet[2] = ((newTotalLength shr 8) and 0xFF).toByte()
+        packet[3] = (newTotalLength and 0xFF).toByte()
+
+        // Recalculate IP Header Checksum
+        packet[10] = 0
+        packet[11] = 0
+        val ipChecksum = computeIpChecksum(packet, ihl)
+        packet[10] = ((ipChecksum.toInt() shr 8) and 0xFF).toByte()
+        packet[11] = (ipChecksum.toInt() and 0xFF).toByte()
+
+        // Swap UDP Ports
+        val origSrcPort0 = origIpPacket[ihl]
+        val origSrcPort1 = origIpPacket[ihl + 1]
+        val origDstPort0 = origIpPacket[ihl + 2]
+        val origDstPort1 = origIpPacket[ihl + 3]
+
+        packet[ihl] = origDstPort0
+        packet[ihl + 1] = origDstPort1
+        packet[ihl + 2] = origSrcPort0
+        packet[ihl + 3] = origSrcPort1
+
+        // UDP Length
+        packet[ihl + 4] = ((newUdpLength shr 8) and 0xFF).toByte()
+        packet[ihl + 5] = (newUdpLength and 0xFF).toByte()
+
+        // UDP Checksum = 0 (optional in IPv4)
+        packet[ihl + 6] = 0
+        packet[ihl + 7] = 0
+
+        // Copy DNS payload
+        System.arraycopy(dnsPayload, 0, packet, ihl + 8, dnsPayload.size)
+
+        return packet
+    }
+
+    private fun computeIpChecksum(buffer: ByteArray, headerLength: Int): Short {
+        var sum = 0
+        var i = 0
+        while (i < headerLength) {
+            val word = ((buffer[i].toInt() and 0xFF) shl 8) or (buffer[i + 1].toInt() and 0xFF)
+            sum += word
+            i += 2
+        }
+        while ((sum shr 16) > 0) {
+            sum = (sum and 0xFFFF) + (sum shr 16)
+        }
+        return sum.inv().toShort()
     }
 
     private fun stopVpn() {
@@ -151,6 +327,11 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
     private fun cleanup() {
         try {
+            udpSocket?.close()
+        } catch (_: Exception) {}
+        udpSocket = null
+
+        try {
             vpnInterface?.close()
         } catch (_: IOException) {}
         vpnInterface = null
@@ -159,6 +340,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel()
         stopVpn()
     }
 
@@ -187,7 +369,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("18 Blocker: Adult Protection Active")
             .setContentText("Device-wide family DNS filter is protecting browsers and apps.")
-            .setSmallIcon(R.drawable.app_icon_18_blocker_1792376066440)
+            .setSmallIcon(R.drawable.ic_launcher_fg)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

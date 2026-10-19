@@ -28,38 +28,43 @@ object AdultContentEvaluator {
         "org.torproject.torbrowser"
     )
 
-    // Curated high-impact adult domain database (top adult domains & cam networks)
+    // Curated high-impact adult domain database (top adult domains, cam networks, and hubs)
     private val ADULT_DOMAINS = hashSetOf(
-        "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com",
-        "youporn.com", "chaturbate.com", "onlyfans.com", "stripchat.com", "cam4.com",
-        "livejasmin.com", "bongacams.com", "camsoda.com", "myfreecams.com", "streamate.com",
-        "brazzers.com", "bangbros.com", "spankbang.com", "tube8.com", "hentaihaven.xxx",
-        "nhentai.net", "rule34.xxx", "gelbooru.com", "danbooru.donmai.us", "e-hentai.org",
-        "tsumino.com", "literotica.com", "lushstories.com", "beeg.com", "eporner.com",
-        "hqporner.com", "daftsex.com", "txxx.com", "porn555.com", "motherless.com",
-        "heavy-r.com", "fapello.com", "coomer.party", "kemono.party", "erome.com",
-        "bravoteens.com", "shemalez.com", "playboy.com", "penthouse.com", "hustler.com",
-        "fapster.xxx", "pornone.com", "pornhat.com", "porndo.com", "vporn.com",
-        "youjizz.com", "slutload.com", "tblop.com", "nuvid.com", "sunporno.com",
-        "drtuber.com", "empflix.com", "cliphunter.com", "keezmovies.com", "tube9.com",
-        "pornsharing.com", "pornrabbit.com", "pornhd.com", "porntube.com", "fux.com",
-        "badjojo.com", "thumbzilla.com", "zbporn.com", "fuq.com", "javlibrary.com",
-        "javhd.com", "javbus.com", "dmm.co.jp", "r18.com", "fanza.com",
-        "missav.com", "jable.tv", "supjav.com", "netflav.com", "tktube.com"
+        "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "xhamster.desi",
+        "xhamster.one", "redtube.com", "youporn.com", "chaturbate.com", "onlyfans.com",
+        "stripchat.com", "cam4.com", "livejasmin.com", "bongacams.com", "camsoda.com",
+        "myfreecams.com", "streamate.com", "brazzers.com", "bangbros.com", "spankbang.com",
+        "tube8.com", "hentaihaven.xxx", "nhentai.net", "rule34.xxx", "gelbooru.com",
+        "danbooru.donmai.us", "e-hentai.org", "tsumino.com", "literotica.com", "lushstories.com",
+        "beeg.com", "eporner.com", "hqporner.com", "daftsex.com", "txxx.com", "porn555.com",
+        "motherless.com", "heavy-r.com", "fapello.com", "coomer.party", "coomer.su",
+        "kemono.party", "kemono.su", "erome.com", "bravoteens.com", "shemalez.com",
+        "playboy.com", "penthouse.com", "hustler.com", "fapster.xxx", "pornone.com",
+        "pornhat.com", "porndo.com", "vporn.com", "youjizz.com", "slutload.com", "tblop.com",
+        "nuvid.com", "sunporno.com", "drtuber.com", "empflix.com", "cliphunter.com",
+        "keezmovies.com", "tube9.com", "pornsharing.com", "pornrabbit.com", "pornhd.com",
+        "porntube.com", "fux.com", "badjojo.com", "thumbzilla.com", "zbporn.com", "fuq.com",
+        "javlibrary.com", "javhd.com", "javbus.com", "dmm.co.jp", "r18.com", "fanza.com",
+        "missav.com", "jable.tv", "supjav.com", "netflav.com", "tktube.com", "redgifs.com",
+        "porntrex.com", "spankwire.com", "gotporn.com", "tnaflix.com", "porn.com",
+        "adultfriendfinder.com", "fetlife.com", "manyvids.com", "fansly.com", "thothub.to",
+        "simpcity.su", "leakgirls.com", "leaklinks.com"
     )
 
     // Explicit root terms that indicate pornographic intent in URLs or search queries
     private val EXPLICIT_KEYWORDS = listOf(
-        "porn", "xxx", "xvideos", "xnxx", "xhamster", "pornhub", "redtube",
-        "youporn", "chaturbate", "stripchat", "camsoda", "brazzers", "bangbros",
-        "spankbang", "hentai", "rule34", "erotic video", "hardcore sex", "blowjob",
-        "gangbang", "creampie", "milf sex", "anal sex", "incest porn", "threesome sex",
-        "shemale porn", "trans porn", "camgirl live", "fetish porn", "nsfw video",
-        "nude leak", "onlyfans leak", "fapello", "sex tape", "adult video",
-        "adult webcam", "live sex cam", "nude cam", "erome leak"
+        "porn", "porno", "pornography", "pornographic", "xxx", "xvideos", "xnxx",
+        "xhamster", "pornhub", "redtube", "youporn", "chaturbate", "stripchat",
+        "camsoda", "brazzers", "bangbros", "spankbang", "hentai", "rule34",
+        "erotic video", "hardcore sex", "blowjob", "gangbang", "creampie", "milf sex",
+        "anal sex", "incest porn", "threesome sex", "shemale porn", "trans porn",
+        "camgirl live", "fetish porn", "nsfw video", "nude leak", "onlyfans leak",
+        "fapello", "sex tape", "adult video", "adult webcam", "live sex cam",
+        "nude cam", "erome leak", "naked girls", "naked women", "free porn",
+        "adult tube", "sex video", "hardcore video"
     )
 
-    // Search Engine hosts where SafeSearch can be audited
+    // Search Engine hosts
     private val SEARCH_ENGINES = listOf(
         "google.", "bing.com", "duckduckgo.com", "yahoo.com", "yandex.", "ecosia.org"
     )
@@ -119,7 +124,7 @@ object AdultContentEvaluator {
 
         // 4. Check for explicit keywords in search queries or URL paths
         for (keyword in EXPLICIT_KEYWORDS) {
-            // Word boundary or URL token match
+            // Word boundary match
             val regex = Regex("(^|[^a-z0-9])${Regex.escape(keyword)}([^a-z0-9]|$)", RegexOption.IGNORE_CASE)
             if (regex.containsMatchIn(decoded)) {
                 return EvaluationResult.Blocked(
@@ -143,11 +148,13 @@ object AdultContentEvaluator {
 
         if (ADULT_DOMAINS.contains(lowerDomain)) return true
 
-        // Check parent domains (e.g. s1.xvideos.com -> xvideos.com)
+        // Check parent domains across all part depths (e.g. video.s1.xvideos.com -> xvideos.com, dmm.co.jp)
         val parts = lowerDomain.split(".")
-        if (parts.size > 2) {
-            val rootDomain = parts.takeLast(2).joinToString(".")
-            if (ADULT_DOMAINS.contains(rootDomain)) return true
+        if (parts.size >= 2) {
+            for (i in 2..parts.size) {
+                val candidate = parts.takeLast(i).joinToString(".")
+                if (ADULT_DOMAINS.contains(candidate)) return true
+            }
         }
 
         return false
@@ -175,12 +182,23 @@ object AdultContentEvaluator {
     }
 
     /**
-     * Checks if an application package name belongs to a web browser.
+     * Checks if an application package name belongs to a web browser or web content viewer.
      */
     fun isBrowserPackage(packageName: String): Boolean {
-        return BROWSER_PACKAGES.contains(packageName) ||
-                packageName.contains("browser", ignoreCase = true) ||
-                packageName.contains("chrome", ignoreCase = true) ||
-                packageName.contains("firefox", ignoreCase = true)
+        val lower = packageName.lowercase(Locale.ROOT)
+        return BROWSER_PACKAGES.contains(lower) ||
+                lower.contains("browser") ||
+                lower.contains("chrome") ||
+                lower.contains("firefox") ||
+                lower.contains("webview") ||
+                lower.contains("searchbox")
+    }
+
+    /**
+     * Checks if a domain is a known search engine.
+     */
+    fun isSearchEngine(domain: String): Boolean {
+        val lower = domain.lowercase(Locale.ROOT)
+        return SEARCH_ENGINES.any { lower.contains(it) }
     }
 }

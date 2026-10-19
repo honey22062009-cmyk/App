@@ -90,7 +90,7 @@ class BlockerActivity : ComponentActivity() {
         }
 
         setContent {
-            StrictBlockerTheme(darkTheme = true) {
+            StrictBlockerTheme {
                 // Intercept hardware/gesture back to always exit to Home screen
                 BackHandler {
                     navigateHome()
@@ -138,6 +138,7 @@ class BlockerActivity : ComponentActivity() {
 
 /**
  * Clean, neutral, non-shaming 18+ Adult Content Block Screen.
+ * Fully theme-aware with light and dark mode glass surfaces.
  * Never displays explicit text, search queries, or thumbnails.
  */
 @Composable
@@ -147,14 +148,25 @@ fun AdultBlockerScreen(
     reason: String,
     onGoHome: () -> Unit
 ) {
-    val backgroundBrush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF090D16),
-                Color(0xFF0F172A),
-                Color(0xFF070A10)
+    val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
+    val backgroundBrush = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF090D16),
+                    Color(0xFF0F172A),
+                    Color(0xFF070A10)
+                )
             )
-        )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFF8FAFC),
+                    Color(0xFFF1F5F9),
+                    Color(0xFFE2E8F0)
+                )
+            )
+        }
     }
 
     Box(
@@ -176,8 +188,8 @@ fun AdultBlockerScreen(
                 modifier = Modifier
                     .size(92.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF1E293B))
-                    .border(1.5.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), CircleShape),
+                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE0F2FE))
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -185,13 +197,13 @@ fun AdultBlockerScreen(
                         text = "18+",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF38BDF8)
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "BLOCKED",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 1.sp
                     )
                 }
@@ -203,7 +215,7 @@ fun AdultBlockerScreen(
                 text = "Content Restricted",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("blocker_screen_title")
             )
@@ -214,7 +226,7 @@ fun AdultBlockerScreen(
                 text = "18+ Adult Material Blocked",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF38BDF8),
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
 
@@ -223,22 +235,21 @@ fun AdultBlockerScreen(
             Text(
                 text = "Access to this page, explicit search query, or unmonitored private window was restricted under 18 Blocker protection.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF94A3B8),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Enforcement Layer Info Card
+            // Enforcement Layer Info Card with theme-aware glass
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                backgroundColor = Color(0xFF111827).copy(alpha = 0.9f),
-                borderColor = Color(0xFF1E293B)
+                variant = com.example.ui.components.GlassVariant.Elevated
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(18.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -248,17 +259,17 @@ fun AdultBlockerScreen(
                         Text(
                             text = "Enforcement Shield",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF0284C7).copy(alpha = 0.2f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                         ) {
                             Text(
                                 text = "ON-DEVICE",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF38BDF8),
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -270,7 +281,7 @@ fun AdultBlockerScreen(
                         text = layer,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -278,7 +289,7 @@ fun AdultBlockerScreen(
                     Text(
                         text = "Detected in $appName. Content was intercepted locally before rendering.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF64748B)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -294,8 +305,8 @@ fun AdultBlockerScreen(
                     .testTag("blocker_btn_home"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2563EB),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Icon(
@@ -323,14 +334,25 @@ fun BlockerScreen(
     onGoHome: () -> Unit,
     onViewSchedule: () -> Unit
 ) {
-    val backgroundBrush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF090D16),
-                Color(0xFF0D1424),
-                Color(0xFF070A10)
+    val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
+    val backgroundBrush = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF090D16),
+                    Color(0xFF0D1424),
+                    Color(0xFF070A10)
+                )
             )
-        )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFF8FAFC),
+                    Color(0xFFF1F5F9),
+                    Color(0xFFE2E8F0)
+                )
+            )
+        }
     }
 
     Box(
@@ -352,14 +374,14 @@ fun BlockerScreen(
                 modifier = Modifier
                     .size(88.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF1E293B))
-                    .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.35f), CircleShape),
+                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE0F2FE))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = "Shield Locked",
-                    tint = Color(0xFF38BDF8),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(42.dp)
                 )
             }
@@ -371,7 +393,7 @@ fun BlockerScreen(
                 text = stringResource(R.string.blocker_title),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("blocker_screen_title")
             )
@@ -381,7 +403,7 @@ fun BlockerScreen(
             Text(
                 text = "This application is currently outside its scheduled hours.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF94A3B8),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -390,8 +412,7 @@ fun BlockerScreen(
             // App Identity Glass Card
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                backgroundColor = Color(0xFF111827).copy(alpha = 0.9f),
-                borderColor = Color(0xFF334155).copy(alpha = 0.5f)
+                variant = com.example.ui.components.GlassVariant.Standard
             ) {
                 Row(
                     modifier = Modifier
@@ -429,13 +450,13 @@ fun BlockerScreen(
                             text = appName,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (packageName.isNotEmpty()) {
                             Text(
                                 text = packageName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF94A3B8),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
                             )
                         }
@@ -448,8 +469,7 @@ fun BlockerScreen(
             // Next Availability Window Card
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                backgroundColor = Color(0xFF0F172A).copy(alpha = 0.85f),
-                borderColor = Color(0xFF1E293B)
+                variant = com.example.ui.components.GlassVariant.Elevated
             ) {
                 Column(
                     modifier = Modifier
@@ -461,7 +481,7 @@ fun BlockerScreen(
                         Icon(
                             imageVector = Icons.Default.HourglassEmpty,
                             contentDescription = null,
-                            tint = Color(0xFF38BDF8),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -469,7 +489,7 @@ fun BlockerScreen(
                             text = stringResource(R.string.blocker_available_again),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF38BDF8)
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -479,7 +499,7 @@ fun BlockerScreen(
                         text = nextAllowed,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -496,8 +516,8 @@ fun BlockerScreen(
                     .testTag("blocker_btn_home"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2563EB),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Icon(
@@ -523,7 +543,7 @@ fun BlockerScreen(
                     .testTag("blocker_btn_view_schedule"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color(0xFFE2E8F0)
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
                 Icon(

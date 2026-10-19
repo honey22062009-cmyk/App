@@ -57,8 +57,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             // 1. Layer: 18+ Adult Content Protection across browsers and webviews
             val adultProtectionEnabled = repository.settings.isAdultProtectionEnabledFlow.first()
             if (adultProtectionEnabled && AdultContentEvaluator.isBrowserPackage(packageName)) {
-                if (now - lastAdultTriggerTimestamp > 500L) {
-                    val isAdultBlocked = inspectBrowserForAdultContent(packageName)
+                if (now - lastAdultTriggerTimestamp > 400L) {
+                    val isAdultBlocked = inspectBrowserForAdultContent(packageName, event)
                     if (isAdultBlocked) {
                         lastAdultTriggerTimestamp = now
                         return@launch
@@ -109,14 +109,39 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * Inspects browser address bar / active window nodes to detect explicit adult content or incognito tabs.
      * Returns true if adult content was detected and blocked.
      */
-    private suspend fun inspectBrowserForAdultContent(packageName: String): Boolean {
+    private suspend fun inspectBrowserForAdultContent(packageName: String, event: AccessibilityEvent): Boolean {
+        val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
+
+        // 1. Check immediate event text and content descriptions (fastest 0ms detection)
+        event.text?.forEach { charSeq ->
+            val text = charSeq.toString()
+            if (text.isNotBlank()) {
+                val eval = AdultContentEvaluator.evaluateText(text)
+                if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
+                    if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
+                        triggerAdultBlock(packageName, eval.category.label, eval.layer)
+                        return true
+                    }
+                }
+            }
+        }
+
+        val eventDesc = event.contentDescription?.toString()
+        if (!eventDesc.isNullOrBlank()) {
+            val eval = AdultContentEvaluator.evaluateText(eventDesc)
+            if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
+                if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
+                    triggerAdultBlock(packageName, eval.category.label, eval.layer)
+                    return true
+                }
+            }
+        }
+
         val rootNode = try {
-            rootInActiveWindow
+            rootInActiveWindow ?: event.source
         } catch (_: Exception) {
             null
         } ?: return false
-
-        val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
 
         // Known browser address bar and omnibox resource IDs
         val addressBarIds = listOf(
@@ -129,7 +154,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             "com.duckduckgo.mobile.android:id/omnibar_text_input"
         )
 
-        // 1. Check known URL input nodes
+        // 2. Check known URL input nodes
         for (id in addressBarIds) {
             val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
             if (!nodes.isNullOrEmpty()) {
@@ -149,9 +174,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. Scan window title and text for incognito tab indicator or explicit query
+        // 3. Scan interactive window nodes up to depth 8 (max 80 nodes inspected for low latency)
         val windowTextBuilder = StringBuilder()
-        collectNodeText(rootNode, windowTextBuilder, maxDepth = 4)
+        collectNodeText(rootNode, windowTextBuilder, maxDepth = 8, maxNodes = intArrayOf(80))
         val combinedText = windowTextBuilder.toString()
 
         if (combinedText.isNotBlank()) {
@@ -168,22 +193,27 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun collectNodeText(node: AccessibilityNodeInfo?, out: StringBuilder, maxDepth: Int) {
-        if (node == null || maxDepth <= 0) return
+    private fun collectNodeText(node: AccessibilityNodeInfo?, out: StringBuilder, maxDepth: Int, maxNodes: IntArray) {
+        if (node == null || maxDepth <= 0 || maxNodes[0] <= 0) return
+        maxNodes[0]--
+
         val text = node.text?.toString()
         if (!text.isNullOrBlank()) {
             out.append(" ").append(text)
         }
+        val desc = node.contentDescription?.toString()
+        if (!desc.isNullOrBlank()) {
+            out.append(" ").append(desc)
+        }
+
         for (i in 0 until node.childCount) {
+            if (maxNodes[0] <= 0) break
             val child = try { node.getChild(i) } catch (_: Exception) { null }
-            collectNodeText(child, out, maxDepth - 1)
+            collectNodeText(child, out, maxDepth - 1, maxNodes)
         }
     }
 
     private suspend fun triggerAdultBlock(packageName: String, reason: String, layer: String) {
-        // Immediately take user out of browser tab
-        performGlobalAction(GLOBAL_ACTION_BACK)
-
         val appLabel = try {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
             packageManager.getApplicationLabel(appInfo).toString()
@@ -194,9 +224,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         // Record adult block event in database and increment count
         repository.recordAdultBlockEvent("18+ Content Blocked ($reason)")
 
-        // Launch clean neutral 18+ Block Screen
+        // Launch clean neutral 18+ Block Screen (single top to prevent stacked duplicates)
         val intent = Intent(this, BlockerActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
             putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
             putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_ADULT)
