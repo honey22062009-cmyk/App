@@ -22,11 +22,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +50,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +82,8 @@ fun AppsScreen(
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Managed", "Unmanaged"
     var installedApps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showGroupDialog by remember { mutableStateOf(false) }
+    val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
 
     val selectedPackages = remember { mutableStateListOf<String>() }
 
@@ -128,16 +133,43 @@ fun AppsScreen(
             ) {
                 Column {
                     Text(
-                        text = "Installed Apps",
+                        text = "Apps",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "${installedApps.count { it.isManaged }} protected • ${installedApps.size} launchable total",
+                        text = "${installedApps.count { it.isManaged }} protected",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                OutlinedButton(onClick = { showGroupDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("New group")
+                }
+            }
+
+            if (groups.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    groups.take(3).forEach { group ->
+                        GlassCard(elevation = 0.dp) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(group.name, style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -355,6 +387,91 @@ fun AppsScreen(
             }
         }
     }
+
+    if (showGroupDialog) {
+        AppGroupDialog(
+            apps = installedApps.filter { !it.isSystemCritical },
+            onDismiss = { showGroupDialog = false },
+            onSave = { name, packages ->
+                coroutineScope.launch {
+                    repository.saveAppGroup(name, packages)
+                    packages.forEach { pkg ->
+                        installedApps.firstOrNull { it.packageName == pkg }?.let { app ->
+                            repository.setAppManaged(app.packageName, app.appName, true)
+                        }
+                    }
+                    showGroupDialog = false
+                    refreshApps()
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AppGroupDialog(
+    apps: List<InstalledAppInfo>,
+    onDismiss: () -> Unit,
+    onSave: (String, Set<String>) -> Unit
+) {
+    var groupName by remember { mutableStateOf("") }
+    val chosen = remember { mutableStateListOf<String>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create app group") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Group name") },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Choose apps",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                LazyColumn(modifier = Modifier.height(280.dp)) {
+                    items(apps, key = { it.packageName }) { app ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (chosen.contains(app.packageName)) chosen.remove(app.packageName)
+                                    else chosen.add(app.packageName)
+                                }
+                                .padding(vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppIconImage(packageName = app.packageName, size = 32.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(app.appName, modifier = Modifier.weight(1f))
+                            Checkbox(
+                                checked = chosen.contains(app.packageName),
+                                onCheckedChange = {
+                                    if (chosen.contains(app.packageName)) chosen.remove(app.packageName)
+                                    else chosen.add(app.packageName)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(groupName.trim(), chosen.toSet()) },
+                enabled = groupName.isNotBlank() && chosen.isNotEmpty()
+            ) { Text("Create") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -366,13 +483,13 @@ fun AppItemCard(
     onOpenSchedule: () -> Unit
 ) {
     val cardBg = if (app.isManaged) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
     } else {
         MaterialTheme.colorScheme.surface
     }
 
     val cardBorder = if (app.isManaged) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     } else {
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     }
@@ -380,6 +497,7 @@ fun AppItemCard(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = app.isManaged && !app.isSystemCritical) { onOpenSchedule() }
             .testTag("app_item_${app.packageName}"),
         backgroundColor = cardBg,
         borderColor = cardBorder
@@ -390,20 +508,6 @@ fun AppItemCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox for batch selection
-            if (!app.isSystemCritical) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelected() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            } else {
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
             AppIconImage(packageName = app.packageName, size = 42.dp)
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -416,40 +520,9 @@ fun AppItemCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Text(
-                    text = app.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-
-                if (app.isSystemCritical) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    InfoChip(
-                        text = "System Core (Exempt)",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else if (app.isManaged) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    InfoChip(
-                        text = if (app.periodCount > 0) "${app.periodCount} allowed rules" else "Always Blocked",
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
 
             if (!app.isSystemCritical) {
-                if (app.isManaged) {
-                    IconButton(onClick = onOpenSchedule) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Edit Schedule",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
                 Switch(
                     checked = app.isManaged,
                     onCheckedChange = { onToggleManaged(it) },

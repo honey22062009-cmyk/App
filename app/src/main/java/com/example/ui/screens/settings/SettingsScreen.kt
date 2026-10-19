@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -23,38 +22,41 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
 import kotlinx.coroutines.launch
+
+private enum class SettingsSection(val title: String, val icon: ImageVector) {
+    Appearance("Appearance", Icons.Default.Palette),
+    Blocking("Blocking", Icons.Default.HourglassBottom),
+    Protection("Protection", Icons.Default.Shield),
+    Permissions("Permissions", Icons.Default.Security),
+    Privacy("Privacy & legal", Icons.Default.PrivacyTip),
+    About("About", Icons.Default.Info)
+}
 
 @Composable
 fun SettingsScreen(
@@ -64,367 +66,347 @@ fun SettingsScreen(
     onNavigateToLegal: () -> Unit,
     onNavigateToAdultProtection: () -> Unit = {}
 ) {
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val delayMinutes by repository.settings.strictChangeDelayMinutesFlow.collectAsState(initial = 0)
-    val isOverlayEnabled by repository.settings.isOverlayShieldEnabledFlow.collectAsState(initial = true)
     val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+    var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("settings_screen_root")
+    ) {
         val isTablet = maxWidth >= 720.dp
-        val horizontalPadding = if (isTablet) 32.dp else 16.dp
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = horizontalPadding, vertical = 14.dp)
-                .testTag("settings_screen_root"),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header
-            item {
-                Column {
+        if (isTablet) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                Column(modifier = Modifier.width(250.dp)) {
                     Text(
                         text = "Settings",
-                        style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Manage application appearance, delay friction, and system policies.",
+                        text = "App behavior and system controls",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    SettingsSection.entries.forEach { section ->
+                        SettingsSidebarItem(
+                            section = section,
+                            selected = selectedSection == section,
+                            onClick = { selectedSection = section }
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
+
+                GlassCard(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                    elevation = 0.dp
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        item {
+                            Text(
+                                text = selectedSection.title,
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        item {
+                            SettingsSectionContent(
+                                section = selectedSection,
+                                themeMode = themeMode,
+                                delayMinutes = delayMinutes,
+                                isProtectionEnabled = isProtectionEnabled,
+                                onThemeChange = { mode ->
+                                    scope.launch { repository.settings.setThemeMode(mode) }
+                                },
+                                onDelayChange = { minutes ->
+                                    scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
+                                },
+                                onProtectionChange = { enabled ->
+                                    scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                },
+                                onNavigateToPermissions = onNavigateToPermissions,
+                                onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
+                                onNavigateToLegal = onNavigateToLegal,
+                                onNavigateToAdultProtection = onNavigateToAdultProtection
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "App behavior and system controls",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
 
-            // Section 1: Appearance & Theme
-            item {
-                Text(
-                    text = "Appearance",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            item {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Color Theme",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Choose between automatic system matching, bright light mode, or calm dark mode.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
+                SettingsSection.entries.forEach { section ->
+                    item {
+                        GlassCard(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            elevation = 0.dp
                         ) {
-                            val themes = listOf(
-                                "system" to "System",
-                                "light" to "Light",
-                                "dark" to "Dark"
-                            )
-                            themes.forEach { (mode, label) ->
-                                val isSelected = themeMode == mode
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            repository.settings.setThemeMode(mode)
-                                        }
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = section.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SettingsSectionContent(
+                                    section = section,
+                                    themeMode = themeMode,
+                                    delayMinutes = delayMinutes,
+                                    isProtectionEnabled = isProtectionEnabled,
+                                    onThemeChange = { mode ->
+                                        scope.launch { repository.settings.setThemeMode(mode) }
                                     },
-                                    leadingIcon = {
-                                        val icon = when (mode) {
-                                            "light" -> Icons.Default.LightMode
-                                            "dark" -> Icons.Default.DarkMode
-                                            else -> Icons.Default.PhoneAndroid
-                                        }
-                                        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    onDelayChange = { minutes ->
+                                        scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
                                     },
-                                    label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
+                                    onProtectionChange = { enabled ->
+                                        scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                    },
+                                    onNavigateToPermissions = onNavigateToPermissions,
+                                    onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
+                                    onNavigateToLegal = onNavigateToLegal,
+                                    onNavigateToAdultProtection = onNavigateToAdultProtection
                                 )
                             }
                         }
                     }
                 }
-            }
-
-            // Section 2: Enforcement & Blocking Behavior
-            item {
-                Text(
-                    text = "Enforcement & Friction",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            // Global Protection Toggle
-            item {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Strict Protection Master Switch",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "When active, unallowed applications are strictly blocked outside schedule.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Switch(
-                            checked = isProtectionEnabled,
-                            onCheckedChange = { checked ->
-                                coroutineScope.launch { repository.settings.setProtectionEnabled(checked) }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        )
-                    }
-                }
-            }
-
-            // Schedule Change Delay
-            item {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.HourglassBottom,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Anti-Impulsive Change Delay",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Enforces an intentional waiting period before schedule modifications take effect, preventing in-the-moment bypass.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val options = listOf(0 to "Instant", 5 to "5 min", 15 to "15 min", 30 to "30 min")
-                            options.forEach { (mins, label) ->
-                                val isSelected = delayMinutes == mins
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            repository.settings.setStrictChangeDelayMinutes(mins)
-                                        }
-                                    },
-                                    label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Section 3: Navigation Links
-            item {
-                Text(
-                    text = "Security & Compliance",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            // 18+ Adult Content Protection
-            item {
-                SettingsNavigationRow(
-                    title = "18+ Adult Content Protection",
-                    subtitle = "DNS filtering, SafeSearch enforcement & browser incognito lock",
-                    icon = Icons.Default.Shield,
-                    iconTint = Color(0xFF38BDF8),
-                    onClick = onNavigateToAdultProtection
-                )
-            }
-
-            // System Permissions Menu
-            item {
-                SettingsNavigationRow(
-                    title = "System Permissions & Services",
-                    subtitle = "Review Accessibility, Usage Access, and Battery settings",
-                    icon = Icons.Default.Security,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onClick = onNavigateToPermissions
-                )
-            }
-
-            // Anti-Bypass & Architecture Guide
-            item {
-                SettingsNavigationRow(
-                    title = "Security & Anti-Bypass Architecture",
-                    subtitle = "Learn about Android platform guarantees and enterprise kiosk mode",
-                    icon = Icons.Default.Shield,
-                    iconTint = Color(0xFFF59E0B),
-                    onClick = onNavigateToAntiBypassGuide
-                )
-            }
-
-            // Privacy Policy, Terms & Legal Compliance
-            item {
-                SettingsNavigationRow(
-                    title = "Privacy, Terms & Legal Compliance",
-                    subtitle = "Zero telemetry audit, terms, children's consent & Data Deletion Request",
-                    icon = Icons.Default.PrivacyTip,
-                    iconTint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToLegal
-                )
-            }
-
-            // About Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Strict Blocker for Android",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Version 1.0 (Production Release) • 100% On-Device Room Storage • Zero Analytics or Cloud Tracking.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
 }
 
 @Composable
-fun SettingsNavigationRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    iconTint: Color,
+private fun SettingsSidebarItem(
+    section: SettingsSection,
+    selected: Boolean,
     onClick: () -> Unit
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+    val background = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    } else {
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(background, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(iconTint.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp)
-                )
+        Icon(
+            imageVector = section.icon,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = section.title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun SettingsSectionContent(
+    section: SettingsSection,
+    themeMode: String,
+    delayMinutes: Int,
+    isProtectionEnabled: Boolean,
+    onThemeChange: (String) -> Unit,
+    onDelayChange: (Int) -> Unit,
+    onProtectionChange: (Boolean) -> Unit,
+    onNavigateToPermissions: () -> Unit,
+    onNavigateToAntiBypassGuide: () -> Unit,
+    onNavigateToLegal: () -> Unit,
+    onNavigateToAdultProtection: () -> Unit
+) {
+    when (section) {
+        SettingsSection.Appearance -> {
+            SettingsDescription("Choose how the app follows your device theme.")
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    Triple("system", "System", Icons.Default.PhoneAndroid),
+                    Triple("light", "Light", Icons.Default.LightMode),
+                    Triple("dark", "Dark", Icons.Default.DarkMode)
+                ).forEach { (mode, label, icon) ->
+                    FilterChip(
+                        selected = themeMode == mode,
+                        onClick = { onThemeChange(mode) },
+                        leadingIcon = {
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                        },
+                        label = { Text(label) }
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        }
+
+        SettingsSection.Blocking -> {
+            SettingsToggleRow(
+                title = "App blocking",
+                subtitle = "Apply saved schedules to protected apps.",
+                checked = isProtectionEnabled,
+                onCheckedChange = onProtectionChange
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                text = "Change delay",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            SettingsDescription("Adds a waiting period before schedule changes take effect.")
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(0 to "Instant", 5 to "5 min", 15 to "15 min", 30 to "30 min").forEach { (mins, label) ->
+                    FilterChip(
+                        selected = delayMinutes == mins,
+                        onClick = { onDelayChange(mins) },
+                        label = { Text(label) }
+                    )
+                }
             }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+        }
+
+        SettingsSection.Protection -> {
+            SettingsLinkRow(
+                title = "18+ content protection",
+                subtitle = "Browser, SafeSearch and DNS controls",
+                onClick = onNavigateToAdultProtection
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsLinkRow(
+                title = "Anti-bypass information",
+                subtitle = "Understand Android limits and stronger device-owner options",
+                onClick = onNavigateToAntiBypassGuide
             )
         }
+
+        SettingsSection.Permissions -> {
+            SettingsDescription("Review the Android permissions used for blocking and background reliability.")
+            Spacer(modifier = Modifier.height(12.dp))
+            SettingsLinkRow(
+                title = "System permissions",
+                subtitle = "Accessibility, usage access, overlay and battery settings",
+                onClick = onNavigateToPermissions
+            )
+        }
+
+        SettingsSection.Privacy -> {
+            SettingsLinkRow(
+                title = "Privacy, terms & data controls",
+                subtitle = "Read policies and manage local data",
+                onClick = onNavigateToLegal
+            )
+        }
+
+        SettingsSection.About -> {
+            Text(
+                text = "Strict Blocker",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            SettingsDescription("Version 1.0")
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsDescription("Schedules and app preferences are stored on-device.")
+        }
+    }
+}
+
+@Composable
+private fun SettingsDescription(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun SettingsLinkRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

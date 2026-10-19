@@ -74,7 +74,6 @@ import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppBackdrop
 import com.example.ui.components.GlassCard
-import com.example.ui.components.StatusBadge
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -131,53 +130,25 @@ fun DashboardScreen(
                 .testTag("dashboard_lazy_column"),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // Header Bar
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Dashboard",
-                            style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = if (isTablet) "Tablet Enforcement & Schedule Monitor" else "Strict Scheduled Focus & Discipline",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    StatusBadge(
-                        text = if (isProtectionEnabled) "Enforcing" else "Paused",
-                        isActive = isProtectionEnabled,
-                        activeColor = MaterialTheme.colorScheme.tertiary,
-                        inactiveColor = MaterialTheme.colorScheme.error
+                Column {
+                    Text(
+                        text = "Dashboard",
+                        style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "Schedules, protected apps and recent activity",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Hero Master Protection Card
             item {
-                val bannerBorder = if (isProtectionEnabled) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                } else {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
-                }
-                val bannerBg = if (isProtectionEnabled) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
-                } else {
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f)
-                }
-
                 GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = bannerBorder,
-                    backgroundColor = bannerBg
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
@@ -192,25 +163,22 @@ fun DashboardScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(44.dp)
                                     .clip(CircleShape)
-                                    .background(
-                                        if (isProtectionEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                        else MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
-                                    ),
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (isProtectionEnabled) Icons.Default.Shield else Icons.Default.PowerSettingsNew,
                                     contentDescription = null,
                                     tint = if (isProtectionEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(
-                                    text = if (isProtectionEnabled) "Strict Protection Active" else "Protection Suspended",
+                                    text = if (isProtectionEnabled) "App blocking is on" else "App blocking is off",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -218,9 +186,9 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isProtectionEnabled) {
-                                        "Restricted apps are blocked outside allowed schedule periods"
+                                        "Selected apps follow their allowed schedules"
                                     } else {
-                                        "All scheduled blocking is temporarily disabled"
+                                        "Schedules are saved, but blocking is paused"
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -263,38 +231,30 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF38BDF8).copy(alpha = 0.15f)),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Shield,
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "18+ Adult Protection",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                StatusBadge(
-                                    text = if (isAdultProtectionEnabled) "ACTIVE" else "OFF",
-                                    isActive = isAdultProtectionEnabled
-                                )
-                            }
+                            Text(
+                                text = "18+ Adult Protection",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isAdultProtectionEnabled) {
-                                    if (adultBlocksCount > 0) "$adultBlocksCount adult attempts prevented • Device-wide DNS & Browser Filter"
-                                    else "Device-wide adult filter & SafeSearch active across all apps"
+                                    if (adultBlocksCount > 0) "$adultBlocksCount blocked attempts" else "Browser, DNS and SafeSearch controls"
                                 } else {
-                                    "Tap to enable device-wide 18+ sexual content blocking"
+                                    "Protection is currently off"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -415,7 +375,7 @@ fun DashboardScreen(
                         } ?: "--:--",
                         subtitle = nextTransition?.let { "${it.appName} opens" } ?: "No schedule upcoming",
                         icon = Icons.Default.HourglassTop,
-                        iconTint = Color(0xFFF59E0B),
+                        iconTint = MaterialTheme.colorScheme.secondary,
                         onClick = onNavigateToSchedules,
                         modifier = Modifier.width(cardWidth)
                     )
@@ -463,7 +423,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1.2f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color(0xFF38BDF8))
+                        Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("18+ Shield", fontSize = 12.sp)
                     }
