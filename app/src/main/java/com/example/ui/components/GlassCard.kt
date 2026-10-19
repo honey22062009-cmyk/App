@@ -6,8 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,11 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -373,5 +376,70 @@ fun InfoChip(
             color = color,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
         )
+    }
+}
+
+
+/**
+ * App-wide atmospheric background used behind all primary screens.
+ * Keeps the interface visually rich without sacrificing readability.
+ */
+@Composable
+fun AppBackdrop(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val isDark = GlassDefaults.isDarkTheme()
+    val base = MaterialTheme.colorScheme.background
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(base)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val minSide = size.minDimension
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        primary.copy(alpha = if (isDark) 0.20f else 0.13f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.14f, size.height * 0.08f),
+                    radius = minSide * 0.72f
+                ),
+                radius = minSide * 0.72f,
+                center = Offset(size.width * 0.14f, size.height * 0.08f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        secondary.copy(alpha = if (isDark) 0.14f else 0.10f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.92f, size.height * 0.28f),
+                    radius = minSide * 0.58f
+                ),
+                radius = minSide * 0.58f,
+                center = Offset(size.width * 0.92f, size.height * 0.28f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        tertiary.copy(alpha = if (isDark) 0.10f else 0.07f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.55f, size.height * 0.96f),
+                    radius = minSide * 0.66f
+                ),
+                radius = minSide * 0.66f,
+                center = Offset(size.width * 0.55f, size.height * 0.96f)
+            )
+        }
+
+        content()
     }
 }
