@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,7 @@ class SettingsPreferences(private val context: Context) {
         val FORCE_SAFESEARCH_ENABLED = booleanPreferencesKey("force_safesearch_enabled")
         val DNS_FILTER_ENABLED = booleanPreferencesKey("dns_filter_enabled")
         val ADULT_BLOCKS_COUNT = intPreferencesKey("adult_blocks_count")
+        val APP_GROUPS = stringSetPreferencesKey("app_groups")
     }
 
     val themeModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -75,6 +77,10 @@ class SettingsPreferences(private val context: Context) {
 
     val adultBlocksCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
+    }
+
+    val appGroupsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.APP_GROUPS] ?: emptySet()
     }
 
     suspend fun setProtectionEnabled(enabled: Boolean) {
@@ -134,6 +140,12 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setDnsFilterEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.DNS_FILTER_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setAppGroups(groups: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.APP_GROUPS] = groups
         }
     }
 
