@@ -5,7 +5,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -72,9 +71,8 @@ object GlassDefaults {
 
     @Composable
     fun isDarkTheme(): Boolean {
-        val systemDark = isSystemInDarkTheme()
         val surfaceLuminance = MaterialTheme.colorScheme.surface.luminance()
-        return systemDark || surfaceLuminance < 0.5f
+        return surfaceLuminance < 0.5f
     }
 
     @Composable
@@ -91,16 +89,16 @@ object GlassDefaults {
         // If caller passed a custom background, use it directly or with appropriate glass opacity
         val baseBackground = customBackground ?: when (variant) {
             GlassVariant.Standard -> {
-                if (isDark) Color(0xFF111827).copy(alpha = 0.78f)
-                else Color(0xFFFFFFFF).copy(alpha = 0.86f)
+                if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
             }
             GlassVariant.Subtle -> {
-                if (isDark) Color(0xFF111827).copy(alpha = 0.55f)
-                else Color(0xFFFFFFFF).copy(alpha = 0.65f)
+                if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
             }
             GlassVariant.Elevated -> {
-                if (isDark) Color(0xFF1E293B).copy(alpha = 0.88f)
-                else Color(0xFFFFFFFF).copy(alpha = 0.94f)
+                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
             }
             GlassVariant.Accent -> {
                 val primary = MaterialTheme.colorScheme.primary
@@ -135,8 +133,8 @@ object GlassDefaults {
             )
             else -> Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.55f),
-                    Color.White.copy(alpha = 0.15f),
+                    Color.White.copy(alpha = 0.38f),
+                    Color.White.copy(alpha = 0.08f),
                     Color.Transparent
                 )
             )
@@ -163,8 +161,8 @@ object GlassDefaults {
                     } else {
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.85f),
-                                Color(0xFFCBD5E1).copy(alpha = 0.45f)
+                                Color.White.copy(alpha = 0.72f),
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                             )
                         )
                     }
