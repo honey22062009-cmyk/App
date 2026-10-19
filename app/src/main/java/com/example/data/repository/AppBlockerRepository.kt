@@ -33,6 +33,11 @@ data class InstalledAppInfo(
     val isSystemCritical: Boolean
 )
 
+data class AppGroup(
+    val name: String,
+    val packageNames: Set<String>
+)
+
 data class NextTransitionInfo(
     val appName: String,
     val packageName: String,
@@ -58,6 +63,20 @@ class AppBlockerRepository(
     }
     val recentBlocksFlow: Flow<List<BlockEventEntity>> = blockEventDao.getRecentBlockEventsFlow()
     val totalBlocksCountFlow: Flow<Int> = blockEventDao.getTotalBlocksCountFlow()
+    val appGroupsFlow: Flow<List<AppGroup>> = settings.appGroupsFlow.map { encoded ->
+        encoded.mapNotNull { entry ->
+            val parts = entry.split("::", limit = 2)
+            val name = parts.getOrNull(0)?.trim().orEmpty()
+            if (name.isBlank()) return@mapNotNull null
+            val packages = parts.getOrNull(1)
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                ?.toSet()
+                ?: emptySet()
+            AppGroup(name = name, packageNames = packages)
+        }.sortedBy { it.name.lowercase() }
+    }
 
     fun getPeriodsForAppFlow(packageName: String): Flow<List<SchedulePeriod>> {
         return scheduleDao.getPeriodsForAppFlow(packageName).map { list ->
@@ -133,6 +152,28 @@ class AppBlockerRepository(
         } else {
             managedAppDao.setManagedStatus(packageName, isManaged)
         }
+    }
+
+    suspend fun saveAppGroup(name: String, packageNames: Set<String>) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return
+        val current = appGroupsFlow.first().toMutableList()
+        current.removeAll { it.name.equals(cleanName, ignoreCase = true) }
+        current.add(AppGroup(cleanName, packageNames))
+        settings.setAppGroups(
+            current.map { group ->
+                group.name + "::" + group.packageNames.sorted().joinToString(",")
+            }.toSet()
+        )
+    }
+
+    suspend fun deleteAppGroup(name: String) {
+        val current = appGroupsFlow.first().filterNot { it.name == name }
+        settings.setAppGroups(
+            current.map { group ->
+                group.name + "::" + group.packageNames.sorted().joinToString(",")
+            }.toSet()
+        )
     }
 
     suspend fun removeManagedApp(packageName: String) = withContext(Dispatchers.IO) {
