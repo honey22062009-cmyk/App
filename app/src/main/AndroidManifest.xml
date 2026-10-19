@@ -83,6 +83,16 @@
                 android:value="Enforce scheduled application blocking and background verification" />
         </service>
 
+        <!-- On-Device DNS Filtering VPN Service for 18+ Adult Content Protection -->
+        <service
+            android:name=".service.AdultFilterVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
         <!-- Boot & App Update Receiver -->
         <receiver
             android:name=".receiver.BootReceiver"

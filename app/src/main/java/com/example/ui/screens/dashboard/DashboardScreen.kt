@@ -1,5 +1,8 @@
 package com.example.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,24 +19,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -42,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +72,8 @@ import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
+import com.example.ui.components.GlassCard
+import com.example.ui.components.StatusBadge
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -71,19 +84,22 @@ fun DashboardScreen(
     repository: AppBlockerRepository,
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
-    onNavigateToSchedules: () -> Unit
+    onNavigateToSchedules: () -> Unit,
+    onNavigateToAdultProtection: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
+    val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
+    val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val activeManagedApps = managedApps.filter { it.isManaged }
     val totalBlocksCount by repository.totalBlocksCountFlow.collectAsState(initial = 0)
     val recentBlocks by repository.recentBlocksFlow.collectAsState(initial = emptyList())
 
     var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
-    var currentlyBlockedCount by remember { mutableStateOf(0) }
+    var currentlyBlockedCount by remember { mutableIntStateOf(0) }
 
     // Permission checks
     val isAccessibilityOk = remember(context) { PermissionHelper.isAccessibilityServiceEnabled(context) }
@@ -94,7 +110,6 @@ fun DashboardScreen(
     LaunchedEffect(activeManagedApps) {
         nextTransition = repository.findNextGlobalTransition()
 
-        // Calculate how many apps are blocked right now
         var blockedCount = 0
         for (app in activeManagedApps) {
             val eval = repository.evaluateApp(app.packageName)
@@ -105,15 +120,16 @@ fun DashboardScreen(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth >= 720.dp
+        val horizontalPadding = if (isTablet) 32.dp else 16.dp
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (isTablet) 32.dp else 16.dp, vertical = 16.dp)
+                .padding(horizontal = horizontalPadding, vertical = 16.dp)
                 .testTag("dashboard_lazy_column"),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // Header
+            // Header Bar
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -122,53 +138,44 @@ fun DashboardScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Strict Blocker",
-                            fontSize = if (isTablet) 30.sp else 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = "Dashboard",
+                            style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = if (isTablet) "Samsung Galaxy Tab Enforcement Engine" else "Strict Scheduled Enforcement",
-                            fontSize = 13.sp,
+                            text = if (isTablet) "Tablet Enforcement & Schedule Monitor" else "Strict Scheduled Focus & Discipline",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                if (isProtectionEnabled) Color(0xFF10B981).copy(alpha = 0.15f)
-                                else Color(0xFFEF4444).copy(alpha = 0.15f)
-                            )
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(if (isProtectionEnabled) Color(0xFF10B981) else Color(0xFFEF4444))
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isProtectionEnabled) "ENFORCING" else "PAUSED",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isProtectionEnabled) Color(0xFF10B981) else Color(0xFFEF4444)
-                        )
-                    }
+                    StatusBadge(
+                        text = if (isProtectionEnabled) "Enforcing" else "Paused",
+                        isActive = isProtectionEnabled,
+                        activeColor = MaterialTheme.colorScheme.tertiary,
+                        inactiveColor = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
-            // Hero Status Banner
+            // Hero Master Protection Card
             item {
-                Card(
+                val bannerBorder = if (isProtectionEnabled) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
+                }
+                val bannerBg = if (isProtectionEnabled) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+                } else {
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f)
+                }
+
+                GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isProtectionEnabled) Color(0xFF0F233A) else Color(0xFF281118)
-                    )
+                    borderColor = bannerBorder,
+                    backgroundColor = bannerBg
                 ) {
                     Row(
                         modifier = Modifier
@@ -183,40 +190,43 @@ fun DashboardScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
+                                    .size(52.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isProtectionEnabled) Color(0xFF0284C7).copy(alpha = 0.25f)
-                                        else Color(0xFFEF4444).copy(alpha = 0.25f)
+                                        if (isProtectionEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                        else MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (isProtectionEnabled) Icons.Default.Shield else Icons.Default.PowerSettingsNew,
                                     contentDescription = null,
-                                    tint = if (isProtectionEnabled) Color(0xFF38BDF8) else Color(0xFFF87171),
+                                    tint = if (isProtectionEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(
-                                    text = if (isProtectionEnabled) "Strict Mode Active" else "Protection Disabled",
-                                    fontSize = 18.sp,
+                                    text = if (isProtectionEnabled) "Strict Protection Active" else "Protection Suspended",
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isProtectionEnabled) {
-                                        "Blocking unallowed apps outside scheduled hours"
+                                        "Restricted apps are blocked outside allowed schedule periods"
                                     } else {
-                                        "App restrictions are currently suspended"
+                                        "All scheduled blocking is temporarily disabled"
                                     },
-                                    fontSize = 13.sp,
-                                    color = Color(0xFF94A3B8)
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Switch(
                             checked = isProtectionEnabled,
@@ -226,8 +236,8 @@ fun DashboardScreen(
                                 }
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF38BDF8),
-                                checkedTrackColor = Color(0xFF0369A1)
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
                             ),
                             modifier = Modifier.testTag("protection_toggle_switch")
                         )
@@ -235,15 +245,77 @@ fun DashboardScreen(
                 }
             }
 
-            // Permission Warning if any missing
+            // 18+ Adult Content Protection Dedicated Card
+            item {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToAdultProtection
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF38BDF8).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "18+ Adult Protection",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                StatusBadge(
+                                    text = if (isAdultProtectionEnabled) "ACTIVE" else "OFF",
+                                    isActive = isAdultProtectionEnabled
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isAdultProtectionEnabled) {
+                                    if (adultBlocksCount > 0) "$adultBlocksCount adult attempts prevented • Device-wide DNS & Browser Filter"
+                                    else "Device-wide adult filter & SafeSearch active across all apps"
+                                } else {
+                                    "Tap to enable device-wide 18+ sexual content blocking"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Configure Adult Shield",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // Permission Warning Card if critical permissions missing
             if (!allCriticalPermissionsOk) {
                 item {
-                    Card(
+                    GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF451A03)
-                        )
+                        borderColor = Color(0xFFF59E0B).copy(alpha = 0.45f),
+                        backgroundColor = Color(0xFFF59E0B).copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier
@@ -251,24 +323,32 @@ fun DashboardScreen(
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFF59E0B),
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFF59E0B).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF59E0B),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Missing Required System Permissions",
-                                    fontSize = 15.sp,
+                                    text = "System Permissions Incomplete",
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFFDE68A)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Accessibility or Usage Access is disabled. Blocking cannot react without them.",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFFBBF24)
+                                    text = "Accessibility or Usage Access is needed for zero-latency app detection.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
@@ -276,29 +356,29 @@ fun DashboardScreen(
                                 onClick = onNavigateToPermissions,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFFF59E0B),
-                                    contentColor = Color(0xFF78350F)
+                                    contentColor = Color(0xFF1E293B)
                                 ),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Fix", fontWeight = FontWeight.Bold)
+                                Text("Review", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
                 }
             }
 
-            // Stat Cards Grid (Adaptive layout)
+            // Section: Metric Cards
             item {
                 Text(
                     text = "Enforcement Overview",
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
 
             item {
-                val cardWidth = if (isTablet) (maxWidth - 96.dp) / 4 else (maxWidth - 44.dp) / 2
+                val cardWidth = if (isTablet) (maxWidth - 64.dp - 36.dp) / 4 else (maxWidth - 32.dp - 12.dp) / 2
 
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -306,47 +386,95 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     maxItemsInEachRow = if (isTablet) 4 else 2
                 ) {
-                    MetricCard(
+                    DashboardMetricCard(
                         title = "Protected Apps",
                         value = "${activeManagedApps.size}",
-                        subtitle = "Launchable apps managed",
+                        subtitle = "Managed apps",
                         icon = Icons.Default.Shield,
-                        iconTint = Color(0xFF38BDF8),
+                        iconTint = MaterialTheme.colorScheme.primary,
                         onClick = onNavigateToApps,
                         modifier = Modifier.width(cardWidth)
                     )
 
-                    MetricCard(
-                        title = "Blocked Right Now",
+                    DashboardMetricCard(
+                        title = "Blocked Now",
                         value = "$currentlyBlockedCount",
                         subtitle = "Outside allowed hours",
                         icon = Icons.Default.Lock,
-                        iconTint = Color(0xFFF87171),
+                        iconTint = MaterialTheme.colorScheme.error,
                         onClick = onNavigateToApps,
                         modifier = Modifier.width(cardWidth)
                     )
 
-                    MetricCard(
-                        title = "Next Transition",
+                    DashboardMetricCard(
+                        title = "Next Event",
                         value = nextTransition?.let {
                             it.transitionDateTime.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
                         } ?: "--:--",
                         subtitle = nextTransition?.let { "${it.appName} opens" } ?: "No schedule upcoming",
                         icon = Icons.Default.HourglassTop,
-                        iconTint = Color(0xFFFBBF24),
+                        iconTint = Color(0xFFF59E0B),
                         onClick = onNavigateToSchedules,
                         modifier = Modifier.width(cardWidth)
                     )
 
-                    MetricCard(
-                        title = "Blocks Prevented",
+                    DashboardMetricCard(
+                        title = "Interceptions",
                         value = "$totalBlocksCount",
-                        subtitle = "Total access attempts",
+                        subtitle = "Total prevented attempts",
                         icon = Icons.Default.History,
-                        iconTint = Color(0xFF34D399),
+                        iconTint = MaterialTheme.colorScheme.tertiary,
                         onClick = {},
                         modifier = Modifier.width(cardWidth)
                     )
+                }
+            }
+
+            // Quick Actions Row
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = onNavigateToApps,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Apps", fontSize = 12.sp)
+                    }
+
+                    FilledTonalButton(
+                        onClick = onNavigateToSchedules,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Schedules", fontSize = 12.sp)
+                    }
+
+                    FilledTonalButton(
+                        onClick = onNavigateToAdultProtection,
+                        modifier = Modifier.weight(1.2f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color(0xFF38BDF8))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("18+ Shield", fontSize = 12.sp)
+                    }
+
+                    FilledTonalButton(
+                        onClick = onNavigateToPermissions,
+                        modifier = Modifier.weight(1.1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Security", fontSize = 12.sp)
+                    }
                 }
             }
 
@@ -359,13 +487,13 @@ fun DashboardScreen(
                 ) {
                     Text(
                         text = "Recent Interceptions",
-                        fontSize = 16.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "${recentBlocks.size} logged",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -373,73 +501,70 @@ fun DashboardScreen(
 
             if (recentBlocks.isEmpty()) {
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(28.dp),
+                                .padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color(0xFF10B981),
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "No Block Events Yet",
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Attempts to open managed apps outside allowed hours will appear here.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                text = "Attempts to open managed apps outside allowed schedules will appear here in real time.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
             } else {
                 items(recentBlocks.take(10)) { event ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AppIconImage(packageName = event.appPackage, size = 36.dp)
+                            AppIconImage(packageName = event.appPackage, size = 38.dp)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = event.appName,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = event.reason,
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFF87171)
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                             Text(
                                 text = event.formattedTime,
-                                fontSize = 11.sp,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -451,7 +576,7 @@ fun DashboardScreen(
 }
 
 @Composable
-fun MetricCard(
+fun DashboardMetricCard(
     title: String,
     value: String,
     subtitle: String,
@@ -460,12 +585,9 @@ fun MetricCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+    GlassCard(
+        modifier = modifier,
+        onClick = onClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -475,28 +597,36 @@ fun MetricCard(
             ) {
                 Text(
                     text = title,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(18.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(iconTint.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = value,
-                fontSize = 24.sp,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )

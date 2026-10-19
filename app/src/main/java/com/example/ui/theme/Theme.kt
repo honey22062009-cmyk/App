@@ -12,46 +12,62 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = CyberCyan,
-    onPrimary = Color(0xFF00363D),
-    primaryContainer = SapphireBlue,
-    onPrimaryContainer = Color.White,
-    secondary = Color(0xFF38BDF8),
-    onSecondary = Color(0xFF003549),
-    tertiary = EmeraldSuccess,
-    onTertiary = Color.White,
-    background = DeepObsidian,
-    onBackground = LightSlate,
-    surface = CardSurfaceDark,
-    onSurface = LightSlate,
-    surfaceVariant = CardSurfaceVariantDark,
-    onSurfaceVariant = SlateGray,
-    error = CrimsonAlert,
-    onError = Color.White
+    primary = BrandPrimaryDark,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF1E3A8A),
+    onPrimaryContainer = Color(0xFFDBEAFE),
+    secondary = BrandSecondaryDark,
+    onSecondary = Color(0xFF082F49),
+    secondaryContainer = Color(0xFF075985),
+    onSecondaryContainer = Color(0xFFE0F2FE),
+    tertiary = BrandEmeraldDark,
+    onTertiary = Color(0xFF064E3B),
+    tertiaryContainer = Color(0xFF064E3B),
+    onTertiaryContainer = Color(0xFFA7F3D0),
+    background = DarkBackground,
+    onBackground = DarkOnBackground,
+    surface = DarkSurface,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    outline = DarkOutline,
+    outlineVariant = DarkSurfaceBorder,
+    error = BrandCrimson,
+    onError = Color.White,
+    errorContainer = Color(0xFF7F1D1D),
+    onErrorContainer = Color(0xFFFEE2E2)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = SapphireBlue,
+    primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE2FF),
-    onPrimaryContainer = Color(0xFF00184A),
-    secondary = Color(0xFF0284C7),
+    primaryContainer = Color(0xFFDBEAFE),
+    onPrimaryContainer = Color(0xFF1E3A8A),
+    secondary = BrandSecondary,
     onSecondary = Color.White,
-    tertiary = EmeraldSuccess,
+    secondaryContainer = Color(0xFFE0F2FE),
+    onSecondaryContainer = Color(0xFF0369A1),
+    tertiary = BrandEmerald,
     onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFD1FAE5),
+    onTertiaryContainer = Color(0xFF064E3B),
     background = LightBackground,
-    onBackground = LightOnSurface,
+    onBackground = LightOnBackground,
     surface = LightSurface,
     onSurface = LightOnSurface,
     surfaceVariant = LightSurfaceVariant,
-    onSurfaceVariant = Color(0xFF475569),
-    error = CrimsonAlert,
-    onError = Color.White
+    onSurfaceVariant = LightOnSurfaceVariant,
+    outline = LightOutline,
+    outlineVariant = LightSurfaceBorder,
+    error = Color(0xFFDC2626),
+    onError = Color.White,
+    errorContainer = Color(0xFFFEE2E2),
+    onErrorContainer = Color(0xFF7F1D1D)
 )
 
 @Composable
 fun StrictBlockerTheme(
-    darkTheme: Boolean = true, // Default to sleek dark mode for strict security aesthetic
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -73,7 +89,7 @@ fun StrictBlockerTheme(
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = true,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

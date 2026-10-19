@@ -6,11 +6,13 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(
@@ -38,6 +40,13 @@ sealed class Screen(
         title = "Schedules",
         selectedIcon = Icons.Filled.CalendarMonth,
         unselectedIcon = Icons.Outlined.CalendarMonth
+    )
+
+    data object AdultProtection : Screen(
+        route = "adult_protection",
+        title = "18+ Shield",
+        selectedIcon = Icons.Filled.Shield,
+        unselectedIcon = Icons.Outlined.Shield
     )
 
     data object Permissions : Screen(
@@ -70,6 +79,6 @@ sealed class Screen(
 
     companion object {
         val navItems: List<Screen>
-            get() = listOf(Dashboard, Apps, Schedules, Settings)
+            get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
     }
 }

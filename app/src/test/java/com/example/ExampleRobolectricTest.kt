@@ -51,7 +51,7 @@ class ExampleRobolectricTest {
     @Test
     fun testScreenNavigationItems_neverNull() {
         val items = Screen.navItems
-        assertEquals(4, items.size)
+        assertEquals(5, items.size)
         items.forEach { screen ->
             assertNotNull(screen)
             assertNotNull(screen.route)
@@ -60,6 +60,21 @@ class ExampleRobolectricTest {
             assertNotNull(screen.unselectedIcon)
             assertTrue(screen.route.isNotEmpty())
         }
+    }
+
+    @Test
+    fun testAdultContentEvaluator_identifiesAdultDomainsAndSafeSearch() {
+        // Adult domain evaluation
+        val pornResult = com.example.core.evaluator.AdultContentEvaluator.evaluateText("https://www.pornhub.com/video")
+        assertTrue(pornResult is com.example.core.evaluator.AdultContentEvaluator.EvaluationResult.Blocked)
+
+        val cleanResult = com.example.core.evaluator.AdultContentEvaluator.evaluateText("https://en.wikipedia.org/wiki/Android")
+        assertTrue(cleanResult is com.example.core.evaluator.AdultContentEvaluator.EvaluationResult.Clean)
+
+        // Browser package identification
+        assertTrue(com.example.core.evaluator.AdultContentEvaluator.isBrowserPackage("com.android.chrome"))
+        assertTrue(com.example.core.evaluator.AdultContentEvaluator.isBrowserPackage("org.mozilla.firefox"))
+        assertFalse(com.example.core.evaluator.AdultContentEvaluator.isBrowserPackage("com.android.calculator2"))
     }
 
     @Test

@@ -6,7 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -41,17 +46,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
+import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
+import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
 import kotlinx.coroutines.launch
 
@@ -68,8 +77,22 @@ class MainActivity : ComponentActivity() {
         val targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
 
         setContent {
-            StrictBlockerTheme(darkTheme = true) {
+            val context = LocalContext.current
+            val repository = remember(context) {
+                (context.applicationContext as? StrictBlockerApplication)?.container?.repository
+                    ?: AppBlockerRepository(context)
+            }
+            val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+            val systemDark = isSystemInDarkTheme()
+            val isDark = when (themeMode) {
+                "light" -> false
+                "dark" -> true
+                else -> systemDark
+            }
+
+            StrictBlockerTheme(darkTheme = isDark) {
                 MainAppContent(
+                    repository = repository,
                     initialTargetPackage = targetPackage,
                     onNewIntentTarget = { /* no-op */ }
                 )
@@ -85,16 +108,29 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppContent(
+    repository: AppBlockerRepository,
     initialTargetPackage: String?,
     onNewIntentTarget: (String?) -> Unit
 ) {
-    val context = LocalContext.current
-    val repository = remember(context) {
-        (context.applicationContext as? StrictBlockerApplication)?.container?.repository
-            ?: AppBlockerRepository(context)
-    }
-    val coroutineScope = rememberCoroutineScope()
+    var isSplashVisible by remember { mutableStateOf(true) }
 
+    if (isSplashVisible) {
+        SplashScreen(
+            onSplashComplete = { isSplashVisible = false }
+        )
+    } else {
+        MainAppScaffold(
+            repository = repository,
+            initialTargetPackage = initialTargetPackage
+        )
+    }
+}
+
+@Composable
+fun MainAppScaffold(
+    repository: AppBlockerRepository,
+    initialTargetPackage: String?
+) {
     var currentScreen by remember {
         mutableStateOf<Screen>(
             if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Dashboard
@@ -107,7 +143,10 @@ fun MainAppContent(
 
     // Intercept back button when on sub-screens
     BackHandler(enabled = currentScreen != Screen.Dashboard) {
-        currentScreen = Screen.Dashboard
+        when (currentScreen) {
+            Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
+            else -> currentScreen = Screen.Dashboard
+        }
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -129,7 +168,7 @@ fun MainAppContent(
                         Icon(
                             imageVector = Icons.Default.Shield,
                             contentDescription = "Strict Blocker",
-                            tint = Color(0xFF38BDF8),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .size(36.dp)
                                 .padding(vertical = 4.dp)
@@ -148,11 +187,19 @@ fun MainAppContent(
                                     contentDescription = screen.title
                                 )
                             },
-                            label = { Text(screen.title, fontSize = 11.sp) },
+                            label = {
+                                Text(
+                                    screen.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
                             colors = NavigationRailItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color(0xFF38BDF8),
-                                indicatorColor = Color(0xFF0284C7)
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             modifier = Modifier.testTag("nav_item_${screen.route}")
                         )
@@ -160,16 +207,22 @@ fun MainAppContent(
                 }
 
                 Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                    ScreenContent(
-                        currentScreen = currentScreen,
-                        repository = repository,
-                        selectedSchedulePackage = selectedSchedulePackage,
-                        onNavigateToScreen = { screen -> currentScreen = screen },
-                        onConfigureScheduleForApp = { pkg ->
-                            selectedSchedulePackage = pkg
-                            currentScreen = Screen.Schedules
-                        }
-                    )
+                    AnimatedContent(
+                        targetState = currentScreen,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "tablet_screen_transition"
+                    ) { targetScreen ->
+                        ScreenContent(
+                            currentScreen = targetScreen,
+                            repository = repository,
+                            selectedSchedulePackage = selectedSchedulePackage,
+                            onNavigateToScreen = { screen -> currentScreen = screen },
+                            onConfigureScheduleForApp = { pkg ->
+                                selectedSchedulePackage = pkg
+                                currentScreen = Screen.Schedules
+                            }
+                        )
+                    }
                 }
             }
         } else {
@@ -180,7 +233,7 @@ fun MainAppContent(
                     NavigationBar(
                         modifier = Modifier.testTag("phone_bottom_navigation"),
                         containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 8.dp
+                        tonalElevation = 3.dp
                     ) {
                         Screen.navItems.forEach { screen ->
                             val isSelected = currentScreen.route == screen.route
@@ -193,11 +246,19 @@ fun MainAppContent(
                                         contentDescription = screen.title
                                     )
                                 },
-                                label = { Text(screen.title, fontSize = 11.sp) },
+                                label = {
+                                    Text(
+                                        screen.title,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color.White,
-                                    selectedTextColor = Color(0xFF38BDF8),
-                                    indicatorColor = Color(0xFF0284C7)
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 modifier = Modifier.testTag("nav_item_${screen.route}")
                             )
@@ -211,16 +272,22 @@ fun MainAppContent(
                         .padding(innerPadding)
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    ScreenContent(
-                        currentScreen = currentScreen,
-                        repository = repository,
-                        selectedSchedulePackage = selectedSchedulePackage,
-                        onNavigateToScreen = { screen -> currentScreen = screen },
-                        onConfigureScheduleForApp = { pkg ->
-                            selectedSchedulePackage = pkg
-                            currentScreen = Screen.Schedules
-                        }
-                    )
+                    AnimatedContent(
+                        targetState = currentScreen,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "phone_screen_transition"
+                    ) { targetScreen ->
+                        ScreenContent(
+                            currentScreen = targetScreen,
+                            repository = repository,
+                            selectedSchedulePackage = selectedSchedulePackage,
+                            onNavigateToScreen = { screen -> currentScreen = screen },
+                            onConfigureScheduleForApp = { pkg ->
+                                selectedSchedulePackage = pkg
+                                currentScreen = Screen.Schedules
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -241,7 +308,8 @@ fun ScreenContent(
                 repository = repository,
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
-                onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) }
+                onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
         }
         Screen.Apps -> {
@@ -257,6 +325,12 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) }
             )
         }
+        Screen.AdultProtection -> {
+            AdultProtectionScreen(
+                repository = repository,
+                onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
+            )
+        }
         Screen.Permissions -> {
             PermissionsScreen(
                 onContinue = { onNavigateToScreen(Screen.Dashboard) }
@@ -267,7 +341,8 @@ fun ScreenContent(
                 repository = repository,
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
-                onNavigateToLegal = { onNavigateToScreen(Screen.Legal) }
+                onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
         }
         Screen.AntiBypassGuide -> {
@@ -276,7 +351,7 @@ fun ScreenContent(
             )
         }
         Screen.Legal -> {
-            com.example.ui.screens.legal.LegalComplianceScreen(
+            LegalComplianceScreen(
                 repository = repository,
                 onNavigateBack = { onNavigateToScreen(Screen.Settings) }
             )

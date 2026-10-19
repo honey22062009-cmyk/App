@@ -19,9 +19,6 @@ import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -74,11 +72,21 @@ fun ScheduleEditorDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = if (initialPeriod == null) "Add Allowed Period" else "Edit Allowed Period",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
+            Column {
+                Text(
+                    text = if (initialPeriod == null) "Add Allowed Time Window" else "Edit Allowed Time Window",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "App: $appName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         },
         text = {
             Column(
@@ -86,23 +94,13 @@ fun ScheduleEditorDialog(
                     .fillMaxWidth()
                     .testTag("schedule_editor_dialog")
             ) {
-                Text(
-                    text = "App: $appName",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
                 // Day Selection
                 Text(
                     text = "Day of the Week",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -124,9 +122,9 @@ fun ScheduleEditorDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(38.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    color = if (isSelected) Color(0xFF0284C7) else MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(8.dp)
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                                 )
                                 .clickable { selectedDay = day },
                             contentAlignment = Alignment.Center
@@ -134,7 +132,7 @@ fun ScheduleEditorDialog(
                             Text(
                                 text = label,
                                 fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -143,7 +141,7 @@ fun ScheduleEditorDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Start Time
+                // Start Time Row
                 TimeSelectorRow(
                     label = "Allowed From (Start):",
                     hour = startHour,
@@ -156,7 +154,7 @@ fun ScheduleEditorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // End Time
+                // End Time Row
                 TimeSelectorRow(
                     label = "Allowed Until (End):",
                     hour = endHour,
@@ -174,7 +172,7 @@ fun ScheduleEditorDialog(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF1E1B4B)
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
                     ) {
                         Row(
                             modifier = Modifier.padding(10.dp),
@@ -183,14 +181,14 @@ fun ScheduleEditorDialog(
                             Icon(
                                 imageVector = Icons.Default.Nightlight,
                                 contentDescription = null,
-                                tint = Color(0xFFA5B4FC),
+                                tint = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Crosses midnight into ${selectedDay.plus(1).name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }} morning.",
-                                fontSize = 12.sp,
-                                color = Color(0xFFC7D2FE)
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -212,14 +210,18 @@ fun ScheduleEditorDialog(
                     )
                     onSave(period)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.testTag("schedule_save_button")
             ) {
-                Text("Save Schedule")
+                Text("Save Schedule", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp)
+            ) {
                 Text("Cancel")
             }
         }
@@ -244,7 +246,7 @@ fun TimeSelectorRow(
         ) {
             Text(
                 text = label,
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Surface(
@@ -253,7 +255,7 @@ fun TimeSelectorRow(
             ) {
                 Text(
                     text = formatted,
-                    fontSize = 15.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -302,13 +304,13 @@ fun TimeSelectorRow(
 private fun QuickTimeButton(label: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.clickable { onClick() },
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Text(
             text = label,
             fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
         )

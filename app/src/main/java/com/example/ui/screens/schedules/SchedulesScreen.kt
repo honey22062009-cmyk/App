@@ -22,9 +22,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -34,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,9 @@ import com.example.core.model.SchedulePeriod
 import com.example.data.db.entity.ManagedAppEntity
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.AppIconImage
+import com.example.ui.components.GlassCard
+import com.example.ui.components.InfoChip
+import com.example.ui.components.StatusBadge
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.util.Locale
@@ -118,37 +122,45 @@ fun SchedulesScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(18.dp))
                     Text(
                         text = "No Applications Managed",
-                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Select applications to configure strict allowed hours.",
-                        fontSize = 14.sp,
+                        text = "Protect apps from the Apps screen to configure allowed schedule windows.",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
                         onClick = onNavigateToApps,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Select Apps to Manage")
+                        Text("Select Apps to Manage", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         } else if (isTablet) {
-            // Dual Pane Layout for Samsung Galaxy Tab A9+
+            // Dual Pane Layout for Samsung Galaxy Tab A9+ / Tablets
             Row(modifier = Modifier.fillMaxSize()) {
                 // Left Pane: Apps selector list
                 Surface(
@@ -156,7 +168,7 @@ fun SchedulesScreen(
                         .width(280.dp)
                         .fillMaxHeight(),
                     color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp
+                    tonalElevation = 1.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -165,7 +177,7 @@ fun SchedulesScreen(
                     ) {
                         Text(
                             text = "Managed Apps",
-                            fontSize = 18.sp,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -177,12 +189,12 @@ fun SchedulesScreen(
                         ) {
                             items(activeManagedApps) { app ->
                                 val isSelected = app.packageName == selectedAppPackage
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedAppPackage = app.packageName },
+                                GlassCard(
+                                    modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (isSelected) Color(0xFF0284C7).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                    backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    borderColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else Color.Transparent,
+                                    onClick = { selectedAppPackage = app.packageName }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(12.dp),
@@ -194,8 +206,8 @@ fun SchedulesScreen(
                                             Text(
                                                 text = app.appName,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp,
-                                                color = if (isSelected) Color(0xFF38BDF8) else MaterialTheme.colorScheme.onSurface
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -248,16 +260,16 @@ fun SchedulesScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Horizontal App Selector Row
+                // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "App Schedules",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        text = "Schedules",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -272,9 +284,11 @@ fun SchedulesScreen(
                     activeManagedApps.take(4).forEach { app ->
                         val isSelected = app.packageName == selectedAppPackage
                         Surface(
-                            modifier = Modifier.clickable { selectedAppPackage = app.packageName },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .clickable { selectedAppPackage = app.packageName },
                             shape = RoundedCornerShape(20.dp),
-                            color = if (isSelected) Color(0xFF0284C7) else MaterialTheme.colorScheme.surfaceVariant
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -285,8 +299,8 @@ fun SchedulesScreen(
                                 Text(
                                     text = app.appName,
                                     fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -365,10 +379,8 @@ fun ScheduleDetailPane(
     ) {
         // App Header Card
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            GlassCard(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
@@ -376,31 +388,31 @@ fun ScheduleDetailPane(
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AppIconImage(packageName = app.packageName, size = 48.dp)
+                    AppIconImage(packageName = app.packageName, size = 46.dp)
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = app.appName,
-                            fontSize = 18.sp,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Allowed ${periods.count { it.isEnabled }} periods • Outside these times = BLOCKED",
-                            fontSize = 12.sp,
+                            text = "${periods.count { it.isEnabled }} active window(s) • Outside = strictly blocked",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     Button(
                         onClick = onAddPeriod,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.testTag("btn_add_period")
                     ) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Period", fontSize = 13.sp)
+                        Text("Add Period", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -409,10 +421,10 @@ fun ScheduleDetailPane(
         // Overlap Warning Banner
         if (overlapWarnings.isNotEmpty()) {
             item {
-                Card(
+                GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF451A03))
+                    borderColor = Color(0xFFF59E0B).copy(alpha = 0.5f),
+                    backgroundColor = Color(0xFFF59E0B).copy(alpha = 0.12f)
                 ) {
                     Row(
                         modifier = Modifier
@@ -429,24 +441,27 @@ fun ScheduleDetailPane(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Overlapping Allowed Periods Detected",
-                                fontSize = 13.sp,
+                                text = "Overlapping Allowed Periods",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFDE68A)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = overlapWarnings.first().description,
-                                fontSize = 11.sp,
-                                color = Color(0xFFFBBF24)
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = onMergeOverlapping,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B), contentColor = Color(0xFF78350F)),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFF59E0B),
+                                contentColor = Color(0xFF1E293B)
+                            ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.CallMerge, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.CallMerge, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Merge", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -482,12 +497,8 @@ fun DayScheduleCard(
     onToggleEnabled: (Long, Boolean) -> Unit,
     onDuplicatePeriod: (SchedulePeriod, DayOfWeek) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (periods.isNotEmpty()) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-        )
+    GlassCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -497,15 +508,15 @@ fun DayScheduleCard(
             ) {
                 Text(
                     text = day.name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (periods.isEmpty()) "Strictly Blocked All Day" else "${periods.size} allowed period(s)",
-                    fontSize = 12.sp,
-                    color = if (periods.isEmpty()) Color(0xFFF87171) else Color(0xFF38BDF8),
-                    fontWeight = FontWeight.Medium
+                    text = if (periods.isEmpty()) "Strictly Blocked All Day" else "${periods.size} allowed window(s)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (periods.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
@@ -537,7 +548,7 @@ fun PeriodItemRow(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (period.isEnabled) Color(0xFF0F1E36) else MaterialTheme.colorScheme.surfaceVariant,
+        color = if (period.isEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -550,7 +561,7 @@ fun PeriodItemRow(
                 Icon(
                     imageVector = Icons.Default.Nightlight,
                     contentDescription = "Crosses midnight",
-                    tint = Color(0xFFA5B4FC),
+                    tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -559,41 +570,40 @@ fun PeriodItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = period.timeSpanDisplay,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = if (period.isEnabled) Color.White else Color(0xFF94A3B8)
+                    color = if (period.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = if (period.isEnabled) "Allowed window" else "Disabled rule",
-                    fontSize = 11.sp,
-                    color = if (period.isEnabled) Color(0xFF38BDF8) else Color(0xFF64748B)
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (period.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+            IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
+                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp))
             }
 
             IconButton(
-                onClick = {
-                    // Duplicate to next day
-                    onDuplicate(period.dayOfWeek.plus(1))
-                },
-                modifier = Modifier.size(32.dp)
+                onClick = { onDuplicate(period.dayOfWeek.plus(1)) },
+                modifier = Modifier.size(34.dp)
             ) {
-                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Duplicate", tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Duplicate", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp))
             }
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFF87171), modifier = Modifier.size(16.dp))
+            IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(17.dp))
             }
+
+            Spacer(modifier = Modifier.width(4.dp))
 
             Switch(
                 checked = period.isEnabled,
                 onCheckedChange = onToggleEnabled,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color(0xFF38BDF8),
-                    checkedTrackColor = Color(0xFF0284C7)
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
                 ),
                 modifier = Modifier.size(36.dp)
             )

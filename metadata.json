@@ -1,5 +1,5 @@
 {
-  "name": "Strict App Blocker",
+  "name": "18 blocker",
   "description": "Production-grade scheduled application blocker with strict enforcement for phones and tablets.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

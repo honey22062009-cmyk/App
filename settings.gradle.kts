@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Strict Blocker"
+rootProject.name = "18 blocker"
 
 include(":app")

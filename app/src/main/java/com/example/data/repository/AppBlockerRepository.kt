@@ -215,6 +215,18 @@ class AppBlockerRepository(
         )
     }
 
+    suspend fun recordAdultBlockEvent(reason: String = "18+ Adult Content Blocked") = withContext(Dispatchers.IO) {
+        settings.incrementAdultBlocksCount()
+        blockEventDao.insert(
+            BlockEventEntity(
+                appPackage = "com.aistudio.18blocker.adultfilter",
+                appName = "18+ Adult Shield",
+                timestamp = System.currentTimeMillis(),
+                reason = reason
+            )
+        )
+    }
+
     /**
      * Purges all user data locally: managed apps, schedules, block logs, and preferences.
      * Complies with GDPR/CCPA right to erasure / data deletion requests.

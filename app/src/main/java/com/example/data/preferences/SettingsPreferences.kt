@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -21,6 +22,18 @@ class SettingsPreferences(private val context: Context) {
         val PENDING_CHANGE_UNLOCK_TIME = longPreferencesKey("pending_change_unlock_time")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val SHOW_OVERLAY_SHIELD = booleanPreferencesKey("show_overlay_shield")
+        val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
+
+        // Adult Content Protection Settings
+        val ADULT_PROTECTION_ENABLED = booleanPreferencesKey("adult_protection_enabled")
+        val BLOCK_INCOGNITO_ENABLED = booleanPreferencesKey("block_incognito_enabled")
+        val FORCE_SAFESEARCH_ENABLED = booleanPreferencesKey("force_safesearch_enabled")
+        val DNS_FILTER_ENABLED = booleanPreferencesKey("dns_filter_enabled")
+        val ADULT_BLOCKS_COUNT = intPreferencesKey("adult_blocks_count")
+    }
+
+    val themeModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.THEME_MODE] ?: "system"
     }
 
     val isProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -41,6 +54,27 @@ class SettingsPreferences(private val context: Context) {
 
     val isOverlayShieldEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.SHOW_OVERLAY_SHIELD] ?: true
+    }
+
+    // Adult Content Protection Flows
+    val isAdultProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] ?: true
+    }
+
+    val isBlockIncognitoEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] ?: true
+    }
+
+    val isForceSafeSearchEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] ?: true
+    }
+
+    val isDnsFilterEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DNS_FILTER_ENABLED] ?: true
+    }
+
+    val adultBlocksCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
     }
 
     suspend fun setProtectionEnabled(enabled: Boolean) {
@@ -70,6 +104,43 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setOverlayShieldEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SHOW_OVERLAY_SHIELD] = enabled
+        }
+    }
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.THEME_MODE] = mode
+        }
+    }
+
+    suspend fun setAdultProtectionEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setBlockIncognitoEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setForceSafeSearchEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setDnsFilterEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DNS_FILTER_ENABLED] = enabled
+        }
+    }
+
+    suspend fun incrementAdultBlocksCount() {
+        context.dataStore.edit { preferences ->
+            val current = preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
+            preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] = current + 1
         }
     }
 }
