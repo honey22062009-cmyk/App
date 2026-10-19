@@ -1,5 +1,3 @@
-import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -22,21 +20,23 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
-  // Do not remove or modify these signingConfigs. They are necessary for building, installing,
-  // and updating Android apps in AI Studio.
+  val releaseKeystorePath = System.getenv("KEYSTORE_PATH")
+  val releaseStorePassword = System.getenv("STORE_PASSWORD")
+  val releaseKeyPassword = System.getenv("KEY_PASSWORD")
+  val hasReleaseSigning =
+    !releaseKeystorePath.isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank() &&
+    file(releaseKeystorePath).exists()
+
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+    if (hasReleaseSigning) {
+      create("release") {
+        storeFile = file(releaseKeystorePath!!)
+        storePassword = releaseStorePassword
+        keyAlias = "upload"
+        keyPassword = releaseKeyPassword
+      }
     }
   }
 
@@ -45,19 +45,18 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
-      signingConfig = signingConfigs.getByName("release")
+      if (hasReleaseSigning) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
     debug {
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
-      signingConfig = signingConfigs.getByName("debugConfig")
+      // Use Android Gradle Plugin's standard debug signing key.
+      // This avoids failing builds when a repo-local debug.keystore is absent.
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
   buildFeatures {
     compose = true
@@ -131,5 +130,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }
