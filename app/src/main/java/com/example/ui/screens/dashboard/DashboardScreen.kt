@@ -72,6 +72,7 @@ import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
+import com.example.ui.components.AppBackdrop
 import com.example.ui.components.GlassCard
 import com.example.ui.components.StatusBadge
 import kotlinx.coroutines.launch
@@ -118,8 +119,9 @@ fun DashboardScreen(
         currentlyBlockedCount = blockedCount
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isTablet = maxWidth >= 720.dp
+    AppBackdrop {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isTablet = maxWidth >= 720.dp
         val horizontalPadding = if (isTablet) 32.dp else 16.dp
 
         LazyColumn(
@@ -630,6 +632,7 @@ fun DashboardMetricCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
+        }
         }
     }
 }
