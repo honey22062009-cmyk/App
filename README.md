@@ -158,3 +158,8 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 - **Data Deletion (Right to Erasure)**: Fully functional "Delete All Data" feature available directly in app settings.
 - **License**: Apache License, Version 2.0.
 
+
+
+## UI Design System
+
+The app uses a reusable Material 3 design system with theme-aware glass surfaces, restrained brand colors, adaptive rounded shapes, and responsive layouts for phones and tablets. Visual effects live in shared Compose components so screens remain maintainable and feature logic stays separate from presentation.
