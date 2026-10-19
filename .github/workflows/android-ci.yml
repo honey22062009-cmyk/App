@@ -1,3 +1,4 @@
+# CI registered on default branch
 name: Android CI
 on:
   push:
