@@ -1,0 +1,258 @@
+package com.example.data.repository
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import com.example.core.evaluator.ScheduleEvaluator
+import com.example.core.model.BlockEvaluationResult
+import com.example.core.model.SchedulePeriod
+import com.example.core.system.SafetyWhitelist
+import com.example.data.db.AppDatabase
+import com.example.data.db.dao.AppDao
+import com.example.data.db.dao.BlockEventDao
+import com.example.data.db.dao.ManagedAppDao
+import com.example.data.db.dao.ScheduleDao
+import com.example.data.db.dao.ScheduleEntityDao
+import com.example.data.db.entity.BlockEventEntity
+import com.example.data.db.entity.ManagedAppEntity
+import com.example.data.db.entity.SchedulePeriodEntity
+import com.example.data.preferences.SettingsPreferences
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
+import java.time.LocalDateTime
+
+data class InstalledAppInfo(
+    val packageName: String,
+    val appName: String,
+    val isManaged: Boolean,
+    val periodCount: Int,
+    val isSystemCritical: Boolean
+)
+
+data class NextTransitionInfo(
+    val appName: String,
+    val packageName: String,
+    val transitionDateTime: LocalDateTime,
+    val isOpening: Boolean
+)
+
+class AppBlockerRepository(
+    private val context: Context,
+    val database: AppDatabase = AppDatabase.getInstance(context),
+    val managedAppDao: ManagedAppDao = database.managedAppDao(),
+    val scheduleDao: ScheduleDao = database.scheduleDao(),
+    val blockEventDao: BlockEventDao = database.blockEventDao(),
+    val settings: SettingsPreferences = SettingsPreferences(context),
+    val appDao: AppDao = database.appDao(),
+    val scheduleEntityDao: ScheduleEntityDao = database.scheduleEntityDao()
+) {
+
+    val managedAppsFlow: Flow<List<ManagedAppEntity>> = managedAppDao.getAllManagedAppsFlow()
+    val activeManagedAppsFlow: Flow<List<ManagedAppEntity>> = managedAppDao.getActiveManagedAppsFlow()
+    val allPeriodsFlow: Flow<List<SchedulePeriod>> = scheduleDao.getAllPeriodsFlow().map { list ->
+        list.map { it.toDomain() }
+    }
+    val recentBlocksFlow: Flow<List<BlockEventEntity>> = blockEventDao.getRecentBlockEventsFlow()
+    val totalBlocksCountFlow: Flow<Int> = blockEventDao.getTotalBlocksCountFlow()
+
+    fun getPeriodsForAppFlow(packageName: String): Flow<List<SchedulePeriod>> {
+        return scheduleDao.getPeriodsForAppFlow(packageName).map { list ->
+            list.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Retrieves all installed launchable applications, filtered by safety rules.
+     */
+    suspend fun getInstalledLaunchableApps(): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = try {
+            pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+        } catch (_: Exception) {
+            try {
+                pm.queryIntentActivities(intent, 0)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+        val managedApps = managedAppDao.getAllManagedAppsFlow().first().associateBy { it.packageName }
+        val allPeriods = scheduleDao.getAllPeriodsFlow().first().groupBy { it.appPackage }
+
+        val seenPackages = mutableSetOf<String>()
+        val result = mutableListOf<InstalledAppInfo>()
+
+        for (info in resolveInfos) {
+            val pkg = info.activityInfo.packageName
+            if (seenPackages.contains(pkg)) continue
+            seenPackages.add(pkg)
+
+            val isCritical = SafetyWhitelist.isSystemCritical(context, pkg)
+            val appLabel = try {
+                info.loadLabel(pm).toString()
+            } catch (_: Exception) {
+                pkg
+            }
+
+            val isManaged = managedApps[pkg]?.isManaged ?: false
+            val periods = allPeriods[pkg] ?: emptyList()
+
+            result.add(
+                InstalledAppInfo(
+                    packageName = pkg,
+                    appName = appLabel,
+                    isManaged = isManaged,
+                    periodCount = periods.size,
+                    isSystemCritical = isCritical
+                )
+            )
+        }
+
+        result.sortedWith(compareByDescending<InstalledAppInfo> { it.isManaged }.thenBy { it.appName.lowercase() })
+    }
+
+    suspend fun setAppManaged(packageName: String, appName: String, isManaged: Boolean) = withContext(Dispatchers.IO) {
+        if (SafetyWhitelist.isSystemCritical(context, packageName)) return@withContext
+
+        val existing = managedAppDao.getByPackage(packageName)
+        if (existing == null) {
+            managedAppDao.insertOrUpdate(
+                ManagedAppEntity(
+                    packageName = packageName,
+                    appName = appName,
+                    isManaged = isManaged
+                )
+            )
+        } else {
+            managedAppDao.setManagedStatus(packageName, isManaged)
+        }
+    }
+
+    suspend fun removeManagedApp(packageName: String) = withContext(Dispatchers.IO) {
+        managedAppDao.deleteByPackage(packageName)
+        scheduleDao.deleteByPackage(packageName)
+    }
+
+    suspend fun saveSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
+        if (managedAppDao.getByPackage(period.appPackage) == null) {
+            val appName = try {
+                val appInfo = context.packageManager.getApplicationInfo(period.appPackage, 0)
+                context.packageManager.getApplicationLabel(appInfo).toString()
+            } catch (e: Exception) {
+                period.appPackage
+            }
+            managedAppDao.insertOrUpdate(
+                ManagedAppEntity(
+                    packageName = period.appPackage,
+                    appName = appName,
+                    isManaged = true
+                )
+            )
+        }
+        scheduleDao.insert(SchedulePeriodEntity.fromDomain(period))
+    }
+
+    suspend fun updateSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
+        scheduleDao.update(SchedulePeriodEntity.fromDomain(period))
+    }
+
+    suspend fun deleteSchedulePeriod(id: Long) = withContext(Dispatchers.IO) {
+        scheduleDao.deleteById(id)
+    }
+
+    suspend fun togglePeriodEnabled(id: Long, isEnabled: Boolean) = withContext(Dispatchers.IO) {
+        scheduleDao.setPeriodEnabled(id, isEnabled)
+    }
+
+    suspend fun duplicateSchedulePeriod(period: SchedulePeriod, newDay: DayOfWeek) = withContext(Dispatchers.IO) {
+        val newPeriod = period.copy(
+            id = 0,
+            dayOfWeek = newDay
+        )
+        scheduleDao.insert(SchedulePeriodEntity.fromDomain(newPeriod))
+    }
+
+    suspend fun mergeOverlappingForApp(packageName: String) = withContext(Dispatchers.IO) {
+        val existingEntities = scheduleDao.getPeriodsForApp(packageName)
+        val domainList = existingEntities.map { it.toDomain() }
+        val mergedDomain = ScheduleEvaluator.mergeOverlapping(domainList)
+
+        scheduleDao.deleteByPackage(packageName)
+        scheduleDao.insertAll(mergedDomain.map { SchedulePeriodEntity.fromDomain(it) })
+    }
+
+    /**
+     * Evaluates the status of [packageName] right now.
+     */
+    suspend fun evaluateApp(packageName: String, dateTime: LocalDateTime = LocalDateTime.now()): BlockEvaluationResult = withContext(Dispatchers.IO) {
+        val managedApp = managedAppDao.getByPackage(packageName)
+        if (managedApp == null || !managedApp.isManaged) {
+            return@withContext BlockEvaluationResult(
+                isBlocked = false,
+                reason = "Application is not managed by Strict Blocker."
+            )
+        }
+
+        val periods = scheduleDao.getPeriodsForApp(packageName).map { it.toDomain() }
+        ScheduleEvaluator.evaluate(periods, dateTime)
+    }
+
+    suspend fun recordBlockEvent(packageName: String, appName: String, reason: String) = withContext(Dispatchers.IO) {
+        blockEventDao.insert(
+            BlockEventEntity(
+                appPackage = packageName,
+                appName = appName,
+                timestamp = System.currentTimeMillis(),
+                reason = reason
+            )
+        )
+    }
+
+    /**
+     * Purges all user data locally: managed apps, schedules, block logs, and preferences.
+     * Complies with GDPR/CCPA right to erasure / data deletion requests.
+     */
+    suspend fun deleteAllUserData() = withContext(Dispatchers.IO) {
+        managedAppDao.deleteAll()
+        scheduleDao.deleteAll()
+        blockEventDao.clearAll()
+        settings.setStrictChangeDelayMinutes(0)
+        settings.setProtectionEnabled(true)
+    }
+
+    /**
+     * Determines the earliest upcoming schedule transition across all managed apps.
+     */
+    suspend fun findNextGlobalTransition(): NextTransitionInfo? = withContext(Dispatchers.IO) {
+        val activeApps = managedAppDao.getActiveManagedApps()
+        if (activeApps.isEmpty()) return@withContext null
+
+        val allPeriods = scheduleDao.getAllEnabledPeriods().map { it.toDomain() }
+        val now = LocalDateTime.now()
+
+        var earliestTransition: NextTransitionInfo? = null
+
+        for (app in activeApps) {
+            val appPeriods = allPeriods.filter { it.appPackage == app.packageName }
+            val nextTime = ScheduleEvaluator.findNextAllowedTime(appPeriods, now) ?: continue
+
+            if (earliestTransition == null || nextTime.isBefore(earliestTransition.transitionDateTime)) {
+                earliestTransition = NextTransitionInfo(
+                    appName = app.appName,
+                    packageName = app.packageName,
+                    transitionDateTime = nextTime,
+                    isOpening = true
+                )
+            }
+        }
+
+        earliestTransition
+    }
+}

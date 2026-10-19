@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">Strict Blocker</string>
+    <string name="accessibility_service_description">Monitors foreground applications to enforce your scheduled blocking rules. This service only detects the active app package name to block restricted apps outside their allowed time slots. It does NOT read screen content, keystrokes, or private messages.</string>
+    
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_apps">Apps</string>
+    <string name="nav_schedules">Schedules</string>
+    <string name="nav_settings">Settings</string>
+    
+    <!-- Blocker Screen -->
+    <string name="blocker_title">App Blocked</string>
+    <string name="blocker_available_again">Available again at:</string>
+    <string name="blocker_btn_home">Go Home</string>
+    <string name="blocker_btn_view_schedule">View Schedule</string>
+    <string name="blocker_no_upcoming">No upcoming allowed period scheduled</string>
+    <string name="blocker_outside_schedule_explanation">This application is strictly blocked outside its designated schedule.</string>
+
+    <!-- Permissions -->
+    <string name="perm_accessibility_title">Accessibility Service</string>
+    <string name="perm_accessibility_why">Instant zero-latency detection of foreground apps when they launch.</string>
+    <string name="perm_accessibility_what">Without it, the blocker cannot immediately detect when you tap a blocked app.</string>
+    <string name="perm_accessibility_how">Tap below, select \'Strict Blocker\' under Installed Services, and switch it ON.</string>
+
+    <string name="perm_usage_title">Usage Access</string>
+    <string name="perm_usage_why">System-level background usage query and fallback enforcement engine.</string>
+    <string name="perm_usage_what">Required to verify foreground transitions and cross-check active app status.</string>
+    <string name="perm_usage_how">Find \'Strict Blocker\' in the list and toggle \'Permit usage access\' to ON.</string>
+
+    <string name="perm_overlay_title">Display Over Other Apps</string>
+    <string name="perm_overlay_why">Displays the full-screen interrupt shield immediately over blocked applications.</string>
+    <string name="perm_overlay_what">Without overlay access, the blocker screen cannot interrupt the target app.</string>
+    <string name="perm_overlay_how">Toggle \'Allow display over other apps\' ON for Strict Blocker.</string>
+
+    <string name="perm_battery_title">Unrestricted Battery (Samsung)</string>
+    <string name="perm_battery_why">Prevents Samsung One UI from sleeping or killing the blocking engine.</string>
+    <string name="perm_battery_what">Without unrestricted battery, One UI will terminate the background enforcement after a few hours of screen off.</string>
+    <string name="perm_battery_how">Tap below, go to App Info > Battery, and choose \'Unrestricted\'.</string>
+
+    <string name="perm_notification_title">Notifications &amp; Foreground Service</string>
+    <string name="perm_notification_why">Keeps the blocker background engine alive and provides active protection status.</string>
+    <string name="perm_notification_what">Android requires a persistent notification for continuous background enforcement.</string>
+    <string name="perm_notification_how">Allow notifications when prompted by the system.</string>
+
+    <string name="perm_alarm_title">Exact Alarms</string>
+    <string name="perm_alarm_why">Guarantees precise to-the-minute schedule cutoffs (e.g. blocking right at 7:00 PM).</string>
+    <string name="perm_alarm_what">Without exact alarms, schedule cutoffs could be delayed by up to 15 minutes by Doze mode.</string>
+    <string name="perm_alarm_how">Ensure \'Allow setting alarms and reminders\' is enabled.</string>
+</resources>
