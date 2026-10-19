@@ -77,7 +77,6 @@ import com.example.service.AdultFilterVpnService
 import com.example.ui.blocker.BlockerActivity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
-import com.example.ui.components.StatusBadge
 import kotlinx.coroutines.launch
 
 @Composable
@@ -168,9 +167,7 @@ fun AdultProtectionScreen(
             // Master Protection Status Card
             item {
                 GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = statusColor.copy(alpha = 0.4f),
-                    backgroundColor = statusColor.copy(alpha = 0.12f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Row(
@@ -199,17 +196,18 @@ fun AdultProtectionScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "Adult Content Filter",
+                                        text = "Adult content protection",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = when (overallStatus) {
-                                            "PROTECTED" -> "Full layered browser and DNS protection active"
-                                            "LIMITED PROTECTION" -> "Active via URL shield (DNS filter optional)"
-                                            "PAUSED" -> "Adult filtering is currently suspended"
-                                            else -> "Enable Accessibility or DNS filter to activate"
+                                        text = when {
+                                            !isAdultProtectionEnabled -> "Protection is off"
+                                            isAccessibilityGranted && isVpnActive -> "Browser and DNS protection enabled"
+                                            isAccessibilityGranted -> "Browser protection enabled"
+                                            isVpnActive -> "DNS protection enabled"
+                                            else -> "Setup required"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -243,27 +241,12 @@ fun AdultProtectionScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            StatusBadge(
-                                text = overallStatus,
-                                isActive = overallStatus == "PROTECTED",
-                                activeColor = MaterialTheme.colorScheme.tertiary,
-                                inactiveColor = statusColor
-                            )
-
-                            Text(
-                                text = "$adultBlocksCount Interceptions Logged",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "$adultBlocksCount blocked attempts",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -301,7 +284,7 @@ fun AdultProtectionScreen(
             // Section: Protection Layers
             item {
                 Text(
-                    text = "Defense Layers",
+                    text = "Protection controls",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -311,10 +294,10 @@ fun AdultProtectionScreen(
             // Layer 1: Real-Time Browser Shield (Accessibility URL Inspector)
             item {
                 ProtectionLayerCard(
-                    title = "Real-Time Browser & URL Shield",
-                    description = "Monitors browser address bars and URL transitions to block adult domains and explicit search queries instantly.",
+                    title = "Browser protection",
+                    description = "Checks supported browser URLs and search pages on-device.",
                     icon = Icons.Default.Security,
-                    statusText = if (isAccessibilityGranted) "Active" else "Setup Needed",
+                    statusText = if (isAccessibilityGranted) "On" else "Setup needed",
                     isActive = isAccessibilityGranted,
                     actionText = if (!isAccessibilityGranted) "Grant Accessibility" else null,
                     onAction = onNavigateToPermissions
@@ -324,10 +307,10 @@ fun AdultProtectionScreen(
             // Layer 2: On-Device Secure DNS Filter (VPN Service)
             item {
                 ProtectionLayerCard(
-                    title = "Device-Wide Secure DNS Filter",
-                    description = "Routes DNS queries through verified adult-blocking family DNS (Cloudflare 1.1.1.3 & CleanBrowsing) across all apps and WebViews.",
+                    title = "DNS protection",
+                    description = "Uses the local VPN service to apply family-safe DNS filtering.",
                     icon = Icons.Default.Dns,
-                    statusText = if (isVpnActive) "Connected" else "Disconnected",
+                    statusText = if (isVpnActive) "On" else "Off",
                     isActive = isVpnActive,
                     actionText = if (!isVpnActive) "Connect DNS Filter" else "Disconnect",
                     onAction = {
@@ -376,13 +359,13 @@ fun AdultProtectionScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "SafeSearch Enforcer",
+                                    text = "SafeSearch",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Enforces strict filtering on Google, Bing, and DuckDuckGo search results.",
+                                    text = "Keeps supported search engines in filtered mode.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -435,13 +418,13 @@ fun AdultProtectionScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Incognito / Private Window Guard",
+                                    text = "Private browsing guard",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Restricts unmonitored private windows in browsers to prevent bypassing the URL filter.",
+                                    text = "Restricts private browser windows that cannot be reliably monitored.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -466,7 +449,7 @@ fun AdultProtectionScreen(
             // Section: Diagnostics & Safe Filter Test
             item {
                 Text(
-                    text = "Diagnostics & Filter Verification",
+                    text = "Diagnostics",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -477,14 +460,14 @@ fun AdultProtectionScreen(
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Test Shield Response",
+                            text = "Test protection",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Safely verify that the protection shield intercepts restricted content without opening any actual explicit material.",
+                            text = "Run a safe local simulation to verify that the block screen opens correctly.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -514,7 +497,7 @@ fun AdultProtectionScreen(
                         ) {
                             Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Run Filter Simulation Test", fontWeight = FontWeight.Bold)
+                            Text("Run protection test", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -536,7 +519,7 @@ fun AdultProtectionScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Technical Honesty & Privacy Guarantees",
+                                text = "Privacy & limitations",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -657,11 +640,11 @@ fun ProtectionLayerCard(
                     )
                 }
 
-                StatusBadge(
+                Text(
                     text = statusText,
-                    isActive = isActive,
-                    activeColor = MaterialTheme.colorScheme.tertiary,
-                    inactiveColor = Color(0xFFF59E0B)
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
