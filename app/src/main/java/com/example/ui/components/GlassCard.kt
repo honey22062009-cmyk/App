@@ -28,12 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -232,7 +232,7 @@ fun GlassCard(
     backgroundColor: Color? = null,
     blurRadius: Dp? = null,
     specularHighlight: Boolean = true,
-    elevation: Dp = 0.dp,
+    elevation: Dp = 4.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -254,13 +254,25 @@ fun GlassCard(
 
     Box(
         modifier = clickableModifier
+            .shadow(
+                elevation = elevation,
+                shape = shape,
+                clip = false,
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                spotColor = Color.Black.copy(alpha = if (GlassDefaults.isDarkTheme()) 0.22f else 0.10f)
+            )
             .border(
                 width = spec.borderWidth,
                 brush = spec.borderBrush,
                 shape = shape
             )
             .background(
-                color = spec.backgroundColor,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        spec.backgroundColor.copy(alpha = 0.98f),
+                        spec.backgroundColor.copy(alpha = 0.86f)
+                    )
+                ),
                 shape = shape
             )
     ) {
