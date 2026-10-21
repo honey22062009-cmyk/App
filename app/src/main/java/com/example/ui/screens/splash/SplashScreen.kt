@@ -55,7 +55,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
                 .alpha(alpha.value)
         ) {
             Image(
-                painter = painterResource(R.mipmap.ic_launcher),
+                painter = painterResource(R.drawable.app_icon_18_blocker_1792376066440),
                 contentDescription = null,
                 modifier = Modifier
                     .size(76.dp)
