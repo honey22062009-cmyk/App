@@ -86,14 +86,14 @@ fun SettingsScreen(
                     .padding(24.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                Column(modifier = Modifier.width(250.dp)) {
+                Column(modifier = Modifier.width(280.dp)) {
                     Text(
                         text = "Settings",
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "App behavior and system controls",
+                        text = "Preferences and protection",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -221,15 +221,15 @@ private fun SettingsSidebarItem(
     onClick: () -> Unit
 ) {
     val background = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
     } else {
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+        MaterialTheme.colorScheme.background
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(background, RoundedCornerShape(14.dp))
+            .background(background, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -350,7 +350,7 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.0")
+            SettingsDescription("Version 1.2")
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
         }

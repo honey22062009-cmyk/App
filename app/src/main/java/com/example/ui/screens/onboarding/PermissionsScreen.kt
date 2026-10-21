@@ -120,14 +120,14 @@ fun PermissionsScreen(
             item {
                 Column {
                     Text(
-                        text = "System Permissions",
+                        text = "Permissions",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Strict enforcement relies on transparent, legitimate Android system capabilities. Review each permission below.",
+                        text = "Allow the Android permissions Strict Blocker needs to detect and block restricted apps reliably.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -179,13 +179,13 @@ fun PermissionsScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = if (allCriticalGranted) "Core Protection Configured" else "Setup Action Required",
+                                        text = if (allCriticalGranted) "Protection is ready" else "Setup needs attention",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "$criticalGrantedCount of $totalCritical Essential Permissions Granted",
+                                        text = "$criticalGrantedCount of $totalCritical required permissions allowed",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -219,7 +219,7 @@ fun PermissionsScreen(
             // Section 1: Core Protection
             item {
                 Text(
-                    text = "Core Protection (Required)",
+                    text = "Required",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -229,12 +229,12 @@ fun PermissionsScreen(
             // 1. Accessibility Service
             item {
                 PermissionSetupCard(
-                    title = "Instant App Interception",
+                    title = "Accessibility",
                     technicalName = "Accessibility Service",
                     icon = Icons.Default.AccessibilityNew,
                     isGranted = isAccessibilityGranted,
                     isRequired = true,
-                    summary = "Captures window transitions in real time to interrupt blocked apps immediately.",
+                    summary = "Lets Strict Blocker detect when a restricted app opens and show the block screen.",
                     why = stringResource(R.string.perm_accessibility_why),
                     whatStops = stringResource(R.string.perm_accessibility_what),
                     howToEnable = stringResource(R.string.perm_accessibility_how),
@@ -250,7 +250,7 @@ fun PermissionsScreen(
                     icon = Icons.Default.DataUsage,
                     isGranted = isUsageGranted,
                     isRequired = true,
-                    summary = "System-level verification of active foreground applications.",
+                    summary = "Lets Strict Blocker verify which app is currently in use.",
                     why = stringResource(R.string.perm_usage_why),
                     whatStops = stringResource(R.string.perm_usage_what),
                     howToEnable = stringResource(R.string.perm_usage_how),
@@ -266,7 +266,7 @@ fun PermissionsScreen(
                     icon = Icons.Default.PictureInPicture,
                     isGranted = isOverlayGranted,
                     isRequired = true,
-                    summary = "Displays the full-screen blocking shield when an unallowed app is opened.",
+                    summary = "Allows the blocking screen to appear over a restricted app when needed.",
                     why = stringResource(R.string.perm_overlay_why),
                     whatStops = stringResource(R.string.perm_overlay_what),
                     howToEnable = stringResource(R.string.perm_overlay_how),
@@ -278,7 +278,7 @@ fun PermissionsScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "System Enhancements (Recommended)",
+                    text = "Recommended",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -288,12 +288,12 @@ fun PermissionsScreen(
             // 4. Samsung Battery Optimization
             item {
                 PermissionSetupCard(
-                    title = "Unrestricted Battery Mode",
+                    title = "Battery reliability",
                     technicalName = "Ignore Battery Optimizations",
                     icon = Icons.Default.BatteryAlert,
                     isGranted = isBatteryOptIgnored,
                     isRequired = false,
-                    summary = "Prevents Samsung One UI or Android Doze from putting the blocker to sleep.",
+                    summary = "Helps protection keep running when Android limits background activity.",
                     why = stringResource(R.string.perm_battery_why),
                     whatStops = stringResource(R.string.perm_battery_what),
                     howToEnable = stringResource(R.string.perm_battery_how),
@@ -304,12 +304,12 @@ fun PermissionsScreen(
             // 5. Exact Alarms
             item {
                 PermissionSetupCard(
-                    title = "Exact Schedule Alarms",
+                    title = "Precise schedules",
                     technicalName = "SCHEDULE_EXACT_ALARM",
                     icon = Icons.Default.Alarm,
                     isGranted = isExactAlarmGranted,
                     isRequired = false,
-                    summary = "Guarantees to-the-minute precision when an allowed schedule time expires.",
+                    summary = "Helps schedule changes happen at the expected time.",
                     why = stringResource(R.string.perm_alarm_why),
                     whatStops = stringResource(R.string.perm_alarm_what),
                     howToEnable = stringResource(R.string.perm_alarm_how),
@@ -320,12 +320,12 @@ fun PermissionsScreen(
             // 6. Notifications & Foreground Service
             item {
                 PermissionSetupCard(
-                    title = "Notifications & Live Status",
+                    title = "Notifications",
                     technicalName = "POST_NOTIFICATIONS",
                     icon = Icons.Default.Notifications,
                     isGranted = isNotificationGranted,
                     isRequired = false,
-                    summary = "Provides foreground service permanence and active protection status.",
+                    summary = "Shows important protection and background-service information.",
                     why = stringResource(R.string.perm_notification_why),
                     whatStops = stringResource(R.string.perm_notification_what),
                     howToEnable = stringResource(R.string.perm_notification_how),
@@ -348,7 +348,7 @@ fun PermissionsScreen(
                     )
                 ) {
                     Text(
-                        text = if (allCriticalGranted) "Return to Dashboard" else "Proceed with Setup Incomplete",
+                        text = if (allCriticalGranted) "Return to Dashboard" else "Continue for now",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -472,7 +472,7 @@ fun PermissionSetupCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isExpanded) "Hide details & instructions" else "Why it's needed & how to enable",
+                    text = if (isExpanded) "Hide details" else "Why is this needed?",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
@@ -551,7 +551,7 @@ fun PermissionSetupCard(
                     )
                 ) {
                     Text(
-                        text = "Enable in System Settings",
+                        text = "Allow in Settings",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -575,7 +575,7 @@ fun PermissionSetupCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Permission Granted & Active",
+                            text = "Allowed",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.tertiary

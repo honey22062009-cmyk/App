@@ -184,7 +184,7 @@ fun AppsScreen(
                     .testTag("apps_search_input"),
                 placeholder = {
                     Text(
-                        "Search application name or package...",
+                        "Search apps",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -208,7 +208,7 @@ fun AppsScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -231,7 +231,7 @@ fun AppsScreen(
                         selected = isSelected,
                         onClick = { selectedFilter = filter },
                         label = { Text(filter, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -271,7 +271,7 @@ fun AppsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Batch Actions (${selectedPackages.size})",
+                                text = "${selectedPackages.size} selected",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -293,7 +293,7 @@ fun AppsScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("Protect All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Protect", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
 
                                 OutlinedButton(
