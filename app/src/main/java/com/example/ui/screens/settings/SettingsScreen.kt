@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -351,6 +353,17 @@ private fun SettingsSectionContent(
                 fontWeight = FontWeight.SemiBold
             )
             SettingsDescription("Version 1.2")
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { },
+                enabled = false,
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Text("Update to v1.3")
+            }
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
         }
