@@ -101,17 +101,29 @@ fun AppSurface(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        modifier = modifier,
-        shape = shape,
-        color = backgroundColor,
-        tonalElevation = elevation,
-        shadowElevation = elevation,
-        border = BorderStroke(borderWidth, borderColor),
-        onClick = onClick ?: {},
-        enabled = onClick != null
-    ) {
-        content()
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape,
+            color = backgroundColor,
+            tonalElevation = elevation,
+            shadowElevation = elevation,
+            border = BorderStroke(borderWidth, borderColor)
+        ) {
+            content()
+        }
+    } else {
+        Surface(
+            modifier = modifier,
+            shape = shape,
+            color = backgroundColor,
+            tonalElevation = elevation,
+            shadowElevation = elevation,
+            border = BorderStroke(borderWidth, borderColor)
+        ) {
+            content()
+        }
     }
 }
 
