@@ -1,46 +1,33 @@
 package com.example.ui.components
 
-import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
-/**
- * Variants for Theme-Aware Glassmorphism components.
- */
 enum class GlassVariant {
     Standard,
     Subtle,
@@ -52,7 +39,8 @@ enum class GlassVariant {
 }
 
 /**
- * Configuration specification for a glass surface computed according to active theme.
+ * Kept for source compatibility with the previous glass implementation.
+ * The production UI now resolves these values to restrained Material surfaces.
  */
 data class GlassSpec(
     val backgroundColor: Color,
@@ -62,18 +50,9 @@ data class GlassSpec(
     val borderWidth: Dp
 )
 
-/**
- * Theme-aware glassmorphism calculation engine.
- * Dynamically adjusts surface opacity, gradient borders, and blur intensities
- * between Light Mode and Dark Mode for optimal contrast, legibility, and restraint.
- */
 object GlassDefaults {
-
     @Composable
-    fun isDarkTheme(): Boolean {
-        val surfaceLuminance = MaterialTheme.colorScheme.surface.luminance()
-        return surfaceLuminance < 0.5f
-    }
+    fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
     @Composable
     fun spec(
@@ -83,154 +62,74 @@ object GlassDefaults {
         customBlur: Dp? = null,
         borderWidth: Dp = 1.dp
     ): GlassSpec {
-        val isDark = isDarkTheme()
-        val defaultBlur = customBlur ?: if (isDark) 18.dp else 16.dp
-
-        // If caller passed a custom background, use it directly or with appropriate glass opacity
-        val baseBackground = customBackground ?: when (variant) {
-            GlassVariant.Standard -> {
-                if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-            }
-            GlassVariant.Subtle -> {
-                if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-            }
-            GlassVariant.Elevated -> {
-                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
-            }
-            GlassVariant.Accent -> {
-                val primary = MaterialTheme.colorScheme.primary
-                if (isDark) primary.copy(alpha = 0.16f)
-                else primary.copy(alpha = 0.12f)
-            }
-            GlassVariant.Success -> {
-                val emerald = MaterialTheme.colorScheme.tertiary
-                if (isDark) emerald.copy(alpha = 0.16f)
-                else emerald.copy(alpha = 0.12f)
-            }
-            GlassVariant.Warning -> {
-                val amber = Color(0xFFF59E0B)
-                if (isDark) amber.copy(alpha = 0.16f)
-                else amber.copy(alpha = 0.12f)
-            }
-            GlassVariant.Error -> {
-                val crimson = MaterialTheme.colorScheme.error
-                if (isDark) crimson.copy(alpha = 0.16f)
-                else crimson.copy(alpha = 0.12f)
-            }
+        val background = customBackground ?: when (variant) {
+            GlassVariant.Standard -> MaterialTheme.colorScheme.surface
+            GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            GlassVariant.Elevated -> MaterialTheme.colorScheme.surface
+            GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
+            GlassVariant.Warning -> MaterialTheme.colorScheme.surfaceVariant
+            GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
         }
-
-        // Specular highlight brush (subtle reflection along top edge)
-        val specularBrush = when {
-            isDark -> Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.09f),
-                    Color.White.copy(alpha = 0.02f),
-                    Color.Transparent
-                )
-            )
-            else -> Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.38f),
-                    Color.White.copy(alpha = 0.08f),
-                    Color.Transparent
-                )
-            )
+        val border = customBorder ?: when (variant) {
+            GlassVariant.Accent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+            GlassVariant.Success -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.22f)
+            GlassVariant.Error -> MaterialTheme.colorScheme.error.copy(alpha = 0.22f)
+            else -> MaterialTheme.colorScheme.outlineVariant
         }
-
-        // Specular gradient border brush
-        val borderBrush = if (customBorder != null) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    customBorder.copy(alpha = 0.60f),
-                    customBorder.copy(alpha = 0.30f)
-                )
-            )
-        } else {
-            when (variant) {
-                GlassVariant.Standard, GlassVariant.Subtle, GlassVariant.Elevated -> {
-                    if (isDark) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.16f),
-                                Color(0xFF334155).copy(alpha = 0.45f)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.72f),
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                            )
-                        )
-                    }
-                }
-                GlassVariant.Accent -> {
-                    val primary = MaterialTheme.colorScheme.primary
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            primary.copy(alpha = 0.50f),
-                            primary.copy(alpha = 0.20f)
-                        )
-                    )
-                }
-                GlassVariant.Success -> {
-                    val emerald = MaterialTheme.colorScheme.tertiary
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            emerald.copy(alpha = 0.50f),
-                            emerald.copy(alpha = 0.20f)
-                        )
-                    )
-                }
-                GlassVariant.Warning -> {
-                    val amber = Color(0xFFF59E0B)
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            amber.copy(alpha = 0.50f),
-                            amber.copy(alpha = 0.20f)
-                        )
-                    )
-                }
-                GlassVariant.Error -> {
-                    val crimson = MaterialTheme.colorScheme.error
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            crimson.copy(alpha = 0.50f),
-                            crimson.copy(alpha = 0.20f)
-                        )
-                    )
-                }
-            }
-        }
-
         return GlassSpec(
-            backgroundColor = baseBackground,
-            borderBrush = borderBrush,
-            specularBrush = specularBrush,
-            blurRadius = defaultBlur,
+            backgroundColor = background,
+            borderBrush = Brush.linearGradient(listOf(border, border)),
+            specularBrush = null,
+            blurRadius = customBlur ?: 0.dp,
             borderWidth = borderWidth
         )
     }
 }
 
 /**
- * Production-grade theme-aware Glassmorphism Card.
- * Seamlessly adapts opacity and specular edge gradients between light and dark themes.
+ * Default production surface. Prefer this component for ordinary content.
+ */
+@Composable
+fun AppSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(14.dp),
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    borderWidth: Dp = 1.dp,
+    elevation: Dp = 0.dp,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = backgroundColor,
+        tonalElevation = elevation,
+        shadowElevation = elevation,
+        border = BorderStroke(borderWidth, borderColor),
+        onClick = onClick ?: {},
+        enabled = onClick != null
+    ) {
+        content()
+    }
+}
+
+/**
+ * Compatibility wrapper for existing screens. The old glass effects were deliberately
+ * removed: no blur, specular shine, gradient border, or brand-tinted shadow.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = RoundedCornerShape(14.dp),
     variant: GlassVariant = GlassVariant.Standard,
     borderWidth: Dp = 1.dp,
     borderColor: Color? = null,
     backgroundColor: Color? = null,
     blurRadius: Dp? = null,
-    specularHighlight: Boolean = true,
-    elevation: Dp = 4.dp,
+    specularHighlight: Boolean = false,
+    elevation: Dp = 0.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -242,214 +141,109 @@ fun GlassCard(
         borderWidth = borderWidth
     )
 
-    val clickableModifier = if (onClick != null) {
-        modifier
-            .clip(shape)
-            .clickable { onClick() }
-    } else {
-        modifier.clip(shape)
-    }
+    val base = modifier
+        .clip(shape)
+        .border(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant, shape)
+        .background(spec.backgroundColor, shape)
 
     Box(
-        modifier = clickableModifier
-            .shadow(
-                elevation = elevation,
-                shape = shape,
-                clip = false,
-                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                spotColor = Color.Black.copy(alpha = if (GlassDefaults.isDarkTheme()) 0.22f else 0.10f)
-            )
-            .border(
-                width = spec.borderWidth,
-                brush = spec.borderBrush,
-                shape = shape
-            )
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        spec.backgroundColor.copy(alpha = 0.98f),
-                        spec.backgroundColor.copy(alpha = 0.86f)
-                    )
-                ),
-                shape = shape
-            )
+        modifier = if (onClick != null) base.clickable(onClick = onClick) else base
     ) {
-        // Specular top highlight overlay
-        if (specularHighlight && spec.specularBrush != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(spec.specularBrush, shape = shape)
-            )
-        }
-
         content()
     }
 }
 
-/**
- * Flexible container surface with theme-aware glass styling.
- */
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = RoundedCornerShape(14.dp),
     variant: GlassVariant = GlassVariant.Standard,
     borderWidth: Dp = 1.dp,
     borderColor: Color? = null,
     backgroundColor: Color? = null,
     blurRadius: Dp? = null,
     content: @Composable () -> Unit
-) {
-    GlassCard(
-        modifier = modifier,
-        shape = shape,
-        variant = variant,
-        borderWidth = borderWidth,
-        borderColor = borderColor,
-        backgroundColor = backgroundColor,
-        blurRadius = blurRadius,
-        content = content
-    )
-}
+) = GlassCard(
+    modifier = modifier,
+    shape = shape,
+    variant = variant,
+    borderWidth = borderWidth,
+    borderColor = borderColor,
+    backgroundColor = backgroundColor,
+    blurRadius = blurRadius,
+    content = content
+)
 
 /**
- * Refined status pill badge with frosted glass styling and status dot indicator.
+ * Retained for compatibility, but intentionally rendered as quiet text metadata.
  */
 @Composable
 fun StatusBadge(
     text: String,
     isActive: Boolean,
     modifier: Modifier = Modifier,
-    activeColor: Color = Color(0xFF10B981),
-    inactiveColor: Color = Color(0xFFEF4444),
-    showDot: Boolean = true
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    inactiveColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    showDot: Boolean = false
 ) {
-    val isDark = GlassDefaults.isDarkTheme()
     val color = if (isActive) activeColor else inactiveColor
-    val bgAlpha = if (isDark) 0.16f else 0.12f
-    val borderAlpha = if (isDark) 0.35f else 0.28f
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = color.copy(alpha = bgAlpha),
-        border = BorderStroke(0.8.dp, color.copy(alpha = borderAlpha))
+    Row(
+        modifier = modifier.padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (showDot) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(color)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            Text(
-                text = text.uppercase(),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.6.sp,
-                color = color
+        if (showDot) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(color)
             )
+            Spacer(modifier = Modifier.width(6.dp))
         }
-    }
-}
-
-/**
- * Compact theme-aware glass information tag.
- */
-@Composable
-fun InfoChip(
-    text: String,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary
-) {
-    val isDark = GlassDefaults.isDarkTheme()
-    val bgAlpha = if (isDark) 0.16f else 0.10f
-    val borderAlpha = if (isDark) 0.30f else 0.22f
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = bgAlpha),
-        border = BorderStroke(0.5.dp, color.copy(alpha = borderAlpha))
-    ) {
         Text(
             text = text,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = color
         )
     }
 }
 
+@Composable
+fun InfoChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
 
 /**
- * App-wide atmospheric background used behind all primary screens.
- * Keeps the interface visually rich without sacrificing readability.
+ * Former atmospheric/glow backdrop. Production UI intentionally uses a neutral canvas.
  */
 @Composable
 fun AppBackdrop(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val isDark = GlassDefaults.isDarkTheme()
-    val base = MaterialTheme.colorScheme.background
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val tertiary = MaterialTheme.colorScheme.tertiary
-
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(base)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val minSide = size.minDimension
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        primary.copy(alpha = if (isDark) 0.20f else 0.13f),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width * 0.14f, size.height * 0.08f),
-                    radius = minSide * 0.72f
-                ),
-                radius = minSide * 0.72f,
-                center = Offset(size.width * 0.14f, size.height * 0.08f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        secondary.copy(alpha = if (isDark) 0.14f else 0.10f),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width * 0.92f, size.height * 0.28f),
-                    radius = minSide * 0.58f
-                ),
-                radius = minSide * 0.58f,
-                center = Offset(size.width * 0.92f, size.height * 0.28f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        tertiary.copy(alpha = if (isDark) 0.10f else 0.07f),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width * 0.55f, size.height * 0.96f),
-                    radius = minSide * 0.66f
-                ),
-                radius = minSide * 0.66f,
-                center = Offset(size.width * 0.55f, size.height * 0.96f)
-            )
-        }
-
         content()
     }
 }
