@@ -82,6 +82,7 @@ object AdultContentEvaluator {
     enum class BlockCategory(val label: String) {
         ADULT_DOMAIN("18+ Adult Website"),
         EXPLICIT_SEARCH("Explicit Sexual Search"),
+        VISIBLE_CONTEXT("Restricted 18+ Content"),
         INCOGNITO_RESTRICTED("Private/Incognito Browsing")
     }
 
@@ -135,6 +136,40 @@ object AdultContentEvaluator {
         }
 
         return EvaluationResult.Clean
+    }
+
+    /**
+     * Conservative context scoring for non-browser apps and WebViews.
+     * One ambiguous term is never enough. Inspected text stays in memory only.
+     */
+    fun evaluateVisibleContext(rawInput: String): EvaluationResult {
+        if (rawInput.isBlank()) return EvaluationResult.Clean
+        val clean = rawInput.lowercase(Locale.ROOT).take(12_000)
+
+        val strongTerms = listOf(
+            "porn", "pornography", "xxx", "adult video", "adult webcam",
+            "nsfw video", "explicit video", "nude leak", "sex video"
+        )
+        if (strongTerms.any { clean.contains(it) }) {
+            return EvaluationResult.Blocked(
+                category = BlockCategory.VISIBLE_CONTEXT,
+                layer = "On-Screen Context Shield"
+            )
+        }
+
+        val contextTerms = listOf(
+            "18+", "adult only", "explicit", "nsfw", "uncensored",
+            "nude", "naked", "webcam", "adult content"
+        )
+        val score = contextTerms.count { clean.contains(it) }
+        return if (score >= 3) {
+            EvaluationResult.Blocked(
+                category = BlockCategory.VISIBLE_CONTEXT,
+                layer = "On-Screen Context Shield"
+            )
+        } else {
+            EvaluationResult.Clean
+        }
     }
 
     /**

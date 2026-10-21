@@ -38,7 +38,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +72,7 @@ class BlockerActivity : ComponentActivity() {
         const val EXTRA_BLOCK_TYPE = "extra_block_type"
         const val EXTRA_ADULT_LAYER = "extra_adult_layer"
         const val EXTRA_ADULT_REASON = "extra_adult_reason"
+        const val EXTRA_ADULT_COOLDOWN_SECONDS = "extra_adult_cooldown_seconds"
 
         const val BLOCK_TYPE_SCHEDULE = "SCHEDULE"
         const val BLOCK_TYPE_ADULT = "ADULT_CONTENT"
@@ -82,6 +88,7 @@ class BlockerActivity : ComponentActivity() {
         val blockType = intent.getStringExtra(EXTRA_BLOCK_TYPE) ?: BLOCK_TYPE_SCHEDULE
         val adultLayer = intent.getStringExtra(EXTRA_ADULT_LAYER) ?: "18+ Adult Protection Shield"
         val adultReason = intent.getStringExtra(EXTRA_ADULT_REASON) ?: "18+ Adult Content Blocked"
+        val adultCooldownSeconds = intent.getIntExtra(EXTRA_ADULT_COOLDOWN_SECONDS, 60).coerceIn(30, 300)
 
         val appIcon: Drawable? = try {
             if (packageName.isNotEmpty()) packageManager.getApplicationIcon(packageName) else null
@@ -91,9 +98,9 @@ class BlockerActivity : ComponentActivity() {
 
         setContent {
             StrictBlockerTheme {
-                // Intercept hardware/gesture back to always exit to Home screen
+                // During an adult-content cooldown Back is intentionally ignored.
                 BackHandler {
-                    navigateHome()
+                    if (blockType != BLOCK_TYPE_ADULT) navigateHome()
                 }
 
                 if (blockType == BLOCK_TYPE_ADULT) {
@@ -101,6 +108,7 @@ class BlockerActivity : ComponentActivity() {
                         appName = appName,
                         layer = adultLayer,
                         reason = adultReason,
+                        cooldownSeconds = adultCooldownSeconds,
                         onGoHome = { navigateHome() }
                     )
                 } else {
@@ -146,8 +154,17 @@ fun AdultBlockerScreen(
     appName: String,
     layer: String,
     reason: String,
+    cooldownSeconds: Int,
     onGoHome: () -> Unit
 ) {
+    var remainingSeconds by remember { mutableIntStateOf(cooldownSeconds) }
+    LaunchedEffect(cooldownSeconds) {
+        while (remainingSeconds > 0) {
+            delay(1_000)
+            remainingSeconds--
+        }
+    }
+
     val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
     val backgroundBrush = remember(isDark) {
         if (isDark) {
@@ -296,9 +313,20 @@ fun AdultBlockerScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Single Non-Bypass Action Button
+            Text(
+                text = if (remainingSeconds > 0) "Protection cooldown: ${remainingSeconds}s" else "Cooldown complete",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Adult shield cannot be dismissed through normal UI until the cooldown ends.
             Button(
                 onClick = onGoHome,
+                enabled = remainingSeconds == 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
@@ -316,7 +344,7 @@ fun AdultBlockerScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Close & Return to Home",
+                    text = if (remainingSeconds > 0) "Please wait" else "Close & Return to Home",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

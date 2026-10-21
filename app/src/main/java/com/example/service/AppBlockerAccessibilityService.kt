@@ -56,9 +56,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             // 1. Layer: 18+ Adult Content Protection across browsers and webviews
             val adultProtectionEnabled = repository.settings.isAdultProtectionEnabledFlow.first()
-            if (adultProtectionEnabled && AdultContentEvaluator.isBrowserPackage(packageName)) {
+            if (adultProtectionEnabled) {
                 if (now - lastAdultTriggerTimestamp > 400L) {
-                    val isAdultBlocked = inspectBrowserForAdultContent(packageName, event)
+                    val isAdultBlocked = inspectForAdultContent(packageName, event)
                     if (isAdultBlocked) {
                         lastAdultTriggerTimestamp = now
                         return@launch
@@ -109,14 +109,15 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * Inspects browser address bar / active window nodes to detect explicit adult content or incognito tabs.
      * Returns true if adult content was detected and blocked.
      */
-    private suspend fun inspectBrowserForAdultContent(packageName: String, event: AccessibilityEvent): Boolean {
+    private suspend fun inspectForAdultContent(packageName: String, event: AccessibilityEvent): Boolean {
+        val isBrowser = AdultContentEvaluator.isBrowserPackage(packageName)
         val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
 
         // 1. Check immediate event text and content descriptions (fastest 0ms detection)
         event.text?.forEach { charSeq ->
             val text = charSeq.toString()
             if (text.isNotBlank()) {
-                val eval = AdultContentEvaluator.evaluateText(text)
+                val eval = if (isBrowser) AdultContentEvaluator.evaluateText(text) else AdultContentEvaluator.evaluateVisibleContext(text)
                 if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                     if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
                         triggerAdultBlock(packageName, eval.category.label, eval.layer)
@@ -128,7 +129,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         val eventDesc = event.contentDescription?.toString()
         if (!eventDesc.isNullOrBlank()) {
-            val eval = AdultContentEvaluator.evaluateText(eventDesc)
+            val eval = if (isBrowser) AdultContentEvaluator.evaluateText(eventDesc) else AdultContentEvaluator.evaluateVisibleContext(eventDesc)
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                 if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
                     triggerAdultBlock(packageName, eval.category.label, eval.layer)
@@ -154,8 +155,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             "com.duckduckgo.mobile.android:id/omnibar_text_input"
         )
 
-        // 2. Check known URL input nodes
-        for (id in addressBarIds) {
+        // 2. Check known URL input nodes only for browsers
+        if (isBrowser) for (id in addressBarIds) {
             val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
             if (!nodes.isNullOrEmpty()) {
                 for (node in nodes) {
@@ -180,7 +181,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val combinedText = windowTextBuilder.toString()
 
         if (combinedText.isNotBlank()) {
-            val eval = AdultContentEvaluator.evaluateText(combinedText)
+            val eval = if (isBrowser) AdultContentEvaluator.evaluateText(combinedText) else AdultContentEvaluator.evaluateVisibleContext(combinedText)
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                 if (eval.category == AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED && !blockIncognito) {
                     return false
@@ -224,6 +225,11 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         // Record adult block event in database and increment count
         repository.recordAdultBlockEvent("18+ Content Blocked ($reason)")
 
+        // Remove offending content from view first. Android does not allow a normal app to force-stop arbitrary apps.
+        performGlobalAction(GLOBAL_ACTION_HOME)
+
+        val cooldownSeconds = repository.settings.adultCooldownSecondsFlow.first()
+
         // Launch clean neutral 18+ Block Screen (single top to prevent stacked duplicates)
         val intent = Intent(this, BlockerActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -232,6 +238,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_ADULT)
             putExtra(BlockerActivity.EXTRA_ADULT_LAYER, layer)
             putExtra(BlockerActivity.EXTRA_ADULT_REASON, reason)
+            putExtra(BlockerActivity.EXTRA_ADULT_COOLDOWN_SECONDS, cooldownSeconds)
         }
         startActivity(intent)
     }

@@ -558,14 +558,14 @@ fun AdultProtectionScreen(
             },
             title = {
                 Text(
-                    text = "Disable Adult Protection?",
+                    text = "Request Strict Mode Unlock",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "Disabling 18+ Adult Protection will suspend real-time browser domain filtering and DNS shielding. Are you sure you want to proceed?",
+                    text = "Strict Adult Mode cannot be switched off immediately. Requesting an unlock starts a 10-minute delay; protection and DNS shielding stay active until the delay and verification are completed.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -574,14 +574,14 @@ fun AdultProtectionScreen(
                 Button(
                     onClick = {
                         coroutineScope.launch {
-                            repository.settings.setAdultProtectionEnabled(false)
-                            AdultFilterVpnService.stop(context)
+                            repository.settings.requestAdultProtectionDisable()
+                            testResultBanner = "Strict Adult Mode stays active. A 10-minute unlock delay has started; verification is still required before protection can be disabled."
                             showDisableConfirmDialog = false
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Disable Protection", fontWeight = FontWeight.Bold)
+                    Text("Start Unlock Delay", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
