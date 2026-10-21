@@ -91,8 +91,15 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        val horizontalPadding = if (maxWidth >= 720.dp) 32.dp else 16.dp
-        val contentWidth = if (maxWidth >= 1000.dp) 860.dp else maxWidth
+        val horizontalPadding = if (maxWidth >= 720.dp) 28.dp else 16.dp
+        // Use the extra landscape space instead of forcing tablet content into a narrow
+        // phone-like column. Keep a cap so very large displays remain easy to scan.
+        val contentWidth = when {
+            maxWidth >= 1280.dp -> 1180.dp
+            maxWidth >= 1000.dp -> maxWidth - 72.dp
+            maxWidth >= 720.dp -> maxWidth - 40.dp
+            else -> maxWidth
+        }
 
         LazyColumn(
             modifier = Modifier
