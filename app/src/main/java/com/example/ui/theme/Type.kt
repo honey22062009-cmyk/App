@@ -8,20 +8,31 @@ import androidx.compose.ui.unit.sp
 
 private val AppFont = FontFamily.SansSerif
 
+private fun appTextStyle(
+    size: Int,
+    lineHeight: Int,
+    weight: FontWeight = FontWeight.Normal
+) = TextStyle(
+    fontFamily = AppFont,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = lineHeight.sp
+)
+
 val Typography = Typography(
-    displayLarge = TextStyle(AppFont, FontWeight.SemiBold, 30.sp, 38.sp),
-    displayMedium = TextStyle(AppFont, FontWeight.SemiBold, 26.sp, 34.sp),
-    displaySmall = TextStyle(AppFont, FontWeight.SemiBold, 24.sp, 32.sp),
-    headlineLarge = TextStyle(AppFont, FontWeight.SemiBold, 24.sp, 32.sp),
-    headlineMedium = TextStyle(AppFont, FontWeight.SemiBold, 20.sp, 28.sp),
-    headlineSmall = TextStyle(AppFont, FontWeight.Medium, 18.sp, 26.sp),
-    titleLarge = TextStyle(AppFont, FontWeight.SemiBold, 17.sp, 24.sp),
-    titleMedium = TextStyle(AppFont, FontWeight.Medium, 15.sp, 22.sp),
-    titleSmall = TextStyle(AppFont, FontWeight.Medium, 14.sp, 20.sp),
-    bodyLarge = TextStyle(AppFont, FontWeight.Normal, 16.sp, 24.sp),
-    bodyMedium = TextStyle(AppFont, FontWeight.Normal, 14.sp, 21.sp),
-    bodySmall = TextStyle(AppFont, FontWeight.Normal, 12.sp, 18.sp),
-    labelLarge = TextStyle(AppFont, FontWeight.Medium, 14.sp, 20.sp),
-    labelMedium = TextStyle(AppFont, FontWeight.Medium, 12.sp, 17.sp),
-    labelSmall = TextStyle(AppFont, FontWeight.Medium, 11.sp, 16.sp)
+    displayLarge = appTextStyle(30, 38, FontWeight.SemiBold),
+    displayMedium = appTextStyle(26, 34, FontWeight.SemiBold),
+    displaySmall = appTextStyle(24, 32, FontWeight.SemiBold),
+    headlineLarge = appTextStyle(24, 32, FontWeight.SemiBold),
+    headlineMedium = appTextStyle(20, 28, FontWeight.SemiBold),
+    headlineSmall = appTextStyle(18, 26, FontWeight.Medium),
+    titleLarge = appTextStyle(17, 24, FontWeight.SemiBold),
+    titleMedium = appTextStyle(15, 22, FontWeight.Medium),
+    titleSmall = appTextStyle(14, 20, FontWeight.Medium),
+    bodyLarge = appTextStyle(16, 24),
+    bodyMedium = appTextStyle(14, 21),
+    bodySmall = appTextStyle(12, 18),
+    labelLarge = appTextStyle(14, 20, FontWeight.Medium),
+    labelMedium = appTextStyle(12, 17, FontWeight.Medium),
+    labelSmall = appTextStyle(11, 16, FontWeight.Medium)
 )
