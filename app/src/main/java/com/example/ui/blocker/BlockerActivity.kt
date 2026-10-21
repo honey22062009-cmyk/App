@@ -189,7 +189,7 @@ fun AdultBlockerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundBrush)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -213,7 +213,7 @@ fun AdultBlockerScreen(
                     Text(
                         text = "18+",
                         fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
@@ -229,7 +229,7 @@ fun AdultBlockerScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Content Restricted",
+                text = "Content blocked",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -240,7 +240,7 @@ fun AdultBlockerScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "18+ Adult Material Blocked",
+                text = "Adult content protection",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -274,7 +274,7 @@ fun AdultBlockerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Enforcement Shield",
+                            text = "Protection",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -283,7 +283,7 @@ fun AdultBlockerScreen(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = "ON-DEVICE",
+                                text = "On device",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -386,7 +386,7 @@ fun BlockerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundBrush)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
