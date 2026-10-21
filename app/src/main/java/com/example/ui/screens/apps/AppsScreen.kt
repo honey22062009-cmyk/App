@@ -254,8 +254,8 @@ fun AppsScreen(
             // Animated Batch Action Toolbar
             AnimatedVisibility(
                 visible = selectedPackages.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
+                enter = fadeIn(animationSpec = androidx.compose.animation.core.tween(180)),
+                exit = fadeOut(animationSpec = androidx.compose.animation.core.tween(140))
             ) {
                 Column {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -361,7 +361,11 @@ fun AppsScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredApps, key = { it.packageName }) { app ->
+                    items(
+                        items = filteredApps,
+                        key = { it.packageName },
+                        contentType = { "installed_app" }
+                    ) { app ->
                         AppItemCard(
                             app = app,
                             isSelected = selectedPackages.contains(app.packageName),
@@ -373,9 +377,13 @@ fun AppsScreen(
                                 }
                             },
                             onToggleManaged = { isManaged ->
+                                // Optimistic row update avoids re-querying every installed app
+                                // and rebuilding the whole list after each switch.
+                                installedApps = installedApps.map { item ->
+                                    if (item.packageName == app.packageName) item.copy(isManaged = isManaged) else item
+                                }
                                 coroutineScope.launch {
                                     repository.setAppManaged(app.packageName, app.appName, isManaged)
-                                    refreshApps()
                                 }
                             },
                             onOpenSchedule = {
