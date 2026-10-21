@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -31,13 +32,19 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onSplashComplete: () -> Unit) {
-    val scale = remember { Animatable(0.96f) }
+    val scale = remember { Animatable(0.82f) }
     val alpha = remember { Animatable(0f) }
+    val rotation = remember { Animatable(-5f) }
+    val exitAlpha = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        alpha.animateTo(1f, tween(180))
-        scale.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
+        // Finite startup motion only: reveal, settle, then hand off to the app.
+        alpha.animateTo(1f, tween(220))
+        scale.animateTo(1.04f, tween(260, easing = FastOutSlowInEasing))
+        rotation.animateTo(0f, tween(180, easing = FastOutSlowInEasing))
+        scale.animateTo(1f, tween(140, easing = FastOutSlowInEasing))
         delay(180)
+        exitAlpha.animateTo(0f, tween(140))
         onSplashComplete()
     }
 
@@ -52,7 +59,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .scale(scale.value)
-                .alpha(alpha.value)
+                .alpha(alpha.value * exitAlpha.value)
         ) {
             Image(
                 painter = painterResource(R.drawable.app_icon_18_blocker_1792376066440),
@@ -60,6 +67,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
                 modifier = Modifier
                     .size(76.dp)
                     .clip(RoundedCornerShape(18.dp))
+                    .graphicsLayer { rotationZ = rotation.value }
             )
 
             Spacer(modifier = Modifier.height(18.dp))

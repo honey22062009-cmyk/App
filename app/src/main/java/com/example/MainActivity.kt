@@ -9,6 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -209,7 +212,10 @@ fun MainAppScaffold(
                 Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                     AnimatedContent(
                         targetState = currentScreen,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        transitionSpec = {
+                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
+                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                        },
                         label = "tablet_screen_transition"
                     ) { targetScreen ->
                         ScreenContent(
@@ -274,7 +280,10 @@ fun MainAppScaffold(
                 ) {
                     AnimatedContent(
                         targetState = currentScreen,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        transitionSpec = {
+                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
+                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                        },
                         label = "phone_screen_transition"
                     ) { targetScreen ->
                         ScreenContent(

@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,18 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private object AppIconMemoryCache {
+    // Package icons are reused heavily while flinging the apps list. Keeping the small
+    // decoded bitmaps in memory avoids repeated PackageManager + bitmap work per row.
+    private val cache = LruCache<String, ImageBitmap>(96)
+
+    fun get(packageName: String): ImageBitmap? = synchronized(cache) { cache.get(packageName) }
+
+    fun put(packageName: String, bitmap: ImageBitmap) {
+        synchronized(cache) { cache.put(packageName, bitmap) }
+    }
+}
+
 @Composable
 fun AppIconImage(
     packageName: String,
@@ -33,11 +46,19 @@ fun AppIconImage(
 ) {
     val context = LocalContext.current
 
-    val bitmapState = produceState<ImageBitmap?>(initialValue = null, key1 = packageName) {
+    val bitmapState = produceState<ImageBitmap?>(
+        initialValue = AppIconMemoryCache.get(packageName),
+        key1 = packageName
+    ) {
+        if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
-            try {
+            AppIconMemoryCache.get(packageName) ?: try {
                 val drawable: Drawable = context.packageManager.getApplicationIcon(packageName)
-                drawable.toBitmap(128, 128).asImageBitmap()
+                // 64px is ample for the 32-44dp list icons and is much cheaper to decode
+                // during a fast fling than the old 128px bitmap.
+                drawable.toBitmap(64, 64).asImageBitmap().also {
+                    AppIconMemoryCache.put(packageName, it)
+                }
             } catch (_: Exception) {
                 null
             }
