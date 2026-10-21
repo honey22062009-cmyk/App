@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -27,6 +28,10 @@ class SettingsPreferences(private val context: Context) {
 
         // Adult Content Protection Settings
         val ADULT_PROTECTION_ENABLED = booleanPreferencesKey("adult_protection_enabled")
+        val STRICT_ADULT_MODE = booleanPreferencesKey("strict_adult_mode")
+        val ADULT_UNLOCK_NOT_BEFORE = longPreferencesKey("adult_unlock_not_before")
+        val ADULT_UNLOCK_VERIFIED = booleanPreferencesKey("adult_unlock_verified")
+        val ADULT_COOLDOWN_SECONDS = intPreferencesKey("adult_cooldown_seconds")
         val BLOCK_INCOGNITO_ENABLED = booleanPreferencesKey("block_incognito_enabled")
         val FORCE_SAFESEARCH_ENABLED = booleanPreferencesKey("force_safesearch_enabled")
         val DNS_FILTER_ENABLED = booleanPreferencesKey("dns_filter_enabled")
@@ -62,6 +67,11 @@ class SettingsPreferences(private val context: Context) {
     val isAdultProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] ?: true
     }
+
+    val isStrictAdultModeFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.STRICT_ADULT_MODE] ?: true }
+    val adultUnlockNotBeforeFlow: Flow<Long> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] ?: 0L }
+    val adultUnlockVerifiedFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_VERIFIED] ?: false }
+    val adultCooldownSecondsFlow: Flow<Int> = context.dataStore.data.map { it[PreferencesKeys.ADULT_COOLDOWN_SECONDS] ?: 60 }
 
     val isBlockIncognitoEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] ?: true
@@ -120,27 +130,65 @@ class SettingsPreferences(private val context: Context) {
     }
 
     suspend fun setAdultProtectionEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] = enabled
+        if (enabled) {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] = true
+                preferences[PreferencesKeys.STRICT_ADULT_MODE] = true
+                preferences[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] = 0L
+                preferences[PreferencesKeys.ADULT_UNLOCK_VERIFIED] = false
+                preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = true
+                preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = true
+                preferences[PreferencesKeys.DNS_FILTER_ENABLED] = true
+            }
+        } else {
+            requestAdultProtectionDisable()
         }
+    }
+
+    suspend fun requestAdultProtectionDisable(delayMinutes: Int = 10) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.STRICT_ADULT_MODE] = true
+            preferences[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] =
+                System.currentTimeMillis() + delayMinutes.coerceAtLeast(1) * 60_000L
+            preferences[PreferencesKeys.ADULT_UNLOCK_VERIFIED] = false
+        }
+    }
+
+    suspend fun markAdultUnlockVerificationPassed() {
+        context.dataStore.edit { it[PreferencesKeys.ADULT_UNLOCK_VERIFIED] = true }
+    }
+
+    suspend fun completeAdultProtectionDisable(verificationPassed: Boolean): Boolean {
+        val snapshot = context.dataStore.data.first()
+        val notBefore = snapshot[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] ?: 0L
+        val verified = verificationPassed || (snapshot[PreferencesKeys.ADULT_UNLOCK_VERIFIED] ?: false)
+        if (notBefore <= 0L || System.currentTimeMillis() < notBefore || !verified) return false
+        context.dataStore.edit {
+            it[PreferencesKeys.ADULT_PROTECTION_ENABLED] = false
+            it[PreferencesKeys.STRICT_ADULT_MODE] = false
+            it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] = 0L
+            it[PreferencesKeys.ADULT_UNLOCK_VERIFIED] = false
+        }
+        return true
+    }
+
+    suspend fun setAdultCooldownSeconds(seconds: Int) {
+        context.dataStore.edit { it[PreferencesKeys.ADULT_COOLDOWN_SECONDS] = seconds.coerceIn(30, 300) }
     }
 
     suspend fun setBlockIncognitoEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = enabled
-        }
+        if (isStrictAdultModeFlow.first() && !enabled) return
+        context.dataStore.edit { it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = enabled }
     }
 
     suspend fun setForceSafeSearchEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = enabled
-        }
+        if (isStrictAdultModeFlow.first() && !enabled) return
+        context.dataStore.edit { it[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = enabled }
     }
 
     suspend fun setDnsFilterEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DNS_FILTER_ENABLED] = enabled
-        }
+        if (isStrictAdultModeFlow.first() && !enabled) return
+        context.dataStore.edit { it[PreferencesKeys.DNS_FILTER_ENABLED] = enabled }
     }
 
     suspend fun setAppGroups(groups: Set<String>) {
