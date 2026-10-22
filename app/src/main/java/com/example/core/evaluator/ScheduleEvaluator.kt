@@ -255,7 +255,7 @@ object ScheduleEvaluator {
         var candidate: ScheduleTransition? = null
 
         // Eight days covers the next weekly recurrence plus an overnight end boundary.
-        for (dayOffset in 0L..8L) {
+        for (dayOffset in -1L..8L) {
             val date = fromDateTime.toLocalDate().plusDays(dayOffset)
             for (period in enabledPeriods) {
                 if (period.dayOfWeek != date.dayOfWeek) continue
