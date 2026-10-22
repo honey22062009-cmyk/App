@@ -169,10 +169,18 @@ class BlockerMonitoringService : Service() {
         val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
         val event = UsageEvents.Event()
         var lastForegroundPkg: String? = null
+        // Android 10 renamed MOVE_TO_FOREGROUND to ACTIVITY_RESUMED. Support both
+        // because the app's minSdk is Android 8.0 (API 26).
+        val foregroundEventType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            UsageEvents.Event.ACTIVITY_RESUMED
+        } else {
+            @Suppress("DEPRECATION")
+            UsageEvents.Event.MOVE_TO_FOREGROUND
+        }
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+            if (event.eventType == foregroundEventType) {
                 lastForegroundPkg = event.packageName
             }
         }
