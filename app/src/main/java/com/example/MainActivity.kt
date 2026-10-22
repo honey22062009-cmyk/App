@@ -138,7 +138,7 @@ fun MainAppScaffold(
 ) {
     var currentScreen by remember {
         mutableStateOf<Screen>(
-            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Dashboard
+            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
         )
     }
 
@@ -147,13 +147,16 @@ fun MainAppScaffold(
     }
     var isInitialRouteResolved by remember { mutableStateOf(false) }
 
-    // Resolve the first-run route from persisted state before showing navigation.
+    // Resolve persisted onboarding before exposing navigation. A schedule deep link
+    // remains the highest-priority destination.
     LaunchedEffect(repository, initialTargetPackage) {
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
-        currentScreen = when {
-            !initialTargetPackage.isNullOrEmpty() -> Screen.Schedules
-            onboardingCompleted -> Screen.Dashboard
-            else -> Screen.Permissions
+        if (!initialTargetPackage.isNullOrEmpty()) {
+            currentScreen = Screen.Schedules
+        } else if (onboardingCompleted) {
+            currentScreen = Screen.Dashboard
+        } else {
+            currentScreen = Screen.Permissions
         }
         isInitialRouteResolved = true
     }
