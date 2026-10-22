@@ -77,8 +77,11 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
         val usageStats = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return false
         val end = System.currentTimeMillis()
+        // Keep the last resume transition even when the target app has stayed
+        // foreground for longer than a short polling window.
+        val start = end - 24L * 60L * 60L * 1000L
         val events = try {
-            usageStats.queryEvents(end - 15_000L, end)
+            usageStats.queryEvents(start, end)
         } catch (_: SecurityException) {
             return false
         } ?: return false
