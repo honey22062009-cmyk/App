@@ -37,15 +37,18 @@ import java.nio.ByteBuffer
 /**
  * On-device DNS filtering VPN Service for device-wide 18+ adult content blocking.
  *
- * Configures the system network stack to resolve domain names through verified,
- * privacy-first adult-blocking DNS resolvers (CleanBrowsing Family, Cloudflare Families 1.1.1.3).
+ * Configures system DNS to use the selected IPv4 resolver(s). If no custom resolver is set,
+ * the default upstreams are Cloudflare Family DNS (1.1.1.3 and 1.0.0.3). Custom DNS addresses
+ * are user-selected and are not independently verified by this app.
  *
- * Intercepts DNS queries on port 53 locally:
- * - If domain is on the adult blocklist, responds with NXDOMAIN / 0.0.0.0 locally.
- * - Otherwise forwards through Cloudflare Families (1.1.1.3) protected upstream.
+ * Intercepts IPv4 UDP DNS queries on port 53 locally:
+ * - If a domain matches the local adult block rules, returns a local NXDOMAIN response.
+ * - Otherwise forwards the DNS query to the configured upstream resolver.
  *
- * Privacy Note: Does NOT inspect or decrypt HTTPS traffic, does NOT tunnel non-DNS traffic
- * to any remote proxy. Explicitly blocked DNS domains may be recorded as local block events; no browsing data is uploaded by this service.
+ * Privacy note: this service does not decrypt HTTPS or route non-DNS traffic through a proxy.
+ * Non-blocked DNS queries are sent to the configured resolver, which can see the queried domain
+ * and may log it according to its own policies. Blocked domains may be recorded as local events;
+ * this app does not include an analytics or browsing-history upload backend.
  */
 class AdultFilterVpnService : VpnService(), Runnable {
 
