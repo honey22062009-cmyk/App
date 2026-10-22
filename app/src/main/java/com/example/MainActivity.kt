@@ -169,8 +169,11 @@ fun MainAppScaffold(
         isInitialRouteResolved = true
     }
 
-    // Intercept back button when on sub-screens
-    BackHandler(enabled = currentScreen != Screen.Dashboard) {
+    // On first launch, Back should leave the permission guide rather than silently
+    // navigating around the incomplete setup. Onboarding remains pending for next launch.
+    BackHandler(
+        enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
+    ) {
         when (currentScreen) {
             Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
