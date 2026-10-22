@@ -241,14 +241,14 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         }
 
         val combinedText = windowTextBuilder.toString()
-        if (combinedText.isNotBlank()) {
-            // Full page/window text uses conservative context scoring. Strict keyword/domain
-            // matching is reserved for the actual address/search field.
+        if (combinedText.isNotBlank() && !isBrowser) {
+            // Do not classify an entire browser page from visible words. A legitimate page
+            // (GitHub source, documentation, health/education content, etc.) can mention
+            // restricted terms without the user visiting restricted content. Browsers are
+            // enforced from their URL/search field plus DNS; non-browser WebViews/apps use
+            // conservative visible-context scoring.
             val eval = AdultContentEvaluator.evaluateVisibleContext(combinedText)
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
-                if (eval.category == AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED && !blockIncognito) {
-                    return false
-                }
                 triggerAdultBlock(packageName, eval.category.label, eval.layer)
                 return true
             }
