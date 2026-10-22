@@ -32,6 +32,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private var lastBlockTimestamp: Long = 0L
 
     private var lastAdultTriggerTimestamp: Long = 0L
+    private var adultBlockedPackage: String? = null
+    private var adultBlockedUntil: Long = 0L
+    private var lastAdultReassertTimestamp: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -58,6 +61,17 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
 
         serviceScope.launch {
+            // If explicit content was just detected in this app, keep the offending app
+            // out of view for the configured cooldown even if its next accessibility event
+            // no longer exposes the original text.
+            if (packageName == adultBlockedPackage && now < adultBlockedUntil) {
+                if (now - lastAdultReassertTimestamp > 700L) {
+                    lastAdultReassertTimestamp = now
+                    reassertAdultBlock(packageName)
+                }
+                return@launch
+            }
+
             // 1. Layer: 18+ Adult Content Protection across browsers and webviews
             val adultProtectionEnabled = repository.settings.isAdultProtectionEnabledFlow.first()
             if (adultProtectionEnabled) {
@@ -254,6 +268,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         delay(120)
 
         val cooldownSeconds = repository.settings.adultCooldownSecondsFlow.first()
+        adultBlockedPackage = packageName
+        adultBlockedUntil = System.currentTimeMillis() + cooldownSeconds * 1000L
 
         // Launch clean neutral 18+ Block Screen (single top to prevent stacked duplicates)
         val intent = Intent(this, BlockerActivity::class.java).apply {
@@ -264,6 +280,31 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             putExtra(BlockerActivity.EXTRA_ADULT_LAYER, layer)
             putExtra(BlockerActivity.EXTRA_ADULT_REASON, reason)
             putExtra(BlockerActivity.EXTRA_ADULT_COOLDOWN_SECONDS, cooldownSeconds)
+        }
+        startActivity(intent)
+    }
+
+    private suspend fun reassertAdultBlock(packageName: String) {
+        val remainingSeconds = ((adultBlockedUntil - System.currentTimeMillis()) / 1000L)
+            .coerceAtLeast(1L)
+            .toInt()
+        val appLabel = try {
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(appInfo).toString()
+        } catch (_: Exception) {
+            "Restricted app"
+        }
+
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        delay(100)
+        val intent = Intent(this, BlockerActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
+            putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
+            putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_ADULT)
+            putExtra(BlockerActivity.EXTRA_ADULT_LAYER, "Protection cooldown")
+            putExtra(BlockerActivity.EXTRA_ADULT_REASON, "Restricted content was recently detected")
+            putExtra(BlockerActivity.EXTRA_ADULT_COOLDOWN_SECONDS, remainingSeconds)
         }
         startActivity(intent)
     }
