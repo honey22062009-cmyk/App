@@ -128,7 +128,8 @@
       "",
       "I understand that delivery is manual and subject to payment verification."
     ].join("\n");
-    const mailto = "mailto:" + encodeURIComponent(supportEmail) +
+    // supportEmail is validated above; keep the addr-spec intact in the mailto path.
+    const mailto = "mailto:" + supportEmail +
       "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
     byId("deliveryStatus").textContent = "Your email app should open with a draft. Review it and press Send. No request is sent automatically.";
     window.location.href = mailto;
