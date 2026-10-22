@@ -2,6 +2,8 @@ package com.example.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.net.Uri
+import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.core.evaluator.AdultContentEvaluator
@@ -128,14 +130,18 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * Returns true if adult content was detected and blocked.
      */
     private suspend fun inspectForAdultContent(packageName: String, event: AccessibilityEvent): Boolean {
-        val isBrowser = AdultContentEvaluator.isBrowserPackage(packageName)
+        val isBrowser = isBrowserApp(packageName)
         val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
 
         // 1. Check immediate event text and content descriptions (fastest 0ms detection)
         event.text?.forEach { charSeq ->
             val text = charSeq.toString()
             if (text.isNotBlank()) {
-                val eval = if (isBrowser) AdultContentEvaluator.evaluateText(text) else AdultContentEvaluator.evaluateVisibleContext(text)
+                // Generic browser events often contain page/menu text. Treating every word
+                // as a URL caused false positives (for example a normal page mentioning an
+                // explicit term, or Chrome exposing "New incognito tab" in its menu tree).
+                // Only URL/address-bar nodes get strict URL evaluation below.
+                val eval = AdultContentEvaluator.evaluateVisibleContext(text)
                 if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                     if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
                         triggerAdultBlock(packageName, eval.category.label, eval.layer)
@@ -147,7 +153,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         val eventDesc = event.contentDescription?.toString()
         if (!eventDesc.isNullOrBlank()) {
-            val eval = if (isBrowser) AdultContentEvaluator.evaluateText(eventDesc) else AdultContentEvaluator.evaluateVisibleContext(eventDesc)
+            val eval = AdultContentEvaluator.evaluateVisibleContext(eventDesc)
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                 if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
                     triggerAdultBlock(packageName, eval.category.label, eval.layer)
@@ -193,6 +199,29 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 2b. Unknown/new browsers may use different resource IDs. Inspect editable
+        // fields as URL/search candidates so they cannot bypass protection just because
+        // their package or toolbar ID is not in our curated list.
+        if (isBrowser) {
+            val editableNodes = ArrayDeque<AccessibilityNodeInfo>()
+            editableNodes.add(rootNode)
+            var inspectedEditableCandidates = 0
+            while (editableNodes.isNotEmpty() && inspectedEditableCandidates < 160) {
+                val node = editableNodes.removeFirst()
+                inspectedEditableCandidates++
+                val eval = evaluateEditableBrowserNode(node)
+                if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
+                    if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
+                        triggerAdultBlock(packageName, eval.category.label, eval.layer)
+                        return true
+                    }
+                }
+                for (i in 0 until node.childCount) {
+                    try { node.getChild(i)?.let(editableNodes::addLast) } catch (_: Exception) { }
+                }
+            }
+        }
+
         // 3. Scan the active hierarchy more deeply. Some modern browsers and WebViews
         // expose the address bar/page text only after focus, scroll or text-change events.
         val windowTextBuilder = StringBuilder()
@@ -213,11 +242,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         val combinedText = windowTextBuilder.toString()
         if (combinedText.isNotBlank()) {
-            val eval = if (isBrowser) {
-                AdultContentEvaluator.evaluateText(combinedText)
-            } else {
-                AdultContentEvaluator.evaluateVisibleContext(combinedText)
-            }
+            // Full page/window text uses conservative context scoring. Strict keyword/domain
+            // matching is reserved for the actual address/search field.
+            val eval = AdultContentEvaluator.evaluateVisibleContext(combinedText)
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                 if (eval.category == AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED && !blockIncognito) {
                     return false
@@ -228,6 +255,27 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         }
 
         return false
+    }
+
+    private fun isBrowserApp(packageName: String): Boolean {
+        if (AdultContentEvaluator.isBrowserPackage(packageName)) return true
+
+        // Detect installed third-party browsers by capability instead of relying only on
+        // a package-name list. This closes the easy "install another browser" bypass.
+        return try {
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"))
+            packageManager.queryIntentActivities(webIntent, PackageManager.MATCH_ALL)
+                .any { it.activityInfo?.packageName == packageName }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun evaluateEditableBrowserNode(node: AccessibilityNodeInfo?): AdultContentEvaluator.EvaluationResult {
+        if (node == null || !node.isEditable) return AdultContentEvaluator.EvaluationResult.Clean
+        val value = node.text?.toString().orEmpty()
+        if (value.isBlank()) return AdultContentEvaluator.EvaluationResult.Clean
+        return AdultContentEvaluator.evaluateText(value)
     }
 
     private fun collectNodeText(node: AccessibilityNodeInfo?, out: StringBuilder, maxDepth: Int, maxNodes: IntArray) {
