@@ -404,4 +404,24 @@ class ScheduleEvaluatorTest {
         assertEquals(9, merged.first { it.appPackage == samplePkg }.startHour)
         assertEquals(10, merged.first { it.appPackage == "com.example.other" }.startHour)
     }
+    @Test
+    fun zeroLengthMidnightWindowDoesNotPretendThereIsAnAllowedBoundary() {
+        val emptyWindow = SchedulePeriod(
+            id = 60,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 0,
+            startMinute = 0,
+            endHour = 0,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(17, 0)
+
+        val evaluation = ScheduleEvaluator.evaluate(listOf(emptyWindow), now)
+
+        assertTrue(evaluation.isBlocked)
+        assertEquals(null, evaluation.nextAllowedDateTime)
+        assertEquals(null, ScheduleEvaluator.findNextAllowedTime(listOf(emptyWindow), now))
+        assertEquals(null, ScheduleEvaluator.findNextTransition(listOf(emptyWindow), now))
+    }
 }
