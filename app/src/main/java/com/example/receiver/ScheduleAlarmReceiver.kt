@@ -12,8 +12,8 @@ import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Verifies the app's state at schedule boundaries and schedules the next boundary.
@@ -32,30 +32,33 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
                 if (!packageName.isNullOrBlank()) {
                     val repository = AppBlockerRepository(appContext)
                     val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
-                    if (protectionEnabled && isPackageForeground(appContext, packageName)) {
+                    val targetIsForeground =
+                        protectionEnabled && isPackageForeground(appContext, packageName)
+
+                    if (targetIsForeground) {
                         val evaluation = repository.evaluateApp(packageName)
                         if (evaluation.isBlocked) {
-                        val appLabel = try {
-                            val info = appContext.packageManager.getApplicationInfo(packageName, 0)
-                            appContext.packageManager.getApplicationLabel(info).toString()
-                        } catch (_: Exception) {
-                            packageName
-                        }
+                            val appLabel = try {
+                                val info = appContext.packageManager.getApplicationInfo(packageName, 0)
+                                appContext.packageManager.getApplicationLabel(info).toString()
+                            } catch (_: Exception) {
+                                packageName
+                            }
 
-                        repository.recordBlockEvent(packageName, appLabel, "Schedule window expired")
+                            repository.recordBlockEvent(packageName, appLabel, "Schedule window expired")
 
-                        val blockIntent = Intent(appContext, BlockerActivity::class.java).apply {
-                            addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                    Intent.FLAG_ACTIVITY_NO_ANIMATION
-                            )
-                            putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
-                            putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
-                            putExtra(BlockerActivity.EXTRA_NEXT_ALLOWED, evaluation.formattedNextAllowedTime)
-                            putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
-                        }
-                        appContext.startActivity(blockIntent)
+                            val blockIntent = Intent(appContext, BlockerActivity::class.java).apply {
+                                addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                                )
+                                putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
+                                putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
+                                putExtra(BlockerActivity.EXTRA_NEXT_ALLOWED, evaluation.formattedNextAllowedTime)
+                                putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
+                            }
+                            appContext.startActivity(blockIntent)
                         }
                     }
                 }
