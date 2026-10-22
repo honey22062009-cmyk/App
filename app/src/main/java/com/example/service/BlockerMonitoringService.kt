@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.PowerManager
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -36,6 +37,9 @@ class BlockerMonitoringService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var repository: AppBlockerRepository
+
+    @Volatile
+    private var lastKnownForegroundPackage: String? = null
 
     companion object {
         const val CHANNEL_ID = "strict_blocker_service_channel"
@@ -164,14 +168,25 @@ class BlockerMonitoringService : Service() {
     }
 
     private fun getForegroundPackage(usageStatsManager: UsageStatsManager): String? {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (powerManager?.isInteractive == false) return null
+
         val endTime = System.currentTimeMillis()
-        // queryEvents only includes resume transitions inside its requested window. A
-        // 10-second window returned null for apps that stayed foreground longer than
-        // 10 seconds, disabling the polling fallback until the next app switch.
-        val startTime = endTime - 24L * 60L * 60L * 1000L
-        val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
-        val event = UsageEvents.Event()
-        var lastForegroundPkg: String? = null
+        val cachedPackage = lastKnownForegroundPackage
+        // A short rolling window detects switches cheaply. Query a full day only once
+        // when the service has no cached foreground package (e.g. process restart).
+        val lookback = if (cachedPackage == null) {
+            24L * 60L * 60L * 1000L
+        } else {
+            10_000L
+        }
+        val events = try {
+            usageStatsManager.queryEvents(endTime - lookback, endTime)
+        } catch (_: SecurityException) {
+            return null
+        } ?: return cachedPackage
+
+        var mostRecentForegroundPackage: String? = null
         // Android 10 renamed MOVE_TO_FOREGROUND to ACTIVITY_RESUMED. Support both
         // because the app's minSdk is Android 8.0 (API 26).
         val foregroundEventType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -181,13 +196,18 @@ class BlockerMonitoringService : Service() {
             UsageEvents.Event.MOVE_TO_FOREGROUND
         }
 
+        val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             if (event.eventType == foregroundEventType) {
-                lastForegroundPkg = event.packageName
+                mostRecentForegroundPackage = event.packageName
             }
         }
-        return lastForegroundPkg
+
+        if (!mostRecentForegroundPackage.isNullOrBlank()) {
+            lastKnownForegroundPackage = mostRecentForegroundPackage
+        }
+        return lastKnownForegroundPackage
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
