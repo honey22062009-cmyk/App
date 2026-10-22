@@ -5,12 +5,14 @@ import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import com.example.core.system.AlarmScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -27,38 +29,44 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                if (!packageName.isNullOrBlank() && isPackageForeground(appContext, packageName)) {
+                if (!packageName.isNullOrBlank()) {
                     val repository = AppBlockerRepository(appContext)
-                    val evaluation = repository.evaluateApp(packageName)
-                    if (evaluation.isBlocked) {
-                        val appLabel = try {
-                            val info = appContext.packageManager.getApplicationInfo(packageName, 0)
-                            appContext.packageManager.getApplicationLabel(info).toString()
-                        } catch (_: Exception) {
-                            packageName
-                        }
+                    val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
+                    val targetIsForeground =
+                        protectionEnabled && isPackageForeground(appContext, packageName)
 
-                        repository.recordBlockEvent(packageName, appLabel, "Schedule window expired")
+                    if (targetIsForeground) {
+                        val evaluation = repository.evaluateApp(packageName)
+                        if (evaluation.isBlocked) {
+                            val appLabel = try {
+                                val info = appContext.packageManager.getApplicationInfo(packageName, 0)
+                                appContext.packageManager.getApplicationLabel(info).toString()
+                            } catch (_: Exception) {
+                                packageName
+                            }
 
-                        val blockIntent = Intent(appContext, BlockerActivity::class.java).apply {
-                            addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                    Intent.FLAG_ACTIVITY_NO_ANIMATION
-                            )
-                            putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
-                            putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
-                            putExtra(BlockerActivity.EXTRA_NEXT_ALLOWED, evaluation.formattedNextAllowedTime)
-                            putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
+                            repository.recordBlockEvent(packageName, appLabel, "Schedule window expired")
+
+                            val blockIntent = Intent(appContext, BlockerActivity::class.java).apply {
+                                addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                                )
+                                putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
+                                putExtra(BlockerActivity.EXTRA_APP_NAME, appLabel)
+                                putExtra(BlockerActivity.EXTRA_NEXT_ALLOWED, evaluation.formattedNextAllowedTime)
+                                putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
+                            }
+                            appContext.startActivity(blockIntent)
                         }
-                        appContext.startActivity(blockIntent)
                     }
                 }
             } catch (e: Exception) {
                 Log.w("ScheduleAlarmReceiver", "Transition verification failed", e)
             } finally {
-                // Always replace the fired alarm, even when querying Usage Access or the
-                // database fails. The Accessibility/monitoring services remain fallback paths.
+                // Always replace the fired alarm. The Accessibility/monitoring services
+                // remain fallback enforcement paths if Usage Access is unavailable.
                 AlarmScheduler.scheduleNextTransition(appContext)
                 pendingResult.finish()
             }
@@ -69,7 +77,9 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
         val usageStats = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return false
         val end = System.currentTimeMillis()
-        val start = end - 15_000L
+        // Keep the last resume transition even when the target app has stayed
+        // foreground for longer than a short polling window.
+        val start = end - 24L * 60L * 60L * 1000L
         val events = try {
             usageStats.queryEvents(start, end)
         } catch (_: SecurityException) {
@@ -78,9 +88,16 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
 
         val event = UsageEvents.Event()
         var mostRecentResumedPackage: String? = null
+        // Android 10+ emits ACTIVITY_RESUMED; Android 8/9 use MOVE_TO_FOREGROUND.
+        val foregroundEventType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            UsageEvents.Event.ACTIVITY_RESUMED
+        } else {
+            @Suppress("DEPRECATION")
+            UsageEvents.Event.MOVE_TO_FOREGROUND
+        }
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+            if (event.eventType == foregroundEventType) {
                 mostRecentResumedPackage = event.packageName
             }
         }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -65,6 +66,7 @@ import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -73,11 +75,15 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TARGET_PACKAGE = "extra_target_package"
     }
 
+    // Compose observes this state, so a new intent sent to an existing Activity
+    // updates the requested destination instead of being silently ignored.
+    private var targetPackage by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
+        targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
 
         setContent {
             val context = LocalContext.current
@@ -96,8 +102,7 @@ class MainActivity : ComponentActivity() {
             StrictBlockerTheme(darkTheme = isDark) {
                 MainAppContent(
                     repository = repository,
-                    initialTargetPackage = targetPackage,
-                    onNewIntentTarget = { /* no-op */ }
+                    initialTargetPackage = targetPackage
                 )
             }
         }
@@ -106,14 +111,18 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // Normal launcher intents should not reset navigation. Only reroute when an
+        // explicit schedule deep-link target is supplied.
+        if (intent.hasExtra(EXTRA_TARGET_PACKAGE)) {
+            targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+        }
     }
 }
 
 @Composable
 fun MainAppContent(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?,
-    onNewIntentTarget: (String?) -> Unit
+    initialTargetPackage: String?
 ) {
     var isSplashVisible by remember { mutableStateOf(true) }
 
@@ -136,23 +145,52 @@ fun MainAppScaffold(
 ) {
     var currentScreen by remember {
         mutableStateOf<Screen>(
-            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Dashboard
+            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
         )
     }
 
     var selectedSchedulePackage by remember {
         mutableStateOf(initialTargetPackage)
     }
+    var isInitialRouteResolved by remember { mutableStateOf(false) }
 
-    // Intercept back button when on sub-screens
-    BackHandler(enabled = currentScreen != Screen.Dashboard) {
+    // Resolve persisted onboarding before exposing navigation. A schedule deep link
+    // remains the highest-priority destination.
+    LaunchedEffect(repository, initialTargetPackage) {
+        val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
+        if (!initialTargetPackage.isNullOrEmpty()) {
+            selectedSchedulePackage = initialTargetPackage
+            currentScreen = Screen.Schedules
+        } else if (onboardingCompleted) {
+            currentScreen = Screen.Dashboard
+        } else {
+            currentScreen = Screen.Permissions
+        }
+        isInitialRouteResolved = true
+    }
+
+    // On first launch, Back should leave the permission guide rather than silently
+    // navigating around the incomplete setup. Onboarding remains pending for next launch.
+    BackHandler(
+        enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
+    ) {
         when (currentScreen) {
             Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    if (!isInitialRouteResolved) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    } else {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth >= 720.dp
 
         if (isTablet) {
@@ -301,6 +339,7 @@ fun MainAppScaffold(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -311,6 +350,7 @@ fun ScreenContent(
     onNavigateToScreen: (Screen) -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     when (currentScreen) {
         Screen.Dashboard -> {
             DashboardScreen(
@@ -342,7 +382,12 @@ fun ScreenContent(
         }
         Screen.Permissions -> {
             PermissionsScreen(
-                onContinue = { onNavigateToScreen(Screen.Dashboard) }
+                onContinue = {
+                    scope.launch {
+                        repository.settings.setOnboardingCompleted(true)
+                        onNavigateToScreen(Screen.Dashboard)
+                    }
+                }
             )
         }
         Screen.Settings -> {

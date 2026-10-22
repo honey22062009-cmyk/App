@@ -220,4 +220,15 @@ class SettingsPreferences(private val context: Context) {
             preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] = current + 1
         }
     }
+
+    /**
+     * Clears all persisted preferences when the user explicitly requests a full local-data wipe.
+     * All settings flows have safe defaults when their keys are absent.
+     */
+    suspend fun clearAllUserPreferences() {
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+        }
+    }
+
 }

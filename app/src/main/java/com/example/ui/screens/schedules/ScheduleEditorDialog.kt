@@ -64,6 +64,9 @@ fun ScheduleEditorDialog(
 
     val startTime = remember(startHour, startMinute) { LocalTime.of(startHour, startMinute) }
     val endTime = remember(endHour, endMinute) { LocalTime.of(endHour, endMinute) }
+    // The model treats equal non-midnight times as a 24-hour window, but 00:00-00:00
+    // is a zero-length allowed window. Prevent that accidental always-blocked rule.
+    val invalidMidnightWindow = startTime == LocalTime.MIDNIGHT && endTime == LocalTime.MIDNIGHT
 
     val crossesMidnight = remember(startTime, endTime) {
         startTime > endTime || (startTime == endTime && (startHour != 0 || startMinute != 0))
@@ -167,7 +170,15 @@ fun ScheduleEditorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Midnight Crossing Alert Banner
+                // Schedule validation and overnight alert.
+                if (invalidMidnightWindow) {
+                    Text(
+                        text = "Start and end cannot both be 12:00 AM. Choose a different time; this would otherwise allow no time at all.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 if (crossesMidnight) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -186,7 +197,7 @@ fun ScheduleEditorDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Crosses midnight into ${selectedDay.plus(1).name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }} morning.",
+                                text = "This allowed window continues into the next day.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -210,6 +221,7 @@ fun ScheduleEditorDialog(
                     )
                     onSave(period)
                 },
+                enabled = !invalidMidnightWindow,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.testTag("schedule_save_button")

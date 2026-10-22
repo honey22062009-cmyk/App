@@ -17,13 +17,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 /**
  * High-performance, zero-latency accessibility service.
  * Enforces scheduled application blocking and real-time 18+ adult content protection.
  *
- * Privacy Note: Inspects only browser address bar nodes and explicit URL strings.
- * Never logs, records, or transmits passwords, personal chats, banking info, or private messages.
+ * Privacy Note: Adult-content inspection is limited to browser windows and visible accessibility
+ * text. Password fields and unrelated editable inputs are excluded from text inspection. No page
+ * text is uploaded; blocked-content events are recorded locally.
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
 
@@ -130,34 +132,44 @@ class AppBlockerAccessibilityService : AccessibilityService() {
      * Returns true if adult content was detected and blocked.
      */
     private suspend fun inspectForAdultContent(packageName: String, event: AccessibilityEvent): Boolean {
+        // Do not inspect accessibility text from messaging, banking, or non-browser apps.
+        // This guard runs before reading event.text or contentDescription.
         val isBrowser = isBrowserApp(packageName)
+        if (!isBrowser) return false
+
         val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
 
-        // 1. Check immediate event text and content descriptions (fastest 0ms detection)
-        event.text?.forEach { charSeq ->
-            val text = charSeq.toString()
-            if (text.isNotBlank()) {
-                // Generic browser events often contain page/menu text. Treating every word
-                // as a URL caused false positives (for example a normal page mentioning an
-                // explicit term, or Chrome exposing "New incognito tab" in its menu tree).
-                // Only URL/address-bar nodes get strict URL evaluation below.
-                val eval = AdultContentEvaluator.evaluateVisibleContext(text)
+        // Accessibility text-change events can originate from login, comment, or chat
+        // fields inside a browser. Do not evaluate their contents as URL/search text.
+        val eventSource = try { event.source } catch (_: Exception) { null }
+        val skipImmediateText = eventSource != null &&
+            (eventSource.isPassword ||
+                (eventSource.isEditable && !isLikelyAddressSearchField(eventSource)))
+
+        if (!skipImmediateText) {
+            // Immediate browser event text is checked conservatively; strict URL checks
+            // are reserved for fields with address/search metadata below.
+            event.text?.forEach { charSeq ->
+                val text = charSeq.toString()
+                if (text.isNotBlank()) {
+                    val eval = AdultContentEvaluator.evaluateVisibleContext(text)
+                    if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
+                        if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
+                            triggerAdultBlock(packageName, eval.category.label, eval.layer)
+                            return true
+                        }
+                    }
+                }
+            }
+
+            val eventDesc = event.contentDescription?.toString()
+            if (!eventDesc.isNullOrBlank()) {
+                val eval = AdultContentEvaluator.evaluateVisibleContext(eventDesc)
                 if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                     if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
                         triggerAdultBlock(packageName, eval.category.label, eval.layer)
                         return true
                     }
-                }
-            }
-        }
-
-        val eventDesc = event.contentDescription?.toString()
-        if (!eventDesc.isNullOrBlank()) {
-            val eval = AdultContentEvaluator.evaluateVisibleContext(eventDesc)
-            if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
-                if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
-                    triggerAdultBlock(packageName, eval.category.label, eval.layer)
-                    return true
                 }
             }
         }
@@ -272,23 +284,41 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun evaluateEditableBrowserNode(node: AccessibilityNodeInfo?): AdultContentEvaluator.EvaluationResult {
-        if (node == null || !node.isEditable) return AdultContentEvaluator.EvaluationResult.Clean
+        if (node == null || !node.isEditable || node.isPassword) {
+            return AdultContentEvaluator.EvaluationResult.Clean
+        }
+
+        if (!isLikelyAddressSearchField(node)) return AdultContentEvaluator.EvaluationResult.Clean
+
         val value = node.text?.toString().orEmpty()
         if (value.isBlank()) return AdultContentEvaluator.EvaluationResult.Clean
         return AdultContentEvaluator.evaluateText(value)
+    }
+
+    private fun isLikelyAddressSearchField(node: AccessibilityNodeInfo): Boolean {
+        val metadata = listOf(
+            node.viewIdResourceName,
+            node.contentDescription?.toString(),
+            node.hintText?.toString()
+        ).filterNotNull().joinToString(" ").lowercase(Locale.ROOT)
+        return listOf("url", "address", "omnibox", "location bar", "search", "website")
+            .any(metadata::contains)
     }
 
     private fun collectNodeText(node: AccessibilityNodeInfo?, out: StringBuilder, maxDepth: Int, maxNodes: IntArray) {
         if (node == null || maxDepth <= 0 || maxNodes[0] <= 0) return
         maxNodes[0]--
 
-        val text = node.text?.toString()
-        if (!text.isNullOrBlank()) {
-            out.append(" ").append(text)
-        }
-        val desc = node.contentDescription?.toString()
-        if (!desc.isNullOrBlank()) {
-            out.append(" ").append(desc)
+        // Never read or recurse into password fields while scanning visible browser context.
+        if (node.isPassword) return
+
+        // Address/search inputs are evaluated separately. Do not include other editable
+        // values such as login names or chat drafts in the page-context text scan.
+        if (!node.isEditable) {
+            val text = node.text?.toString()
+            if (!text.isNullOrBlank()) out.append(" ").append(text)
+            val desc = node.contentDescription?.toString()
+            if (!desc.isNullOrBlank()) out.append(" ").append(desc)
         }
 
         for (i in 0 until node.childCount) {

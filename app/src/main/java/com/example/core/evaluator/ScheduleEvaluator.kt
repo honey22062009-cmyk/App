@@ -31,7 +31,7 @@ object ScheduleEvaluator {
         periods: List<SchedulePeriod>,
         dateTime: LocalDateTime = LocalDateTime.now()
     ): BlockEvaluationResult {
-        val enabledPeriods = periods.filter { it.isEnabled }
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
 
         if (enabledPeriods.isEmpty()) {
             return BlockEvaluationResult(
@@ -103,7 +103,7 @@ object ScheduleEvaluator {
         periods: List<SchedulePeriod>,
         fromDateTime: LocalDateTime
     ): LocalDateTime? {
-        val enabledPeriods = periods.filter { it.isEnabled }
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
         if (enabledPeriods.isEmpty()) return null
 
         var candidate: LocalDateTime? = null
@@ -181,50 +181,111 @@ object ScheduleEvaluator {
     }
 
     /**
-     * Merges overlapping or contiguous periods on the same day into consolidated periods.
+     * Merges overlapping or contiguous periods for the same weekday and enabled state.
+     * Endpoints for overnight windows are normalised past midnight before comparing them;
+     * comparing LocalTime directly would incorrectly truncate ranges such as 22:00-01:00
+     * merged with 23:00-23:45. Disabled rules must never be merged into enabled rules.
      */
     fun mergeOverlapping(periods: List<SchedulePeriod>): List<SchedulePeriod> {
         val result = mutableListOf<SchedulePeriod>()
-        val groupedByDay = periods.groupBy { it.dayOfWeek }
+        val grouped = periods.groupBy { Triple(it.appPackage, it.dayOfWeek, it.isEnabled) }
 
-        for ((_, dayPeriods) in groupedByDay) {
+        fun startMinute(period: SchedulePeriod): Int =
+            period.startHour * 60 + period.startMinute
+
+        fun endMinuteOnStartDay(period: SchedulePeriod): Int {
+            val end = period.endHour * 60 + period.endMinute
+            return if (period.crossesMidnight) end + 24 * 60 else end
+        }
+
+        for ((_, dayPeriods) in grouped) {
             if (dayPeriods.isEmpty()) continue
 
-            // Sort by start time
             val sorted = dayPeriods.sortedWith(
-                compareBy({ it.startHour * 60 + it.startMinute }, { it.endHour * 60 + it.endMinute })
+                compareBy<SchedulePeriod>({ startMinute(it) }, { endMinuteOnStartDay(it) })
             )
 
             var current = sorted.first()
-            for (i in 1 until sorted.size) {
-                val next = sorted[i]
-                if (periodsOverlapOnSameDay(current, next)) {
-                    // Merge current and next
-                    val earliestStart = if (current.startTime <= next.startTime) current.startTime else next.startTime
-                    val latestEnd = when {
-                        current.crossesMidnight || next.crossesMidnight -> {
-                            if (current.crossesMidnight && next.crossesMidnight) {
-                                if (current.endTime >= next.endTime) current.endTime else next.endTime
-                            } else if (current.crossesMidnight) current.endTime else next.endTime
-                        }
-                        current.endTime >= next.endTime -> current.endTime
-                        else -> next.endTime
-                    }
+            var currentStart = startMinute(current)
+            var currentEnd = endMinuteOnStartDay(current)
 
+            for (next in sorted.drop(1)) {
+                val nextStart = startMinute(next)
+                val nextEnd = endMinuteOnStartDay(next)
+
+                // Inclusive comparison also consolidates back-to-back periods. A full
+                // 24-hour interval cannot be represented unambiguously by this model:
+                // 00:00-00:00 means an empty period, so keep both source rules instead.
+                val proposedEnd = maxOf(currentEnd, nextEnd)
+                val canRepresentMergedWindow = proposedEnd - currentStart < 24 * 60
+                if (nextStart <= currentEnd && canRepresentMergedWindow) {
+                    currentEnd = proposedEnd
+                    val wrappedEnd = currentEnd % (24 * 60)
                     current = current.copy(
-                        startHour = earliestStart.hour,
-                        startMinute = earliestStart.minute,
-                        endHour = latestEnd.hour,
-                        endMinute = latestEnd.minute
+                        endHour = wrappedEnd / 60,
+                        endMinute = wrappedEnd % 60
                     )
                 } else {
                     result.add(current)
                     current = next
+                    currentStart = nextStart
+                    currentEnd = nextEnd
                 }
             }
             result.add(current)
         }
 
-        return result
+        return result.sortedWith(
+            compareBy<SchedulePeriod>(
+                { it.appPackage },
+                { it.dayOfWeek.value },
+                { startMinute(it) },
+                { it.isEnabled }
+            )
+        )
+    }
+
+    /**
+     * Finds the next start or end boundary for any enabled period.
+     * A transition is opening at the period start and closing at its end.
+     */
+    data class ScheduleTransition(
+        val dateTime: LocalDateTime,
+        val isOpening: Boolean
+    )
+
+    fun findNextTransition(
+        periods: List<SchedulePeriod>,
+        fromDateTime: LocalDateTime
+    ): ScheduleTransition? {
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
+        if (enabledPeriods.isEmpty()) return null
+
+        var candidate: ScheduleTransition? = null
+
+        // Eight days covers the next weekly recurrence plus an overnight end boundary.
+        for (dayOffset in -1L..8L) {
+            val date = fromDateTime.toLocalDate().plusDays(dayOffset)
+            for (period in enabledPeriods) {
+                if (period.dayOfWeek != date.dayOfWeek) continue
+
+                val opening = date.atTime(period.startTime)
+                if (opening.isAfter(fromDateTime) &&
+                    (candidate == null || opening.isBefore(candidate.dateTime))
+                ) {
+                    candidate = ScheduleTransition(opening, isOpening = true)
+                }
+
+                val closingDate = if (period.crossesMidnight) date.plusDays(1) else date
+                val closing = closingDate.atTime(period.endTime)
+                if (closing.isAfter(fromDateTime) &&
+                    (candidate == null || closing.isBefore(candidate.dateTime))
+                ) {
+                    candidate = ScheduleTransition(closing, isOpening = false)
+                }
+            }
+        }
+
+        return candidate
     }
 }

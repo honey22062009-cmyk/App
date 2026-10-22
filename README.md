@@ -11,7 +11,7 @@ Strict Blocker allows device owners to manage installed applications and define 
 - **Strict Enforcement**: Outside an allowed schedule window, managed applications are strictly blocked.
 - **Immediate Interruption**: When an unallowed application is opened, an immediate fullscreen interrupt shield (`BlockerActivity`) intercepts access.
 - **No Compromise UI**: Does not display "Ignore", "Use Anyway", "5 More Minutes", or "Snooze" buttons.
-- **Zero Telemetry & 100% Privacy**: Operates fully on-device with a local Room SQLite database. No network requests, tracking, or advertisements.
+- **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. If optional DNS filtering is enabled, DNS queries are sent to the configured resolver, which can observe the queried domains.
 
 ---
 
@@ -27,7 +27,7 @@ Strict Blocker allows device owners to manage installed applications and define 
 ### Strict Blocking Engine
 1. **Accessibility Service (`AppBlockerAccessibilityService`)**:
    - Zero-latency (<50ms) window state change detection (`TYPE_WINDOW_STATE_CHANGED`).
-   - Privacy guarantee: `canRetrieveWindowContent` is explicitly configured to `false`. The service never inspects screen text, passwords, or keyboard inputs.
+   - Privacy boundary: `canRetrieveWindowContent` is enabled because browser protection evaluates visible accessibility text. Inspection is limited to browser context; password fields and unrelated editable values are excluded from text evaluation. The app does not upload page text, although blocked attempts may be recorded locally.
 2. **Usage Access Fallback (`BlockerMonitoringService`)**:
    - Persistent foreground service monitoring active apps via `UsageStatsManager.queryEvents`.
 3. **Exact Schedule Cutoffs (`AlarmManager`)**:
@@ -147,12 +147,13 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 ## Privacy Policy, Terms & Legal Compliance
 
-- **Privacy Policy**: 100% on-device local storage via Room SQLite. Zero telemetry, cloud sync, or remote network transmission.
+- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. No analytics or cloud-sync backend is configured. Optional VPN-based DNS filtering forwards DNS queries to the configured resolver (Cloudflare Family DNS by default, or the user's custom resolver); that resolver can observe queried domains. Blocked attempts may be recorded locally.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
-- **Accessibility Safeguards**: `canRetrieveWindowContent` is explicitly configured to `false` in `accessibility_service_config.xml`, preventing any reading of screen text, keyboard inputs, passwords, or messages.
-- **Terms of Service**: Personal productivity utility software provided as-is without warranty.
-- **Refund Policy & Fees**: 100% free and open source. Zero hidden fees, microtransactions, or subscription fees.
-- **Cookie Policy**: Native Android application; zero HTTP cookies, tracking pixels, or web beacons used.
+- **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
+- **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
+- **Pricing and payments**: The Android app has no checkout SDK or purchase-verification backend. The optional static storefront in the website folder is a separate manual UPI workflow and is disabled by default. Any price must be made clear before payment.
+- **Refund Policy**: A real support contact and clear refund terms must be published before accepting payment. The repository does not implement automated refunds.
+- **Cookie Policy**: The native Android application does not use HTTP cookies, tracking pixels, or web beacons. Review the hosting provider's behavior for the optional website.
 - **Third-Party SDKs**: Zero advertising, tracking, or analytics SDKs bundled in the APK.
 - **Children's Privacy (COPPA / GDPR-K)**: Safe for all ages; no personal data collected from children under 13/16.
 - **Data Deletion (Right to Erasure)**: Fully functional "Delete All Data" feature available directly in app settings.
@@ -163,3 +164,20 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 ## UI Design System
 
 The app uses a reusable Material 3 design system with theme-aware glass surfaces, restrained brand colors, adaptive rounded shapes, and responsive layouts for phones and tablets. Visual effects live in shared Compose components so screens remain maintainable and feature logic stays separate from presentation.
+
+
+## UX redesign and release boundaries
+
+The native app remains local-first: managed applications and schedules are stored with Room, and app preferences are stored with DataStore. The overview uses the saved protection setting together with current Accessibility, Usage Access, and overlay permission checks; it does not label the setting as active when these core permissions are missing. Permission state is re-checked when the activity resumes from Android Settings.
+
+First-run users are sent to the existing permission/setup guide. Continuing from that guide records onboarding completion locally, so returning users are not sent through setup again.
+
+### Authentication and billing status
+
+This repository currently has no configured authentication provider, account backend, purchase SDK, or entitlement-verification service. The app's established behavior is on-device and does not require an account. This redesign intentionally does not add mock sign-in, a fake checkout, client-only Premium unlock flags, or claims that a purchase has been verified.
+
+A live Premium offer must remain disabled until the distribution channel and provider are confirmed, the features included in Premium are implemented, and the purchase flow can verify and restore entitlements. The suggested `₹99` one-time amount is provisional and is not a live price or an offer in this build. If Play Store distribution is intended, evaluate Google Play Billing and the supported entitlement-verification path before taking payments. Adding cloud accounts or synchronization would also change the current privacy and data-flow model and needs an explicit provider/privacy review.
+
+### Verification
+
+The repository's Android CI workflow builds the debug APK and runs `gradle :app:testDebugUnitTest`. A branch/PR CI result should be treated as the build/test evidence; no physical-device test is implied by a successful CI run.

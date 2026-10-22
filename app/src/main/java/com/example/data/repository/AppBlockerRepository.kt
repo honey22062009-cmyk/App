@@ -3,7 +3,9 @@ package com.example.data.repository
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.room.withTransaction
 import com.example.core.evaluator.ScheduleEvaluator
+import com.example.core.system.AlarmScheduler
 import com.example.core.model.BlockEvaluationResult
 import com.example.core.model.SchedulePeriod
 import com.example.core.system.SafetyWhitelist
@@ -152,6 +154,7 @@ class AppBlockerRepository(
         } else {
             managedAppDao.setManagedStatus(packageName, isManaged)
         }
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun saveAppGroup(name: String, packageNames: Set<String>) {
@@ -179,14 +182,16 @@ class AppBlockerRepository(
     suspend fun removeManagedApp(packageName: String) = withContext(Dispatchers.IO) {
         managedAppDao.deleteByPackage(packageName)
         scheduleDao.deleteByPackage(packageName)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun saveSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
-        if (managedAppDao.getByPackage(period.appPackage) == null) {
+        val existingApp = managedAppDao.getByPackage(period.appPackage)
+        if (existingApp == null) {
             val appName = try {
                 val appInfo = context.packageManager.getApplicationInfo(period.appPackage, 0)
                 context.packageManager.getApplicationLabel(appInfo).toString()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 period.appPackage
             }
             managedAppDao.insertOrUpdate(
@@ -196,20 +201,28 @@ class AppBlockerRepository(
                     isManaged = true
                 )
             )
+        } else if (!existingApp.isManaged) {
+            // Saving a schedule must activate the app; otherwise the saved rule is ignored
+            // by evaluateApp because inactive records are explicitly allowed.
+            managedAppDao.setManagedStatus(period.appPackage, true)
         }
         scheduleDao.insert(SchedulePeriodEntity.fromDomain(period))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun updateSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
         scheduleDao.update(SchedulePeriodEntity.fromDomain(period))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun deleteSchedulePeriod(id: Long) = withContext(Dispatchers.IO) {
         scheduleDao.deleteById(id)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun togglePeriodEnabled(id: Long, isEnabled: Boolean) = withContext(Dispatchers.IO) {
         scheduleDao.setPeriodEnabled(id, isEnabled)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun duplicateSchedulePeriod(period: SchedulePeriod, newDay: DayOfWeek) = withContext(Dispatchers.IO) {
@@ -218,6 +231,7 @@ class AppBlockerRepository(
             dayOfWeek = newDay
         )
         scheduleDao.insert(SchedulePeriodEntity.fromDomain(newPeriod))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun mergeOverlappingForApp(packageName: String) = withContext(Dispatchers.IO) {
@@ -225,8 +239,11 @@ class AppBlockerRepository(
         val domainList = existingEntities.map { it.toDomain() }
         val mergedDomain = ScheduleEvaluator.mergeOverlapping(domainList)
 
-        scheduleDao.deleteByPackage(packageName)
-        scheduleDao.insertAll(mergedDomain.map { SchedulePeriodEntity.fromDomain(it) })
+        database.withTransaction {
+            scheduleDao.deleteByPackage(packageName)
+            scheduleDao.insertAll(mergedDomain.map { SchedulePeriodEntity.fromDomain(it) })
+        }
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     /**
@@ -273,15 +290,22 @@ class AppBlockerRepository(
      * Complies with GDPR/CCPA right to erasure / data deletion requests.
      */
     suspend fun deleteAllUserData() = withContext(Dispatchers.IO) {
-        managedAppDao.deleteAll()
-        scheduleDao.deleteAll()
-        blockEventDao.clearAll()
-        settings.setStrictChangeDelayMinutes(0)
-        settings.setProtectionEnabled(true)
+        // Clear both the current tables and legacy tables retained by the database schema.
+        // Each delete runs in a transaction so callers never see a partially cleared database.
+        database.withTransaction {
+            scheduleDao.deleteAll()
+            managedAppDao.deleteAll()
+            scheduleEntityDao.deleteAll()
+            appDao.deleteAll()
+            blockEventDao.clearAll()
+        }
+        settings.clearAllUserPreferences()
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     /**
-     * Determines the earliest upcoming schedule transition across all managed apps.
+     * Determines the earliest upcoming opening or closing boundary across managed apps.
+     * Closing boundaries matter as much as opening boundaries for strict schedule cutoffs.
      */
     suspend fun findNextGlobalTransition(): NextTransitionInfo? = withContext(Dispatchers.IO) {
         val activeApps = managedAppDao.getActiveManagedApps()
@@ -289,19 +313,19 @@ class AppBlockerRepository(
 
         val allPeriods = scheduleDao.getAllEnabledPeriods().map { it.toDomain() }
         val now = LocalDateTime.now()
-
         var earliestTransition: NextTransitionInfo? = null
 
         for (app in activeApps) {
             val appPeriods = allPeriods.filter { it.appPackage == app.packageName }
-            val nextTime = ScheduleEvaluator.findNextAllowedTime(appPeriods, now) ?: continue
-
-            if (earliestTransition == null || nextTime.isBefore(earliestTransition.transitionDateTime)) {
+            val transition = ScheduleEvaluator.findNextTransition(appPeriods, now) ?: continue
+            if (earliestTransition == null ||
+                transition.dateTime.isBefore(earliestTransition.transitionDateTime)
+            ) {
                 earliestTransition = NextTransitionInfo(
                     appName = app.appName,
                     packageName = app.packageName,
-                    transitionDateTime = nextTime,
-                    isOpening = true
+                    transitionDateTime = transition.dateTime,
+                    isOpening = transition.isOpening
                 )
             }
         }

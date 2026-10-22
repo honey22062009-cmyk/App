@@ -229,4 +229,199 @@ class ScheduleEvaluatorTest {
         assertEquals(14, merged[0].startHour)
         assertEquals(17, merged[0].endHour)
     }
+
+    @Test
+    fun mergeOverlapping_overnightMergeKeepsTheLatestEndTime() {
+        val periods = listOf(
+            SchedulePeriod(
+                id = 10,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.FRIDAY,
+                startHour = 22,
+                startMinute = 0,
+                endHour = 1,
+                endMinute = 0
+            ),
+            SchedulePeriod(
+                id = 11,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.FRIDAY,
+                startHour = 23,
+                startMinute = 0,
+                endHour = 2,
+                endMinute = 0
+            )
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(periods)
+        assertEquals(1, merged.size)
+        assertEquals(22, merged.single().startHour)
+        assertEquals(2, merged.single().endHour)
+        assertEquals(0, merged.single().endMinute)
+        assertTrue(merged.single().crossesMidnight)
+    }
+
+    @Test
+    fun mergeOverlapping_doesNotMergeEnabledAndDisabledRules() {
+        val periods = listOf(
+            SchedulePeriod(
+                id = 20,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 18,
+                startMinute = 0,
+                endHour = 20,
+                endMinute = 0,
+                isEnabled = true
+            ),
+            SchedulePeriod(
+                id = 21,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 19,
+                startMinute = 0,
+                endHour = 21,
+                endMinute = 0,
+                isEnabled = false
+            )
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(periods)
+        assertEquals(2, merged.size)
+        assertEquals(setOf(true, false), merged.map { it.isEnabled }.toSet())
+    }
+
+    @Test
+    fun findNextTransition_insideWindowReturnsItsClosingBoundary() {
+        val period = SchedulePeriod(
+            id = 30,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 18,
+            startMinute = 0,
+            endHour = 19,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(18, 30)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(period), now)
+
+        assertNotNull(transition)
+        assertEquals(LocalDate.of(2026, 10, 19).atTime(19, 0), transition?.dateTime)
+        assertEquals(false, transition?.isOpening)
+    }
+
+    @Test
+    fun findNextTransition_beforeWindowReturnsItsOpeningBoundary() {
+        val period = SchedulePeriod(
+            id = 31,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 18,
+            startMinute = 0,
+            endHour = 19,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(17, 0)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(period), now)
+
+        assertNotNull(transition)
+        assertEquals(LocalDate.of(2026, 10, 19).atTime(18, 0), transition?.dateTime)
+        assertEquals(true, transition?.isOpening)
+    }
+    @Test
+    fun findNextTransition_overnightWindowReturnsTodaysClosingBoundary() {
+        val period = SchedulePeriod(
+            id = 32,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 22,
+            startMinute = 0,
+            endHour = 1,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 20).atTime(0, 30)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(period), now)
+
+        assertNotNull(transition)
+        assertEquals(LocalDate.of(2026, 10, 20).atTime(1, 0), transition?.dateTime)
+        assertEquals(false, transition?.isOpening)
+    }
+    @Test
+    fun mergeOverlapping_doesNotTurnFullDayCoverageIntoEmptyMidnightWindow() {
+        val periods = listOf(
+            SchedulePeriod(
+                id = 40,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 0,
+                startMinute = 0,
+                endHour = 12,
+                endMinute = 0
+            ),
+            SchedulePeriod(
+                id = 41,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 12,
+                startMinute = 0,
+                endHour = 0,
+                endMinute = 0
+            )
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(periods)
+
+        // A 00:00-00:00 period is interpreted as empty, not as 24 hours.
+        assertEquals(2, merged.size)
+        assertTrue(merged.all { it.startHour != 0 || it.startMinute != 0 || it.endHour != 0 || it.endMinute != 0 })
+        assertFalse(ScheduleEvaluator.evaluate(merged, LocalDate.of(2026, 10, 19).atTime(16, 0)).isBlocked)
+    }
+    @Test
+    fun mergeOverlapping_neverMergesRulesForDifferentApps() {
+        val firstApp = SchedulePeriod(
+            id = 50,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.TUESDAY,
+            startHour = 9,
+            startMinute = 0,
+            endHour = 11,
+            endMinute = 0
+        )
+        val secondApp = firstApp.copy(
+            id = 51,
+            appPackage = "com.example.other",
+            startHour = 10,
+            endHour = 12
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(listOf(firstApp, secondApp))
+
+        assertEquals(2, merged.size)
+        assertEquals(setOf(samplePkg, "com.example.other"), merged.map { it.appPackage }.toSet())
+        assertEquals(9, merged.first { it.appPackage == samplePkg }.startHour)
+        assertEquals(10, merged.first { it.appPackage == "com.example.other" }.startHour)
+    }
+    @Test
+    fun zeroLengthMidnightWindowDoesNotPretendThereIsAnAllowedBoundary() {
+        val emptyWindow = SchedulePeriod(
+            id = 60,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 0,
+            startMinute = 0,
+            endHour = 0,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(17, 0)
+
+        val evaluation = ScheduleEvaluator.evaluate(listOf(emptyWindow), now)
+
+        assertTrue(evaluation.isBlocked)
+        assertEquals(null, evaluation.nextAllowedDateTime)
+        assertEquals(null, ScheduleEvaluator.findNextAllowedTime(listOf(emptyWindow), now))
+        assertEquals(null, ScheduleEvaluator.findNextTransition(listOf(emptyWindow), now))
+    }
 }

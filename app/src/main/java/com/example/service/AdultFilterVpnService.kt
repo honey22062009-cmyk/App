@@ -37,15 +37,18 @@ import java.nio.ByteBuffer
 /**
  * On-device DNS filtering VPN Service for device-wide 18+ adult content blocking.
  *
- * Configures the system network stack to resolve domain names through verified,
- * privacy-first adult-blocking DNS resolvers (CleanBrowsing Family, Cloudflare Families 1.1.1.3).
+ * Configures system DNS to use the selected IPv4 resolver(s). If no custom resolver is set,
+ * the default upstreams are Cloudflare Family DNS (1.1.1.3 and 1.0.0.3). Custom DNS addresses
+ * are user-selected and are not independently verified by this app.
  *
- * Intercepts DNS queries on port 53 locally:
- * - If domain is on the adult blocklist, responds with NXDOMAIN / 0.0.0.0 locally.
- * - Otherwise forwards through Cloudflare Families (1.1.1.3) protected upstream.
+ * Intercepts IPv4 UDP DNS queries on port 53 locally:
+ * - If a domain matches the local adult block rules, returns a local NXDOMAIN response.
+ * - Otherwise forwards the DNS query to the configured upstream resolver.
  *
- * Privacy Note: Does NOT inspect or decrypt HTTPS traffic, does NOT tunnel non-DNS traffic
- * to any remote proxy, and maintains zero browsing logs or telemetry.
+ * Privacy note: this service does not decrypt HTTPS or route non-DNS traffic through a proxy.
+ * Non-blocked DNS queries are sent to the configured resolver, which can see the queried domain
+ * and may log it according to its own policies. Blocked domains may be recorded as local events;
+ * this app does not include an analytics or browsing-history upload backend.
  */
 class AdultFilterVpnService : VpnService(), Runnable {
 
@@ -101,9 +104,31 @@ class AdultFilterVpnService : VpnService(), Runnable {
                 stopVpn()
                 return START_NOT_STICKY
             }
-            else -> {
-                startVpn()
+            ACTION_START, null -> {
+                // Enter foreground immediately to meet Android's foreground-service
+                // deadline, then verify persisted user switches off the main thread.
+                createNotificationChannel()
+                startForeground(NOTIFICATION_ID, buildForegroundNotification())
+                serviceScope.launch {
+                    try {
+                        val enabled = repository.settings.isAdultProtectionEnabledFlow.first() &&
+                            repository.settings.isDnsFilterEnabledFlow.first()
+                        if (enabled) {
+                            startVpn()
+                        } else {
+                            Log.i("AdultFilterVpn", "DNS filter is disabled in settings; not starting the tunnel")
+                            stopVpn()
+                        }
+                    } catch (e: Exception) {
+                        Log.w("AdultFilterVpn", "Could not verify DNS filter settings", e)
+                        stopVpn()
+                    }
+                }
                 return START_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                return START_NOT_STICKY
             }
         }
     }
@@ -159,11 +184,15 @@ class AdultFilterVpnService : VpnService(), Runnable {
             outStream = FileOutputStream(vpnInterface!!.fileDescriptor)
 
             val socket = DatagramSocket()
-            protect(socket)
+            if (!protect(socket)) {
+                socket.close()
+                throw IOException("Could not protect upstream DNS socket from VPN routing")
+            }
             socket.soTimeout = 2500
             udpSocket = socket
 
-            val upstreamDns = InetAddress.getByName(configuredDns.first())
+            val configuredDnsAddresses = configuredDns.map { InetAddress.getByName(it) }
+            val defaultUpstreamDns = configuredDnsAddresses.first()
             val buffer = ByteArray(32767)
             val responseBuffer = ByteArray(4096)
 
@@ -176,22 +205,34 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
                 if (length <= 0) continue
 
-                // Check for IPv4 UDP packet
+                // Validate packet/header lengths before indexing or copying. Although
+                // packets normally originate from Android's TUN interface, malformed or
+                // truncated input must never cause an out-of-bounds read.
                 val version = (buffer[0].toInt() and 0xF0) shr 4
                 if (version != 4 || length < 28) continue
 
-                val ihl = (buffer[0].toInt() and 0x0F) * 4
+                val ipHeaderLength = (buffer[0].toInt() and 0x0F) * 4
+                if (ipHeaderLength < 20 || ipHeaderLength + 8 > length) continue
+                val ipTotalLength =
+                    ((buffer[2].toInt() and 0xFF) shl 8) or (buffer[3].toInt() and 0xFF)
+                if (ipTotalLength < ipHeaderLength + 8 || ipTotalLength > length) continue
+
                 val protocol = buffer[9].toInt() and 0xFF
                 if (protocol != 17) continue // UDP is 17
 
-                val destPort = ((buffer[ihl + 2].toInt() and 0xFF) shl 8) or (buffer[ihl + 3].toInt() and 0xFF)
+                val destPort =
+                    ((buffer[ipHeaderLength + 2].toInt() and 0xFF) shl 8) or
+                        (buffer[ipHeaderLength + 3].toInt() and 0xFF)
                 if (destPort != 53) continue // DNS is port 53
 
-                val udpLength = ((buffer[ihl + 4].toInt() and 0xFF) shl 8) or (buffer[ihl + 5].toInt() and 0xFF)
-                val dnsPayloadOffset = ihl + 8
-                val dnsPayloadLen = udpLength - 8
+                val udpLength =
+                    ((buffer[ipHeaderLength + 4].toInt() and 0xFF) shl 8) or
+                        (buffer[ipHeaderLength + 5].toInt() and 0xFF)
+                if (udpLength < 8 || udpLength > ipTotalLength - ipHeaderLength) continue
 
-                if (dnsPayloadOffset + dnsPayloadLen > length || dnsPayloadLen < 12) continue
+                val dnsPayloadOffset = ipHeaderLength + 8
+                val dnsPayloadLen = udpLength - 8
+                if (dnsPayloadLen < 12 || dnsPayloadOffset + dnsPayloadLen > ipTotalLength) continue
 
                 val dnsPayload = ByteArray(dnsPayloadLen)
                 System.arraycopy(buffer, dnsPayloadOffset, dnsPayload, 0, dnsPayloadLen)
@@ -208,28 +249,43 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
                     // Return NXDOMAIN blocked response
                     val forgedDns = buildNxDomainResponse(dnsPayload)
-                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, forgedDns)
+                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, forgedDns)
                     try {
                         outStream.write(responsePacket)
                     } catch (_: Exception) {}
                     continue
                 }
 
-                // Forward clean query to the user-selected upstream resolver.
+                // Android may direct a query to either configured DNS server. Respect
+                // the resolver IP in the original packet rather than sending every query
+                // to the primary and silently ignoring the configured secondary.
+                val requestedResolver = try {
+                    InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+                } catch (_: Exception) {
+                    defaultUpstreamDns
+                }
+                val upstreamDns = configuredDnsAddresses.firstOrNull {
+                    it.address.contentEquals(requestedResolver.address)
+                } ?: defaultUpstreamDns
+
+                // Forward clean DNS queries through the protected socket to avoid VPN loops.
                 try {
                     val outPacket = DatagramPacket(dnsPayload, dnsPayloadLen, upstreamDns, 53)
                     socket.send(outPacket)
 
                     val inPacket = DatagramPacket(responseBuffer, responseBuffer.size)
                     socket.receive(inPacket)
+                    if (inPacket.port != 53 || !inPacket.address.address.contentEquals(upstreamDns.address)) {
+                        continue
+                    }
 
                     val upstreamDnsPayload = ByteArray(inPacket.length)
                     System.arraycopy(responseBuffer, 0, upstreamDnsPayload, 0, inPacket.length)
 
-                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, upstreamDnsPayload)
+                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, upstreamDnsPayload)
                     outStream.write(responsePacket)
                 } catch (_: Exception) {
-                    // Upstream timeout or drop; fail gracefully
+                    // Upstream timeout or drop; fail gracefully.
                 }
             }
         } catch (e: Exception) {
@@ -237,7 +293,16 @@ class AdultFilterVpnService : VpnService(), Runnable {
         } finally {
             try { inStream?.close() } catch (_: Exception) {}
             try { outStream?.close() } catch (_: Exception) {}
+            // stopVpn() sets isRunning=false before closing the tunnel. If this worker
+            // exits while still marked running, however, it failed unexpectedly: remove
+            // the stale foreground notification and stop the service so it can be started
+            // cleanly again on the next user action.
+            val unexpectedExit = isRunning
             cleanup()
+            if (unexpectedExit) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
     }
 
@@ -340,6 +405,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
     }
 
     private fun cleanup() {
+        // Also reset the guard after an unexpected VPN-thread exit. Otherwise the
+        // observable state becomes inactive while startVpn() remains permanently blocked.
+        isRunning = false
         try {
             udpSocket?.close()
         } catch (_: Exception) {}
