@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
@@ -123,15 +125,29 @@ class AdultFilterVpnService : VpnService(), Runnable {
         var outStream: FileOutputStream? = null
 
         try {
+            val configuredDns = runBlocking {
+                listOf(
+                    repository.settings.customDnsPrimaryFlow.first(),
+                    repository.settings.customDnsSecondaryFlow.first()
+                ).mapNotNull { raw ->
+                    raw.trim().takeIf { value ->
+                        runCatching { InetAddress.getByName(value) }.isSuccess
+                    }
+                }.distinct()
+            }.ifEmpty { listOf("1.1.1.3", "1.0.0.3") }
+
             val builder = Builder()
-                .setSession("18 Blocker Adult Shield")
+                .setSession("Strict Blocker DNS Protection")
                 .setMtu(1500)
                 .addAddress("10.18.0.2", 32)
-                // Cloudflare 1.1.1.3 (Malware + Adult Content Blocking)
-                .addDnsServer("1.1.1.3")
-                .addDnsServer("1.0.0.3")
-                .addRoute("1.1.1.3", 32)
-                .addRoute("1.0.0.3", 32)
+
+            configuredDns.forEach { dns ->
+                builder.addDnsServer(dns)
+                val address = InetAddress.getByName(dns)
+                if (address.address.size == 4) {
+                    builder.addRoute(dns, 32)
+                }
+            }
 
             val configIntent = Intent(this, MainActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
@@ -149,7 +165,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
             socket.soTimeout = 2500
             udpSocket = socket
 
-            val upstreamDns = InetAddress.getByName("1.1.1.3")
+            val upstreamDns = InetAddress.getByName(configuredDns.first())
             val buffer = ByteArray(32767)
             val responseBuffer = ByteArray(4096)
 
@@ -201,7 +217,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     continue
                 }
 
-                // Forward clean query upstream to Cloudflare 1.1.1.3
+                // Forward clean query to the user-selected upstream resolver.
                 try {
                     val outPacket = DatagramPacket(dnsPayload, dnsPayloadLen, upstreamDns, 53)
                     socket.send(outPacket)
