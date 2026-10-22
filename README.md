@@ -150,9 +150,10 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 - **Privacy Policy**: 100% on-device local storage via Room SQLite. Zero telemetry, cloud sync, or remote network transmission.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
 - **Accessibility Safeguards**: `canRetrieveWindowContent` is explicitly configured to `false` in `accessibility_service_config.xml`, preventing any reading of screen text, keyboard inputs, passwords, or messages.
-- **Terms of Service**: Personal productivity utility software provided as-is without warranty.
-- **Refund Policy & Fees**: 100% free and open source. Zero hidden fees, microtransactions, or subscription fees.
-- **Cookie Policy**: Native Android application; zero HTTP cookies, tracking pixels, or web beacons used.
+- **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
+- **Pricing and payments**: The Android app has no checkout SDK or purchase-verification backend. The optional static storefront in the website folder is a separate manual UPI workflow and is disabled by default. Any price must be made clear before payment.
+- **Refund Policy**: A real support contact and clear refund terms must be published before accepting payment. The repository does not implement automated refunds.
+- **Cookie Policy**: The native Android application does not use HTTP cookies, tracking pixels, or web beacons. Review the hosting provider's behavior for the optional website.
 - **Third-Party SDKs**: Zero advertising, tracking, or analytics SDKs bundled in the APK.
 - **Children's Privacy (COPPA / GDPR-K)**: Safe for all ages; no personal data collected from children under 13/16.
 - **Data Deletion (Right to Erasure)**: Fully functional "Delete All Data" feature available directly in app settings.
