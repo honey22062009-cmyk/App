@@ -379,4 +379,29 @@ class ScheduleEvaluatorTest {
         assertTrue(merged.all { it.startHour != 0 || it.startMinute != 0 || it.endHour != 0 || it.endMinute != 0 })
         assertFalse(ScheduleEvaluator.evaluate(merged, LocalDate.of(2026, 10, 19).atTime(16, 0)).isBlocked)
     }
+    @Test
+    fun mergeOverlapping_neverMergesRulesForDifferentApps() {
+        val firstApp = SchedulePeriod(
+            id = 50,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.TUESDAY,
+            startHour = 9,
+            startMinute = 0,
+            endHour = 11,
+            endMinute = 0
+        )
+        val secondApp = firstApp.copy(
+            id = 51,
+            appPackage = "com.example.other",
+            startHour = 10,
+            endHour = 12
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(listOf(firstApp, secondApp))
+
+        assertEquals(2, merged.size)
+        assertEquals(setOf(samplePkg, "com.example.other"), merged.map { it.appPackage }.toSet())
+        assertEquals(9, merged.first { it.appPackage == samplePkg }.startHour)
+        assertEquals(10, merged.first { it.appPackage == "com.example.other" }.startHour)
+    }
 }
