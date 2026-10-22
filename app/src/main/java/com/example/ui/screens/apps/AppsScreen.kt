@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -63,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.repository.AppBlockerRepository
@@ -70,7 +72,9 @@ import com.example.data.repository.InstalledAppInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun AppsScreen(
@@ -82,6 +86,7 @@ fun AppsScreen(
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Managed", "Unmanaged"
     var installedApps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
 
@@ -89,9 +94,17 @@ fun AppsScreen(
 
     fun refreshApps() {
         isLoading = true
+        loadError = false
         coroutineScope.launch {
-            installedApps = repository.getInstalledLaunchableApps()
-            isLoading = false
+            try {
+                installedApps = repository.getInstalledLaunchableApps()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                loadError = true
+            } finally {
+                isLoading = false
+            }
         }
     }
 
@@ -112,7 +125,7 @@ fun AppsScreen(
             }
 
             matchesSearch && matchesFilter
-        }
+        }.sortedBy { it.appName.lowercase(Locale.getDefault()) }
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -182,9 +195,10 @@ fun AppsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("apps_search_input"),
+                label = { Text("Search apps") },
                 placeholder = {
                     Text(
-                        "Search apps",
+                        "Name or package",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -334,6 +348,35 @@ fun AppsScreen(
                         strokeWidth = 3.dp
                     )
                 }
+            } else if (loadError) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Text(
+                            "Couldn't load installed apps",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Android didn't return the app list. Try again.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Button(onClick = { refreshApps() }) { Text("Retry") }
+                    }
+                }
             } else if (filteredApps.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -341,19 +384,38 @@ fun AppsScreen(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(36.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        val emptyMessage = when {
+                            installedApps.isEmpty() -> "No launchable apps found."
+                            searchQuery.isNotBlank() -> "No apps match “$searchQuery”."
+                            selectedFilter == "Managed" -> "No apps are managed yet."
+                            selectedFilter == "Unmanaged" -> "No unmanaged apps in this list."
+                            else -> "No apps available."
+                        }
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "No applications match '$searchQuery'" else "No apps in this category",
+                            text = emptyMessage,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
+                        if (installedApps.isEmpty()) {
+                            OutlinedButton(onClick = { refreshApps() }) {
+                                Text("Refresh app list")
+                            }
+                        } else if (searchQuery.isNotBlank()) {
+                            OutlinedButton(onClick = { searchQuery = "" }) {
+                                Text("Clear search")
+                            }
+                        }
                     }
                 }
             } else {

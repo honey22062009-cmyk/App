@@ -163,3 +163,20 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 ## UI Design System
 
 The app uses a reusable Material 3 design system with theme-aware glass surfaces, restrained brand colors, adaptive rounded shapes, and responsive layouts for phones and tablets. Visual effects live in shared Compose components so screens remain maintainable and feature logic stays separate from presentation.
+
+
+## UX redesign and release boundaries
+
+The native app remains local-first: managed applications and schedules are stored with Room, and app preferences are stored with DataStore. The overview uses the saved protection setting together with current Accessibility, Usage Access, and overlay permission checks; it does not label the setting as active when these core permissions are missing. Permission state is re-checked when the activity resumes from Android Settings.
+
+First-run users are sent to the existing permission/setup guide. Continuing from that guide records onboarding completion locally, so returning users are not sent through setup again.
+
+### Authentication and billing status
+
+This repository currently has no configured authentication provider, account backend, purchase SDK, or entitlement-verification service. The app's established behavior is on-device and does not require an account. This redesign intentionally does not add mock sign-in, a fake checkout, client-only Premium unlock flags, or claims that a purchase has been verified.
+
+A live Premium offer must remain disabled until the distribution channel and provider are confirmed, the features included in Premium are implemented, and the purchase flow can verify and restore entitlements. The suggested `₹99` one-time amount is provisional and is not a live price or an offer in this build. If Play Store distribution is intended, evaluate Google Play Billing and the supported entitlement-verification path before taking payments. Adding cloud accounts or synchronization would also change the current privacy and data-flow model and needs an explicit provider/privacy review.
+
+### Verification
+
+The repository's Android CI workflow builds the debug APK and runs `gradle :app:testDebugUnitTest`. A branch/PR CI result should be treated as the build/test evidence; no physical-device test is implied by a successful CI run.

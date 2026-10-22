@@ -15,11 +15,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 private val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(24.dp)
+    extraSmall = RoundedCornerShape(CornerRadii.compact),
+    small = RoundedCornerShape(CornerRadii.control),
+    medium = RoundedCornerShape(CornerRadii.card),
+    large = RoundedCornerShape(CornerRadii.dialog),
+    extraLarge = RoundedCornerShape(CornerRadii.large)
 )
 
 private val DarkColorScheme = darkColorScheme(

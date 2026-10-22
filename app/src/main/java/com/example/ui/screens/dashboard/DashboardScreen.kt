@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,12 +47,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
+import com.example.ui.theme.LayoutSpacing
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -76,10 +86,24 @@ fun DashboardScreen(
 
     var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
 
-    val permissionsHealthy = remember(context) {
-        PermissionHelper.isAccessibilityServiceEnabled(context) &&
-            PermissionHelper.isUsageAccessGranted(context) &&
-            PermissionHelper.canDrawOverlays(context)
+    var permissionsHealthy by remember(context) { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Android settings are opened outside this activity. Refresh on resume so the
+    // dashboard never relies on a stale permission snapshot.
+    DisposableEffect(context, lifecycleOwner) {
+        fun refreshPermissions() {
+            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
+                PermissionHelper.isUsageAccessGranted(context) &&
+                PermissionHelper.canDrawOverlays(context)
+        }
+
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        refreshPermissions()
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(activeManagedApps) {
@@ -91,7 +115,7 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        val horizontalPadding = if (maxWidth >= 720.dp) 28.dp else 16.dp
+        val horizontalPadding = if (maxWidth >= 720.dp) LayoutSpacing.xl else LayoutSpacing.md
         // Use the extra landscape space instead of forcing tablet content into a narrow
         // phone-like column. Keep a cap so very large displays remain easy to scan.
         val contentWidth = when {
@@ -104,9 +128,9 @@ fun DashboardScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = horizontalPadding, vertical = 18.dp)
+                .padding(horizontal = horizontalPadding, vertical = LayoutSpacing.lg)
                 .testTag("dashboard_lazy_column"),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
@@ -119,7 +143,7 @@ fun DashboardScreen(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Focus, schedules and protection",
+                        text = "Manage app access, schedules and protection",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -141,13 +165,27 @@ fun DashboardScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isProtectionEnabled) "Protection is running" else "Protection is paused",
+                                text = when {
+                                    !isProtectionEnabled -> "Protection paused"
+                                    !permissionsHealthy -> "Setup required"
+                                    else -> "Protection enabled"
+                                },
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
+                            Spacer(Modifier.height(LayoutSpacing.xxs))
                             Text(
-                                text = "${activeManagedApps.size} apps protected · ${totalBlocksCount} blocked attempts",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "${activeManagedApps.size} managed apps",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = when {
+                                    !isProtectionEnabled -> "App blocking is paused. Turn protection on to enforce your saved rules."
+                                    !permissionsHealthy -> "The setting is on, but required Android permissions need attention."
+                                    else -> "Core permissions are available. Blocking follows your saved app rules."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -156,7 +194,12 @@ fun DashboardScreen(
                             onCheckedChange = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
-                            modifier = Modifier.testTag("protection_toggle_switch")
+                            modifier = Modifier
+                                .testTag("protection_toggle_switch")
+                                .semantics {
+                                    contentDescription = "Protection"
+                                    stateDescription = if (isProtectionEnabled) "On" else "Off"
+                                }
                         )
                     }
                 }
@@ -180,9 +223,14 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    "One or more required Android permissions are off.",
+                                    "Review Accessibility, Usage access and overlay permission status.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Review permissions",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                             Icon(
@@ -206,6 +254,45 @@ fun DashboardScreen(
                         QuickAction("Apps", Icons.Default.Apps, onNavigateToApps, Modifier.weight(1f))
                         QuickAction("Schedules", Icons.Default.CalendarMonth, onNavigateToSchedules, Modifier.weight(1f))
                         QuickAction("Adult protection", Icons.Default.Security, onNavigateToAdultProtection, Modifier.weight(1.35f))
+                    }
+                }
+            }
+
+            if (activeManagedApps.isEmpty()) {
+                item {
+                    AppSurface(
+                        modifier = Modifier.width(contentWidth).fillMaxWidth(),
+                        onClick = onNavigateToApps
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(LayoutSpacing.md),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Apps,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(LayoutSpacing.sm))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "No apps managed yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "Choose which apps should follow your schedules.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Manage apps",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -251,7 +338,7 @@ fun DashboardScreen(
 
             item {
                 Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Today", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("At a glance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     AppSurface(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -268,7 +355,7 @@ fun DashboardScreen(
                             Spacer(Modifier.height(14.dp))
                             StatusRow(
                                 icon = Icons.Default.History,
-                                title = "Blocked attempts",
+                                title = "Recorded blocked attempts",
                                 value = totalBlocksCount.toString()
                             )
                         }
@@ -314,7 +401,8 @@ fun DashboardScreen(
                                 Text(
                                     event.appName,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
                                 )
                                 Text(
                                     event.reason,
@@ -343,13 +431,29 @@ private fun QuickAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FilledTonalButton(
-        onClick = onClick,
-        modifier = modifier.height(48.dp)
+    AppSurface(
+        modifier = modifier.heightIn(min = 76.dp),
+        backgroundColor = MaterialTheme.colorScheme.surface,
+        onClick = onClick
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, maxLines = 1)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.xs)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
+        }
     }
 }
 

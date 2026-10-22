@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -65,6 +66,7 @@ import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -143,6 +145,18 @@ fun MainAppScaffold(
     var selectedSchedulePackage by remember {
         mutableStateOf(initialTargetPackage)
     }
+    var isInitialRouteResolved by remember { mutableStateOf(false) }
+
+    // Resolve the first-run route from persisted state before showing navigation.
+    LaunchedEffect(repository, initialTargetPackage) {
+        val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
+        currentScreen = when {
+            !initialTargetPackage.isNullOrEmpty() -> Screen.Schedules
+            onboardingCompleted -> Screen.Dashboard
+            else -> Screen.Permissions
+        }
+        isInitialRouteResolved = true
+    }
 
     // Intercept back button when on sub-screens
     BackHandler(enabled = currentScreen != Screen.Dashboard) {
@@ -152,7 +166,17 @@ fun MainAppScaffold(
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    if (!isInitialRouteResolved) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    } else {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth >= 720.dp
 
         if (isTablet) {
@@ -301,6 +325,7 @@ fun MainAppScaffold(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -311,6 +336,7 @@ fun ScreenContent(
     onNavigateToScreen: (Screen) -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     when (currentScreen) {
         Screen.Dashboard -> {
             DashboardScreen(
@@ -342,7 +368,12 @@ fun ScreenContent(
         }
         Screen.Permissions -> {
             PermissionsScreen(
-                onContinue = { onNavigateToScreen(Screen.Dashboard) }
+                onContinue = {
+                    scope.launch {
+                        repository.settings.setOnboardingCompleted(true)
+                        onNavigateToScreen(Screen.Dashboard)
+                    }
+                }
             )
         }
         Screen.Settings -> {
