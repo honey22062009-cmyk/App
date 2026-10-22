@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * High-performance, zero-latency accessibility service.
@@ -42,7 +43,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         val eventType = event.eventType
         if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
+            eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED &&
+            eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             return
         }
 
@@ -175,13 +179,31 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 3. Scan interactive window nodes up to depth 8 (max 80 nodes inspected for low latency)
+        // 3. Scan the active hierarchy more deeply. Some modern browsers and WebViews
+        // expose the address bar/page text only after focus, scroll or text-change events.
         val windowTextBuilder = StringBuilder()
-        collectNodeText(rootNode, windowTextBuilder, maxDepth = 8, maxNodes = intArrayOf(80))
-        val combinedText = windowTextBuilder.toString()
+        collectNodeText(rootNode, windowTextBuilder, maxDepth = 12, maxNodes = intArrayOf(240))
 
+        // If multiple interactive windows exist (browser sheets, custom tabs, WebViews),
+        // inspect those too instead of assuming rootInActiveWindow contains everything.
+        try {
+            windows.forEach { window ->
+                val root = window.root ?: return@forEach
+                if (root != rootNode) {
+                    collectNodeText(root, windowTextBuilder, maxDepth = 10, maxNodes = intArrayOf(120))
+                }
+            }
+        } catch (_: Exception) {
+            // Best-effort only; the active root above is still inspected.
+        }
+
+        val combinedText = windowTextBuilder.toString()
         if (combinedText.isNotBlank()) {
-            val eval = if (isBrowser) AdultContentEvaluator.evaluateText(combinedText) else AdultContentEvaluator.evaluateVisibleContext(combinedText)
+            val eval = if (isBrowser) {
+                AdultContentEvaluator.evaluateText(combinedText)
+            } else {
+                AdultContentEvaluator.evaluateVisibleContext(combinedText)
+            }
             if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                 if (eval.category == AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED && !blockIncognito) {
                     return false
@@ -227,6 +249,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         // Remove offending content from view first. Android does not allow a normal app to force-stop arbitrary apps.
         performGlobalAction(GLOBAL_ACTION_HOME)
+        // Let HOME finish before presenting the blocker. Starting both in the same instant
+        // can race on some OEM builds and leave the browser visible.
+        delay(120)
 
         val cooldownSeconds = repository.settings.adultCooldownSecondsFlow.first()
 
