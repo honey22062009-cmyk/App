@@ -213,9 +213,13 @@ object ScheduleEvaluator {
                 val nextStart = startMinute(next)
                 val nextEnd = endMinuteOnStartDay(next)
 
-                // Inclusive comparison also consolidates back-to-back periods.
-                if (nextStart <= currentEnd) {
-                    currentEnd = maxOf(currentEnd, nextEnd).coerceAtMost(currentStart + 24 * 60)
+                // Inclusive comparison also consolidates back-to-back periods. A full
+                // 24-hour interval cannot be represented unambiguously by this model:
+                // 00:00-00:00 means an empty period, so keep both source rules instead.
+                val proposedEnd = maxOf(currentEnd, nextEnd)
+                val canRepresentMergedWindow = proposedEnd - currentStart < 24 * 60
+                if (nextStart <= currentEnd && canRepresentMergedWindow) {
+                    currentEnd = proposedEnd
                     val wrappedEnd = currentEnd % (24 * 60)
                     current = current.copy(
                         endHour = wrappedEnd / 60,
