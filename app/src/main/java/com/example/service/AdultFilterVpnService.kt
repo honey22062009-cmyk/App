@@ -176,22 +176,34 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
                 if (length <= 0) continue
 
-                // Check for IPv4 UDP packet
+                // Validate packet/header lengths before indexing or copying. Although
+                // packets normally originate from Android's TUN interface, malformed or
+                // truncated input must never cause an out-of-bounds read.
                 val version = (buffer[0].toInt() and 0xF0) shr 4
                 if (version != 4 || length < 28) continue
 
-                val ihl = (buffer[0].toInt() and 0x0F) * 4
+                val ipHeaderLength = (buffer[0].toInt() and 0x0F) * 4
+                if (ipHeaderLength < 20 || ipHeaderLength + 8 > length) continue
+                val ipTotalLength =
+                    ((buffer[2].toInt() and 0xFF) shl 8) or (buffer[3].toInt() and 0xFF)
+                if (ipTotalLength < ipHeaderLength + 8 || ipTotalLength > length) continue
+
                 val protocol = buffer[9].toInt() and 0xFF
                 if (protocol != 17) continue // UDP is 17
 
-                val destPort = ((buffer[ihl + 2].toInt() and 0xFF) shl 8) or (buffer[ihl + 3].toInt() and 0xFF)
+                val destPort =
+                    ((buffer[ipHeaderLength + 2].toInt() and 0xFF) shl 8) or
+                        (buffer[ipHeaderLength + 3].toInt() and 0xFF)
                 if (destPort != 53) continue // DNS is port 53
 
-                val udpLength = ((buffer[ihl + 4].toInt() and 0xFF) shl 8) or (buffer[ihl + 5].toInt() and 0xFF)
-                val dnsPayloadOffset = ihl + 8
-                val dnsPayloadLen = udpLength - 8
+                val udpLength =
+                    ((buffer[ipHeaderLength + 4].toInt() and 0xFF) shl 8) or
+                        (buffer[ipHeaderLength + 5].toInt() and 0xFF)
+                if (udpLength < 8 || udpLength > ipTotalLength - ipHeaderLength) continue
 
-                if (dnsPayloadOffset + dnsPayloadLen > length || dnsPayloadLen < 12) continue
+                val dnsPayloadOffset = ipHeaderLength + 8
+                val dnsPayloadLen = udpLength - 8
+                if (dnsPayloadLen < 12 || dnsPayloadOffset + dnsPayloadLen > ipTotalLength) continue
 
                 val dnsPayload = ByteArray(dnsPayloadLen)
                 System.arraycopy(buffer, dnsPayloadOffset, dnsPayload, 0, dnsPayloadLen)
@@ -208,7 +220,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
                     // Return NXDOMAIN blocked response
                     val forgedDns = buildNxDomainResponse(dnsPayload)
-                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, forgedDns)
+                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, forgedDns)
                     try {
                         outStream.write(responsePacket)
                     } catch (_: Exception) {}
@@ -226,7 +238,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     val upstreamDnsPayload = ByteArray(inPacket.length)
                     System.arraycopy(responseBuffer, 0, upstreamDnsPayload, 0, inPacket.length)
 
-                    val responsePacket = buildIpv4UdpPacket(buffer, ihl, upstreamDnsPayload)
+                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, upstreamDnsPayload)
                     outStream.write(responsePacket)
                 } catch (_: Exception) {
                     // Upstream timeout or drop; fail gracefully
