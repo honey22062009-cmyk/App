@@ -111,7 +111,11 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+        // Normal launcher intents should not reset navigation. Only reroute when an
+        // explicit schedule deep-link target is supplied.
+        if (intent.hasExtra(EXTRA_TARGET_PACKAGE)) {
+            targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+        }
     }
 }
 
