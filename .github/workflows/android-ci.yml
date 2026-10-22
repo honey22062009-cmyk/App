@@ -24,6 +24,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check storefront JavaScript syntax
+        run: node --check website/config.js && node --check website/app.js
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
       - name: Upload debug APK
