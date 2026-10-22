@@ -188,7 +188,7 @@ object ScheduleEvaluator {
      */
     fun mergeOverlapping(periods: List<SchedulePeriod>): List<SchedulePeriod> {
         val result = mutableListOf<SchedulePeriod>()
-        val grouped = periods.groupBy { it.dayOfWeek to it.isEnabled }
+        val grouped = periods.groupBy { Triple(it.appPackage, it.dayOfWeek, it.isEnabled) }
 
         fun startMinute(period: SchedulePeriod): Int =
             period.startHour * 60 + period.startMinute
@@ -236,7 +236,12 @@ object ScheduleEvaluator {
         }
 
         return result.sortedWith(
-            compareBy<SchedulePeriod>({ it.dayOfWeek.value }, { startMinute(it) }, { it.isEnabled })
+            compareBy<SchedulePeriod>(
+                { it.appPackage },
+                { it.dayOfWeek.value },
+                { startMinute(it) },
+                { it.isEnabled }
+            )
         )
     }
 
