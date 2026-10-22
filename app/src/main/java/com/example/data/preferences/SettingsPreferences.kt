@@ -35,6 +35,8 @@ class SettingsPreferences(private val context: Context) {
         val BLOCK_INCOGNITO_ENABLED = booleanPreferencesKey("block_incognito_enabled")
         val FORCE_SAFESEARCH_ENABLED = booleanPreferencesKey("force_safesearch_enabled")
         val DNS_FILTER_ENABLED = booleanPreferencesKey("dns_filter_enabled")
+        val CUSTOM_DNS_PRIMARY = stringPreferencesKey("custom_dns_primary")
+        val CUSTOM_DNS_SECONDARY = stringPreferencesKey("custom_dns_secondary")
         val ADULT_BLOCKS_COUNT = intPreferencesKey("adult_blocks_count")
         val APP_GROUPS = stringSetPreferencesKey("app_groups")
     }
@@ -83,6 +85,14 @@ class SettingsPreferences(private val context: Context) {
 
     val isDnsFilterEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.DNS_FILTER_ENABLED] ?: true
+    }
+
+    val customDnsPrimaryFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.CUSTOM_DNS_PRIMARY] ?: "1.1.1.3"
+    }
+
+    val customDnsSecondaryFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.CUSTOM_DNS_SECONDARY] ?: "1.0.0.3"
     }
 
     val adultBlocksCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -189,6 +199,13 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setDnsFilterEnabled(enabled: Boolean) {
         if (isStrictAdultModeFlow.first() && !enabled) return
         context.dataStore.edit { it[PreferencesKeys.DNS_FILTER_ENABLED] = enabled }
+    }
+
+    suspend fun setCustomDns(primary: String, secondary: String) {
+        context.dataStore.edit {
+            it[PreferencesKeys.CUSTOM_DNS_PRIMARY] = primary.trim()
+            it[PreferencesKeys.CUSTOM_DNS_SECONDARY] = secondary.trim()
+        }
     }
 
     suspend fun setAppGroups(groups: Set<String>) {
