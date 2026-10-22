@@ -330,4 +330,23 @@ class ScheduleEvaluatorTest {
         assertEquals(LocalDate.of(2026, 10, 19).atTime(18, 0), transition?.dateTime)
         assertEquals(true, transition?.isOpening)
     }
+    @Test
+    fun findNextTransition_overnightWindowReturnsTodaysClosingBoundary() {
+        val period = SchedulePeriod(
+            id = 32,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 22,
+            startMinute = 0,
+            endHour = 1,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 20).atTime(0, 30)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(period), now)
+
+        assertNotNull(transition)
+        assertEquals(LocalDate.of(2026, 10, 20).atTime(1, 0), transition?.dateTime)
+        assertEquals(false, transition?.isOpening)
+    }
 }
