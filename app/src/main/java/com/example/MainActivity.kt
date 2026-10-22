@@ -75,11 +75,15 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TARGET_PACKAGE = "extra_target_package"
     }
 
+    // Compose observes this state, so a new intent sent to an existing Activity
+    // updates the requested destination instead of being silently ignored.
+    private var targetPackage by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
+        targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
 
         setContent {
             val context = LocalContext.current
@@ -98,8 +102,7 @@ class MainActivity : ComponentActivity() {
             StrictBlockerTheme(darkTheme = isDark) {
                 MainAppContent(
                     repository = repository,
-                    initialTargetPackage = targetPackage,
-                    onNewIntentTarget = { /* no-op */ }
+                    initialTargetPackage = targetPackage
                 )
             }
         }
@@ -108,14 +111,14 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
     }
 }
 
 @Composable
 fun MainAppContent(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?,
-    onNewIntentTarget: (String?) -> Unit
+    initialTargetPackage: String?
 ) {
     var isSplashVisible by remember { mutableStateOf(true) }
 
@@ -152,6 +155,7 @@ fun MainAppScaffold(
     LaunchedEffect(repository, initialTargetPackage) {
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
         if (!initialTargetPackage.isNullOrEmpty()) {
+            selectedSchedulePackage = initialTargetPackage
             currentScreen = Screen.Schedules
         } else if (onboardingCompleted) {
             currentScreen = Screen.Dashboard
