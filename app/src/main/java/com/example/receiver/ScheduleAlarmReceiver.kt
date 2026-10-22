@@ -13,6 +13,7 @@ import com.example.ui.blocker.BlockerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 /**
  * Verifies the app's state at schedule boundaries and schedules the next boundary.
@@ -28,10 +29,12 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                if (!packageName.isNullOrBlank() && isPackageForeground(appContext, packageName)) {
+                if (!packageName.isNullOrBlank()) {
                     val repository = AppBlockerRepository(appContext)
-                    val evaluation = repository.evaluateApp(packageName)
-                    if (evaluation.isBlocked) {
+                    val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
+                    if (protectionEnabled && isPackageForeground(appContext, packageName)) {
+                        val evaluation = repository.evaluateApp(packageName)
+                        if (evaluation.isBlocked) {
                         val appLabel = try {
                             val info = appContext.packageManager.getApplicationInfo(packageName, 0)
                             appContext.packageManager.getApplicationLabel(info).toString()
@@ -53,6 +56,7 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
                             putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
                         }
                         appContext.startActivity(blockIntent)
+                        }
                     }
                 }
             } catch (e: Exception) {
