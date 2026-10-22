@@ -290,7 +290,16 @@ class AdultFilterVpnService : VpnService(), Runnable {
         } finally {
             try { inStream?.close() } catch (_: Exception) {}
             try { outStream?.close() } catch (_: Exception) {}
+            // stopVpn() sets isRunning=false before closing the tunnel. If this worker
+            // exits while still marked running, however, it failed unexpectedly: remove
+            // the stale foreground notification and stop the service so it can be started
+            // cleanly again on the next user action.
+            val unexpectedExit = isRunning
             cleanup()
+            if (unexpectedExit) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
     }
 
