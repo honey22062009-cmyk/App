@@ -151,6 +151,25 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // Search/address text can arrive before the full window tree updates. Evaluate
+        // the focused editable source directly for every browser, including newly installed
+        // browsers discovered by web capability.
+        if (isBrowser) {
+            val source = try { event.source } catch (_: Exception) { null }
+            if (source?.isEditable == true) {
+                val value = source.text?.toString().orEmpty()
+                if (value.isNotBlank()) {
+                    val eval = AdultContentEvaluator.evaluateText(value)
+                    if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
+                        if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
+                            triggerAdultBlock(packageName, eval.category.label, eval.layer)
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+
         val eventDesc = event.contentDescription?.toString()
         if (!eventDesc.isNullOrBlank()) {
             val eval = AdultContentEvaluator.evaluateVisibleContext(eventDesc)
