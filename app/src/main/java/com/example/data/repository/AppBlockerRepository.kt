@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import com.example.core.evaluator.ScheduleEvaluator
+import com.example.core.system.AlarmScheduler
 import com.example.core.model.BlockEvaluationResult
 import com.example.core.model.SchedulePeriod
 import com.example.core.system.SafetyWhitelist
@@ -152,6 +153,7 @@ class AppBlockerRepository(
         } else {
             managedAppDao.setManagedStatus(packageName, isManaged)
         }
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun saveAppGroup(name: String, packageNames: Set<String>) {
@@ -179,6 +181,7 @@ class AppBlockerRepository(
     suspend fun removeManagedApp(packageName: String) = withContext(Dispatchers.IO) {
         managedAppDao.deleteByPackage(packageName)
         scheduleDao.deleteByPackage(packageName)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun saveSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
@@ -198,18 +201,22 @@ class AppBlockerRepository(
             )
         }
         scheduleDao.insert(SchedulePeriodEntity.fromDomain(period))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun updateSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
         scheduleDao.update(SchedulePeriodEntity.fromDomain(period))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun deleteSchedulePeriod(id: Long) = withContext(Dispatchers.IO) {
         scheduleDao.deleteById(id)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun togglePeriodEnabled(id: Long, isEnabled: Boolean) = withContext(Dispatchers.IO) {
         scheduleDao.setPeriodEnabled(id, isEnabled)
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun duplicateSchedulePeriod(period: SchedulePeriod, newDay: DayOfWeek) = withContext(Dispatchers.IO) {
@@ -218,6 +225,7 @@ class AppBlockerRepository(
             dayOfWeek = newDay
         )
         scheduleDao.insert(SchedulePeriodEntity.fromDomain(newPeriod))
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     suspend fun mergeOverlappingForApp(packageName: String) = withContext(Dispatchers.IO) {
@@ -227,6 +235,7 @@ class AppBlockerRepository(
 
         scheduleDao.deleteByPackage(packageName)
         scheduleDao.insertAll(mergedDomain.map { SchedulePeriodEntity.fromDomain(it) })
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     /**
@@ -277,7 +286,8 @@ class AppBlockerRepository(
         scheduleDao.deleteAll()
         blockEventDao.clearAll()
         settings.setStrictChangeDelayMinutes(0)
-        settings.setProtectionEnabled(true)
+        settings.clearAllUserPreferences()
+        AlarmScheduler.scheduleNextTransition(context)
     }
 
     /**
