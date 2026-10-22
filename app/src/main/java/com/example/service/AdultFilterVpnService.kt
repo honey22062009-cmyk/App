@@ -31,6 +31,7 @@ import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.Inet4Address
 import java.nio.ByteBuffer
 
 /**
@@ -131,7 +132,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     repository.settings.customDnsSecondaryFlow.first()
                 ).mapNotNull { raw ->
                     raw.trim().takeIf { value ->
-                        runCatching { InetAddress.getByName(value) }.isSuccess
+                        runCatching { InetAddress.getByName(value) is Inet4Address }.getOrDefault(false)
                     }
                 }.distinct()
             }.ifEmpty { listOf("1.1.1.3", "1.0.0.3") }
@@ -143,10 +144,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
             configuredDns.forEach { dns ->
                 builder.addDnsServer(dns)
-                val address = InetAddress.getByName(dns)
-                if (address.address.size == 4) {
-                    builder.addRoute(dns, 32)
-                }
+                builder.addRoute(dns, 32)
             }
 
             val configIntent = Intent(this, MainActivity::class.java)
