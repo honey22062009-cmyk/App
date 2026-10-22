@@ -31,7 +31,7 @@ object ScheduleEvaluator {
         periods: List<SchedulePeriod>,
         dateTime: LocalDateTime = LocalDateTime.now()
     ): BlockEvaluationResult {
-        val enabledPeriods = periods.filter { it.isEnabled }
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
 
         if (enabledPeriods.isEmpty()) {
             return BlockEvaluationResult(
@@ -103,7 +103,7 @@ object ScheduleEvaluator {
         periods: List<SchedulePeriod>,
         fromDateTime: LocalDateTime
     ): LocalDateTime? {
-        val enabledPeriods = periods.filter { it.isEnabled }
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
         if (enabledPeriods.isEmpty()) return null
 
         var candidate: LocalDateTime? = null
@@ -258,7 +258,7 @@ object ScheduleEvaluator {
         periods: List<SchedulePeriod>,
         fromDateTime: LocalDateTime
     ): ScheduleTransition? {
-        val enabledPeriods = periods.filter { it.isEnabled }
+        val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
         if (enabledPeriods.isEmpty()) return null
 
         var candidate: ScheduleTransition? = null
