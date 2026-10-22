@@ -371,6 +371,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
     }
 
     private fun cleanup() {
+        // Also reset the guard after an unexpected VPN-thread exit. Otherwise the
+        // observable state becomes inactive while startVpn() remains permanently blocked.
+        isRunning = false
         try {
             udpSocket?.close()
         } catch (_: Exception) {}
