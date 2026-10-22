@@ -101,9 +101,31 @@ class AdultFilterVpnService : VpnService(), Runnable {
                 stopVpn()
                 return START_NOT_STICKY
             }
-            else -> {
-                startVpn()
+            ACTION_START, null -> {
+                // Enter foreground immediately to meet Android's foreground-service
+                // deadline, then verify persisted user switches off the main thread.
+                createNotificationChannel()
+                startForeground(NOTIFICATION_ID, buildForegroundNotification())
+                serviceScope.launch {
+                    try {
+                        val enabled = repository.settings.isAdultProtectionEnabledFlow.first() &&
+                            repository.settings.isDnsFilterEnabledFlow.first()
+                        if (enabled) {
+                            startVpn()
+                        } else {
+                            Log.i("AdultFilterVpn", "DNS filter is disabled in settings; not starting the tunnel")
+                            stopVpn()
+                        }
+                    } catch (e: Exception) {
+                        Log.w("AdultFilterVpn", "Could not verify DNS filter settings", e)
+                        stopVpn()
+                    }
+                }
                 return START_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                return START_NOT_STICKY
             }
         }
     }
