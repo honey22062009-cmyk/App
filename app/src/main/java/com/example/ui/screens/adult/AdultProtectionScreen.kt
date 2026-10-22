@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.util.Patterns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -46,12 +47,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +81,7 @@ import com.example.ui.blocker.BlockerActivity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @Composable
 fun AdultProtectionScreen(
@@ -92,6 +96,8 @@ fun AdultProtectionScreen(
     val isBlockIncognito by repository.settings.isBlockIncognitoEnabledFlow.collectAsState(initial = true)
     val isForceSafeSearch by repository.settings.isForceSafeSearchEnabledFlow.collectAsState(initial = true)
     val isDnsFilterPref by repository.settings.isDnsFilterEnabledFlow.collectAsState(initial = true)
+    val savedDnsPrimary by repository.settings.customDnsPrimaryFlow.collectAsState(initial = "1.1.1.3")
+    val savedDnsSecondary by repository.settings.customDnsSecondaryFlow.collectAsState(initial = "1.0.0.3")
     val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
 
     val isVpnActive by AdultFilterVpnService.isVpnActive.collectAsState()
@@ -119,6 +125,14 @@ fun AdultProtectionScreen(
 
     var showDisableConfirmDialog by remember { mutableStateOf(false) }
     var testResultBanner by remember { mutableStateOf<String?>(null) }
+    var dnsPrimaryInput by remember { mutableStateOf(savedDnsPrimary) }
+    var dnsSecondaryInput by remember { mutableStateOf(savedDnsSecondary) }
+    var dnsError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(savedDnsPrimary, savedDnsSecondary) {
+        dnsPrimaryInput = savedDnsPrimary
+        dnsSecondaryInput = savedDnsSecondary
+    }
 
     // Overall Protection Status
     val overallStatus = when {
@@ -304,28 +318,132 @@ fun AdultProtectionScreen(
                 )
             }
 
-            // Layer 2: On-Device Secure DNS Filter (VPN Service)
+            // Layer 2: Editable DNS protection
             item {
-                ProtectionLayerCard(
-                    title = "DNS protection",
-                    description = "Uses the local VPN service to apply family-safe DNS filtering.",
-                    icon = Icons.Default.Dns,
-                    statusText = if (isVpnActive) "On" else "Off",
-                    isActive = isVpnActive,
-                    actionText = if (!isVpnActive) "Connect DNS Filter" else "Disconnect",
-                    onAction = {
-                        if (!isVpnActive) {
-                            val vpnIntent = VpnService.prepare(context)
-                            if (vpnIntent != null) {
-                                vpnLauncher.launch(vpnIntent)
-                            } else {
-                                AdultFilterVpnService.start(context)
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Dns,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                        } else {
-                            AdultFilterVpnService.stop(context)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "DNS protection",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (isVpnActive) "Connected · custom resolver active" else "Choose the DNS resolver Strict Blocker should use.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = if (isVpnActive) "On" else "Off",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isVpnActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = dnsPrimaryInput,
+                            onValueChange = {
+                                dnsPrimaryInput = it.trim()
+                                dnsError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Primary DNS") },
+                            placeholder = { Text("1.1.1.3") },
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = dnsSecondaryInput,
+                            onValueChange = {
+                                dnsSecondaryInput = it.trim()
+                                dnsError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Secondary DNS (optional)") },
+                            placeholder = { Text("1.0.0.3") },
+                            singleLine = true,
+                            supportingText = {
+                                Text(
+                                    dnsError ?: "Enter an IPv4 or IPv6 DNS address. DNS queries remain handled by the local VPN."
+                                )
+                            },
+                            isError = dnsError != null
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val primary = dnsPrimaryInput.trim()
+                                    val secondary = dnsSecondaryInput.trim()
+                                    val primaryValid = Patterns.IP_ADDRESS.matcher(primary).matches()
+                                    val secondaryValid = secondary.isBlank() || Patterns.IP_ADDRESS.matcher(secondary).matches()
+                                    if (!primaryValid || !secondaryValid) {
+                                        dnsError = "Use a valid IPv4 or IPv6 address."
+                                    } else {
+                                        coroutineScope.launch {
+                                            repository.settings.setCustomDns(primary, secondary)
+                                            dnsError = null
+                                            testResultBanner = "DNS settings saved."
+                                            if (isVpnActive) {
+                                                AdultFilterVpnService.stop(context)
+                                                delay(250)
+                                                AdultFilterVpnService.start(context)
+                                                testResultBanner = "DNS settings applied."
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Apply DNS")
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    if (!isVpnActive) {
+                                        val vpnIntent = VpnService.prepare(context)
+                                        if (vpnIntent != null) vpnLauncher.launch(vpnIntent)
+                                        else AdultFilterVpnService.start(context)
+                                    } else {
+                                        AdultFilterVpnService.stop(context)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (isVpnActive) "Disconnect" else "Connect")
+                            }
                         }
                     }
-                )
+                }
             }
 
             // Layer 3: SafeSearch Enforcer
