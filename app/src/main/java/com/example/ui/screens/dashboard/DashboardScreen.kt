@@ -349,7 +349,7 @@ fun DashboardScreen(
                                     val time = it.transitionDateTime.format(
                                         DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
                                     )
-                                    "$time · ${it.appName}"
+                                    "$time · ${if (it.isOpening) "opens" else "closes"} · ${it.appName}"
                                 } ?: "No upcoming transition"
                             )
                             Spacer(Modifier.height(14.dp))
