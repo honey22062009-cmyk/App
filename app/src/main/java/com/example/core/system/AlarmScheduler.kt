@@ -72,12 +72,27 @@ object AlarmScheduler {
                 )
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (alarmManager.canScheduleExactAlarms()) {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            transitionMillis,
-                            transitionIntent
-                        )
+                    val exactAlarmsAllowed = try {
+                        alarmManager.canScheduleExactAlarms()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                    if (exactAlarmsAllowed) {
+                        try {
+                            alarmManager.setExactAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                transitionMillis,
+                                transitionIntent
+                            )
+                        } catch (_: SecurityException) {
+                            // The special access may be revoked between checking it and
+                            // scheduling. Preserve the boundary with an inexact fallback.
+                            alarmManager.setAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                transitionMillis,
+                                transitionIntent
+                            )
+                        }
                     } else {
                         alarmManager.setAndAllowWhileIdle(
                             AlarmManager.RTC_WAKEUP,
