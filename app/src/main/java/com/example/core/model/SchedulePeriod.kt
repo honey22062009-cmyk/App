@@ -31,6 +31,13 @@ data class SchedulePeriod(
     val endTime: LocalTime get() = LocalTime.of(endHour, endMinute)
 
     /**
+     * 00:00-00:00 is the one equal-time pair that represents no allowed minutes in
+     * this model. Equal non-midnight times are treated as a 24-hour window.
+     */
+    val isZeroLengthMidnightWindow: Boolean
+        get() = startTime == LocalTime.MIDNIGHT && endTime == LocalTime.MIDNIGHT
+
+    /**
      * Returns true if this period crosses midnight (e.g. 22:00 -> 01:00).
      */
     val crossesMidnight: Boolean
