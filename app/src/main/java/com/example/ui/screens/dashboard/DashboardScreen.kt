@@ -95,7 +95,8 @@ fun DashboardScreen(
         fun refreshPermissions() {
             permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
                 PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context)
+                PermissionHelper.canDrawOverlays(context) &&
+                PermissionHelper.canScheduleExactAlarms(context)
         }
 
         val observer = LifecycleEventObserver { _, event ->
@@ -223,7 +224,7 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    "Review Accessibility, Usage access and overlay permission status.",
+                                    "Review Accessibility, Usage access, overlay and exact-alarm access.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
