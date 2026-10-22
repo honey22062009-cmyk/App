@@ -349,4 +349,34 @@ class ScheduleEvaluatorTest {
         assertEquals(LocalDate.of(2026, 10, 20).atTime(1, 0), transition?.dateTime)
         assertEquals(false, transition?.isOpening)
     }
+    @Test
+    fun mergeOverlapping_doesNotTurnFullDayCoverageIntoEmptyMidnightWindow() {
+        val periods = listOf(
+            SchedulePeriod(
+                id = 40,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 0,
+                startMinute = 0,
+                endHour = 12,
+                endMinute = 0
+            ),
+            SchedulePeriod(
+                id = 41,
+                appPackage = samplePkg,
+                dayOfWeek = DayOfWeek.MONDAY,
+                startHour = 12,
+                startMinute = 0,
+                endHour = 0,
+                endMinute = 0
+            )
+        )
+
+        val merged = ScheduleEvaluator.mergeOverlapping(periods)
+
+        // A 00:00-00:00 period is interpreted as empty, not as 24 hours.
+        assertEquals(2, merged.size)
+        assertTrue(merged.all { it.startHour != 0 || it.startMinute != 0 || it.endHour != 0 || it.endMinute != 0 })
+        assertFalse(ScheduleEvaluator.evaluate(merged, LocalDate.of(2026, 10, 19).atTime(16, 0)).isBlocked)
+    }
 }
