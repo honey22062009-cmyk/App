@@ -281,7 +281,8 @@ class AppBlockerRepository(
     }
 
     /**
-     * Determines the earliest upcoming schedule transition across all managed apps.
+     * Determines the earliest upcoming opening or closing boundary across managed apps.
+     * Closing boundaries matter as much as opening boundaries for strict schedule cutoffs.
      */
     suspend fun findNextGlobalTransition(): NextTransitionInfo? = withContext(Dispatchers.IO) {
         val activeApps = managedAppDao.getActiveManagedApps()
@@ -289,19 +290,19 @@ class AppBlockerRepository(
 
         val allPeriods = scheduleDao.getAllEnabledPeriods().map { it.toDomain() }
         val now = LocalDateTime.now()
-
         var earliestTransition: NextTransitionInfo? = null
 
         for (app in activeApps) {
             val appPeriods = allPeriods.filter { it.appPackage == app.packageName }
-            val nextTime = ScheduleEvaluator.findNextAllowedTime(appPeriods, now) ?: continue
-
-            if (earliestTransition == null || nextTime.isBefore(earliestTransition.transitionDateTime)) {
+            val transition = ScheduleEvaluator.findNextTransition(appPeriods, now) ?: continue
+            if (earliestTransition == null ||
+                transition.dateTime.isBefore(earliestTransition.transitionDateTime)
+            ) {
                 earliestTransition = NextTransitionInfo(
                     appName = app.appName,
                     packageName = app.packageName,
-                    transitionDateTime = nextTime,
-                    isOpening = true
+                    transitionDateTime = transition.dateTime,
+                    isOpening = transition.isOpening
                 )
             }
         }
