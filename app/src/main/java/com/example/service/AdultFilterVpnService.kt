@@ -159,11 +159,15 @@ class AdultFilterVpnService : VpnService(), Runnable {
             outStream = FileOutputStream(vpnInterface!!.fileDescriptor)
 
             val socket = DatagramSocket()
-            protect(socket)
+            if (!protect(socket)) {
+                socket.close()
+                throw IOException("Could not protect upstream DNS socket from VPN routing")
+            }
             socket.soTimeout = 2500
             udpSocket = socket
 
-            val upstreamDns = InetAddress.getByName(configuredDns.first())
+            val configuredDnsAddresses = configuredDns.map { InetAddress.getByName(it) }
+            val defaultUpstreamDns = configuredDnsAddresses.first()
             val buffer = ByteArray(32767)
             val responseBuffer = ByteArray(4096)
 
@@ -227,13 +231,28 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     continue
                 }
 
-                // Forward clean query to the user-selected upstream resolver.
+                // Android may direct a query to either configured DNS server. Respect
+                // the resolver IP in the original packet rather than sending every query
+                // to the primary and silently ignoring the configured secondary.
+                val requestedResolver = try {
+                    InetAddress.getByAddress(buffer.copyOfRange(16, 20))
+                } catch (_: Exception) {
+                    defaultUpstreamDns
+                }
+                val upstreamDns = configuredDnsAddresses.firstOrNull {
+                    it.address.contentEquals(requestedResolver.address)
+                } ?: defaultUpstreamDns
+
+                // Forward clean DNS queries through the protected socket to avoid VPN loops.
                 try {
                     val outPacket = DatagramPacket(dnsPayload, dnsPayloadLen, upstreamDns, 53)
                     socket.send(outPacket)
 
                     val inPacket = DatagramPacket(responseBuffer, responseBuffer.size)
                     socket.receive(inPacket)
+                    if (inPacket.port != 53 || !inPacket.address.address.contentEquals(upstreamDns.address)) {
+                        continue
+                    }
 
                     val upstreamDnsPayload = ByteArray(inPacket.length)
                     System.arraycopy(responseBuffer, 0, upstreamDnsPayload, 0, inPacket.length)
@@ -241,7 +260,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, upstreamDnsPayload)
                     outStream.write(responsePacket)
                 } catch (_: Exception) {
-                    // Upstream timeout or drop; fail gracefully
+                    // Upstream timeout or drop; fail gracefully.
                 }
             }
         } catch (e: Exception) {
