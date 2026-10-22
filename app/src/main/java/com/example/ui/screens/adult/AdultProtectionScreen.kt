@@ -388,7 +388,7 @@ fun AdultProtectionScreen(
                             singleLine = true,
                             supportingText = {
                                 Text(
-                                    dnsError ?: "Enter an IPv4 or IPv6 DNS address. DNS queries remain handled by the local VPN."
+                                    dnsError ?: "Enter an IPv4 DNS address. DNS queries remain handled by the local VPN."
                                 )
                             },
                             isError = dnsError != null
@@ -404,10 +404,10 @@ fun AdultProtectionScreen(
                                 onClick = {
                                     val primary = dnsPrimaryInput.trim()
                                     val secondary = dnsSecondaryInput.trim()
-                                    val primaryValid = Patterns.IP_ADDRESS.matcher(primary).matches()
-                                    val secondaryValid = secondary.isBlank() || Patterns.IP_ADDRESS.matcher(secondary).matches()
+                                    val primaryValid = primary.isNotBlank() && !primary.contains(":") && Patterns.IP_ADDRESS.matcher(primary).matches()
+                                    val secondaryValid = secondary.isBlank() || (!secondary.contains(":") && Patterns.IP_ADDRESS.matcher(secondary).matches())
                                     if (!primaryValid || !secondaryValid) {
-                                        dnsError = "Use a valid IPv4 or IPv6 address."
+                                        dnsError = "Use a valid IPv4 DNS address."
                                     } else {
                                         coroutineScope.launch {
                                             repository.settings.setCustomDns(primary, secondary)
