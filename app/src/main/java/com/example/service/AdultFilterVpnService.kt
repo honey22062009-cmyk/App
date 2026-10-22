@@ -45,7 +45,7 @@ import java.nio.ByteBuffer
  * - Otherwise forwards through Cloudflare Families (1.1.1.3) protected upstream.
  *
  * Privacy Note: Does NOT inspect or decrypt HTTPS traffic, does NOT tunnel non-DNS traffic
- * to any remote proxy, and maintains zero browsing logs or telemetry.
+ * to any remote proxy. Explicitly blocked DNS domains may be recorded as local block events; no browsing data is uploaded by this service.
  */
 class AdultFilterVpnService : VpnService(), Runnable {
 
