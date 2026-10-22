@@ -165,7 +165,10 @@ class BlockerMonitoringService : Service() {
 
     private fun getForegroundPackage(usageStatsManager: UsageStatsManager): String? {
         val endTime = System.currentTimeMillis()
-        val startTime = endTime - 10000L
+        // queryEvents only includes resume transitions inside its requested window. A
+        // 10-second window returned null for apps that stayed foreground longer than
+        // 10 seconds, disabling the polling fallback until the next app switch.
+        val startTime = endTime - 24L * 60L * 60L * 1000L
         val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
         val event = UsageEvents.Event()
         var lastForegroundPkg: String? = null
