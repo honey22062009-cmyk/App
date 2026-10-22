@@ -11,7 +11,7 @@ Strict Blocker allows device owners to manage installed applications and define 
 - **Strict Enforcement**: Outside an allowed schedule window, managed applications are strictly blocked.
 - **Immediate Interruption**: When an unallowed application is opened, an immediate fullscreen interrupt shield (`BlockerActivity`) intercepts access.
 - **No Compromise UI**: Does not display "Ignore", "Use Anyway", "5 More Minutes", or "Snooze" buttons.
-- **Zero Telemetry & 100% Privacy**: Operates fully on-device with a local Room SQLite database. No network requests, tracking, or advertisements.
+- **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. If optional DNS filtering is enabled, DNS queries are sent to the configured resolver, which can observe the queried domains.
 
 ---
 
@@ -147,7 +147,7 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 ## Privacy Policy, Terms & Legal Compliance
 
-- **Privacy Policy**: 100% on-device local storage via Room SQLite. Zero telemetry, cloud sync, or remote network transmission.
+- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. No analytics or cloud-sync backend is configured. Optional VPN-based DNS filtering forwards DNS queries to the configured resolver (Cloudflare Family DNS by default, or the user's custom resolver); that resolver can observe queried domains. Blocked attempts may be recorded locally.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
 - **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
 - **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
