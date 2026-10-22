@@ -27,7 +27,7 @@ Strict Blocker allows device owners to manage installed applications and define 
 ### Strict Blocking Engine
 1. **Accessibility Service (`AppBlockerAccessibilityService`)**:
    - Zero-latency (<50ms) window state change detection (`TYPE_WINDOW_STATE_CHANGED`).
-   - Privacy guarantee: `canRetrieveWindowContent` is explicitly configured to `false`. The service never inspects screen text, passwords, or keyboard inputs.
+   - Privacy boundary: `canRetrieveWindowContent` is enabled because browser protection evaluates visible accessibility text. Inspection is limited to browser context; password fields and unrelated editable values are excluded from text evaluation. The app does not upload page text, although blocked attempts may be recorded locally.
 2. **Usage Access Fallback (`BlockerMonitoringService`)**:
    - Persistent foreground service monitoring active apps via `UsageStatsManager.queryEvents`.
 3. **Exact Schedule Cutoffs (`AlarmManager`)**:
@@ -149,7 +149,7 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 - **Privacy Policy**: 100% on-device local storage via Room SQLite. Zero telemetry, cloud sync, or remote network transmission.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
-- **Accessibility Safeguards**: `canRetrieveWindowContent` is explicitly configured to `false` in `accessibility_service_config.xml`, preventing any reading of screen text, keyboard inputs, passwords, or messages.
+- **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
 - **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
 - **Pricing and payments**: The Android app has no checkout SDK or purchase-verification backend. The optional static storefront in the website folder is a separate manual UPI workflow and is disabled by default. Any price must be made clear before payment.
 - **Refund Policy**: A real support contact and clear refund terms must be published before accepting payment. The repository does not implement automated refunds.
