@@ -149,6 +149,7 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 - **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. No analytics or cloud-sync backend is configured. Optional VPN-based DNS filtering forwards DNS queries to the configured resolver (Cloudflare Family DNS by default, or the user's custom resolver); that resolver can observe queried domains. Blocked attempts may be recorded locally.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
+- **Android backup**: Android Auto Backup and device-to-device backup are disabled in the manifest to avoid copying managed-app identifiers, schedules, preferences, and local enforcement records into device backups. Users should export or record any settings they want to recreate before changing devices.
 - **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
 - **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
 - **Pricing and payments**: The Android app has no checkout SDK or purchase-verification backend. The optional static storefront in the website folder is a separate manual UPI workflow and is disabled by default. Any price must be made clear before payment.
@@ -181,3 +182,42 @@ A live Premium offer must remain disabled until the distribution channel and pro
 ### Verification
 
 The repository's Android CI workflow builds the debug APK and runs `gradle :app:testDebugUnitTest`. A branch/PR CI result should be treated as the build/test evidence; no physical-device test is implied by a successful CI run.
+
+
+---
+
+## Version 1.4: account, purchase UI, diagnostics, and data portability
+
+New screens include Account, Upgrade, Diagnostics, Activity Reports, Schedule Templates, and encrypted Backup & Restore. The dashboard exposes these tools directly, with shortcuts in Settings.
+
+### Configure account sign-in
+
+Email/password sign-in uses Firebase Authentication; Strict Blocker does not store account passwords locally. Configure the following Gradle properties or environment variables for a reviewed build:
+
+- FIREBASE_API_KEY
+- FIREBASE_APP_ID
+- FIREBASE_PROJECT_ID
+- FIREBASE_MESSAGING_SENDER_ID
+
+Enable Email/Password sign-in in the matching Firebase project. Without these values, the account screen reports that authentication is not configured. Signing in does not grant Premium access on its own.
+
+### Configure UPI purchase options
+
+Set the following Gradle properties or environment variables in a reviewed build:
+
+- PAYMENT_UPI_ID: genuine UPI ID for the receiving account.
+- PAYMENT_PAYEE_NAME: payee name verified against the receiving account.
+- PAYMENT_PRICE_INR: final price.
+- PAYMENT_SUPPORT_EMAIL: monitored support inbox.
+- PAYMENT_WEBSITE_URL: optional HTTPS storefront URL.
+- PAYMENT_CHECKOUT_ENABLED: leave unset/false until the receiving account, seller/refund terms, support contact and payment flow have been reviewed; set to `true` only for the approved release.
+
+No payment details are committed by default. Missing details keep the UPI action disabled. Manual email is not automatic transaction verification and does not unlock Premium. Automated unlock requires a backend that verifies transactions server-side. Have the adult/guardian responsible for the payment account review eligibility, seller details, terms, refund policy, and applicable obligations before taking payments.
+
+### Encrypted backup and restore
+
+Backup files use PBKDF2-HMAC-SHA256 and AES-GCM encryption. They include managed app records, schedule windows, and app groups, but exclude activity logs, passwords, payment details, and Android permission grants. The passphrase cannot be recovered. Restoring replaces existing managed-app schedules; check Diagnostics and test the schedules afterwards.
+
+### Release status
+
+Version 1.4 needs CI verification, a release APK signed with the intended release key, and real-device testing for schedules, reboot recovery, permissions, and content filtering. CI success is not proof of device-level reliability.

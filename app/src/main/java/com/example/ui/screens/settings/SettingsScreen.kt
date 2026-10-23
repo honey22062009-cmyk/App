@@ -18,6 +18,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Info
@@ -47,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
 import kotlinx.coroutines.launch
@@ -57,6 +64,12 @@ private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Protection("Protection", Icons.Default.Shield),
     Permissions("Permissions", Icons.Default.Security),
     Privacy("Privacy & legal", Icons.Default.PrivacyTip),
+    Account("Account & sign-in", Icons.Default.Person),
+    Upgrade("Upgrade to Premium", Icons.Default.Star),
+    Diagnostics("Protection diagnostics", Icons.Default.Build),
+    Reports("Activity reports", Icons.Default.Assessment),
+    Backup("Backup & restore", Icons.Default.Folder),
+    Templates("Schedule templates", Icons.Default.CalendarMonth),
     About("About", Icons.Default.Info)
 }
 
@@ -66,7 +79,13 @@ fun SettingsScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+    onNavigateToAdultProtection: () -> Unit = {},
+    onNavigateToAccount: () -> Unit = {},
+    onNavigateToUpgrade: () -> Unit = {},
+    onNavigateToDiagnostics: () -> Unit = {},
+    onNavigateToReports: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
+    onNavigateToTemplates: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -149,7 +168,13 @@ fun SettingsScreen(
                                 onNavigateToPermissions = onNavigateToPermissions,
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
-                                onNavigateToAdultProtection = onNavigateToAdultProtection
+                                onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                onNavigateToAccount = onNavigateToAccount,
+                                onNavigateToUpgrade = onNavigateToUpgrade,
+                                onNavigateToDiagnostics = onNavigateToDiagnostics,
+                                onNavigateToReports = onNavigateToReports,
+                                onNavigateToBackup = onNavigateToBackup,
+                                onNavigateToTemplates = onNavigateToTemplates
                             )
                         }
                     }
@@ -205,7 +230,13 @@ fun SettingsScreen(
                                     onNavigateToPermissions = onNavigateToPermissions,
                                     onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                     onNavigateToLegal = onNavigateToLegal,
-                                    onNavigateToAdultProtection = onNavigateToAdultProtection
+                                    onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                    onNavigateToAccount = onNavigateToAccount,
+                                    onNavigateToUpgrade = onNavigateToUpgrade,
+                                    onNavigateToDiagnostics = onNavigateToDiagnostics,
+                                    onNavigateToReports = onNavigateToReports,
+                                    onNavigateToBackup = onNavigateToBackup,
+                                    onNavigateToTemplates = onNavigateToTemplates
                                 )
                             }
                         }
@@ -264,7 +295,13 @@ private fun SettingsSectionContent(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit
+    onNavigateToAdultProtection: () -> Unit,
+    onNavigateToAccount: () -> Unit,
+    onNavigateToUpgrade: () -> Unit,
+    onNavigateToDiagnostics: () -> Unit,
+    onNavigateToReports: () -> Unit,
+    onNavigateToBackup: () -> Unit,
+    onNavigateToTemplates: () -> Unit
 ) {
     when (section) {
         SettingsSection.Appearance -> {
@@ -346,26 +383,51 @@ private fun SettingsSectionContent(
             )
         }
 
+        SettingsSection.Account -> SettingsLinkRow(
+            title = "Account and sign-in",
+            subtitle = "Email sign-in, create an account, or reset a password",
+            onClick = onNavigateToAccount
+        )
+
+        SettingsSection.Upgrade -> SettingsLinkRow(
+            title = "Upgrade to Premium",
+            subtitle = "UPI purchase option and manual verification",
+            onClick = onNavigateToUpgrade
+        )
+
+        SettingsSection.Diagnostics -> SettingsLinkRow(
+            title = "Run protection diagnostics",
+            subtitle = "Check permissions and background reliability setup",
+            onClick = onNavigateToDiagnostics
+        )
+
+        SettingsSection.Reports -> SettingsLinkRow(
+            title = "Activity reports",
+            subtitle = "Review local block-event summaries",
+            onClick = onNavigateToReports
+        )
+
+        SettingsSection.Backup -> SettingsLinkRow(
+            title = "Backup and restore",
+            subtitle = "Export or import encrypted schedules and app groups",
+            onClick = onNavigateToBackup
+        )
+
+        SettingsSection.Templates -> SettingsLinkRow(
+            title = "Schedule templates",
+            subtitle = "Apply a ready-made weekly pattern to one app",
+            onClick = onNavigateToTemplates
+        )
+
         SettingsSection.About -> {
             Text(
                 text = "Strict Blocker",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.2")
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { },
-                enabled = false,
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Text("Update to v1.3")
-            }
+            SettingsDescription("Version " + BuildConfig.VERSION_NAME)
             Spacer(modifier = Modifier.height(8.dp))
-            SettingsDescription("Schedules and app preferences are stored on-device.")
+            SettingsDescription("For updates, use the official distribution page. Update APKs must be signed with the same release key as your installed copy.")
         }
     }
 }

@@ -6,7 +6,7 @@
  */
 window.STRICT_BLOCKER_CONFIG = {
   productName: "Strict Blocker",
-  appVersion: "1.2",
+  appVersion: "1.4",
   priceInr: 99,
   currency: "INR",
 

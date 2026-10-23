@@ -210,6 +210,18 @@ class AppBlockerRepository(
         AlarmScheduler.scheduleNextTransition(context)
     }
 
+    /** Replaces one app's schedule atomically, then recalculates the next alarm. */
+    suspend fun replaceSchedulePeriodsForApp(packageName: String, periods: List<SchedulePeriod>) = withContext(Dispatchers.IO) {
+        require(periods.all { it.appPackage == packageName }) { "Every schedule must belong to the selected app." }
+        require(periods.none { it.isZeroLengthMidnightWindow }) { "Empty midnight windows are not valid schedules." }
+        require(managedAppDao.getByPackage(packageName)?.isManaged == true) { "Choose an app that is currently managed." }
+        database.withTransaction {
+            scheduleDao.deleteByPackage(packageName)
+            if (periods.isNotEmpty()) scheduleDao.insertAll(periods.map { SchedulePeriodEntity.fromDomain(it.copy(id = 0)) })
+        }
+        AlarmScheduler.scheduleNextTransition(context)
+    }
+
     suspend fun updateSchedulePeriod(period: SchedulePeriod) = withContext(Dispatchers.IO) {
         scheduleDao.update(SchedulePeriodEntity.fromDomain(period))
         AlarmScheduler.scheduleNextTransition(context)

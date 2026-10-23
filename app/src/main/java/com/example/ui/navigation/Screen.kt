@@ -15,70 +15,23 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.ui.graphics.vector.ImageVector
 
-sealed class Screen(
-    val route: String,
-    val title: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
-) {
-    data object Dashboard : Screen(
-        route = "dashboard",
-        title = "Dashboard",
-        selectedIcon = Icons.Filled.Dashboard,
-        unselectedIcon = Icons.Outlined.Dashboard
-    )
-
-    data object Apps : Screen(
-        route = "apps",
-        title = "Apps",
-        selectedIcon = Icons.Filled.Apps,
-        unselectedIcon = Icons.Outlined.Apps
-    )
-
-    data object Schedules : Screen(
-        route = "schedules",
-        title = "Schedules",
-        selectedIcon = Icons.Filled.CalendarMonth,
-        unselectedIcon = Icons.Outlined.CalendarMonth
-    )
-
-    data object AdultProtection : Screen(
-        route = "adult_protection",
-        title = "18+ Shield",
-        selectedIcon = Icons.Filled.Shield,
-        unselectedIcon = Icons.Outlined.Shield
-    )
-
-    data object Permissions : Screen(
-        route = "permissions",
-        title = "Permissions",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
-
-    data object Settings : Screen(
-        route = "settings",
-        title = "Settings",
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings
-    )
-
-    data object AntiBypassGuide : Screen(
-        route = "anti_bypass_guide",
-        title = "Security Guide",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
-
-    data object Legal : Screen(
-        route = "legal",
-        title = "Privacy & Legal",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
+sealed class Screen(val route: String, val title: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector) {
+    data object Dashboard : Screen("dashboard", "Dashboard", Icons.Filled.Dashboard, Icons.Outlined.Dashboard)
+    data object Apps : Screen("apps", "Apps", Icons.Filled.Apps, Icons.Outlined.Apps)
+    data object Schedules : Screen("schedules", "Schedules", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
+    data object AdultProtection : Screen("adult_protection", "18+ Shield", Icons.Filled.Shield, Icons.Outlined.Shield)
+    data object Permissions : Screen("permissions", "Permissions", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Settings : Screen("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
+    data object AntiBypassGuide : Screen("anti_bypass_guide", "Security Guide", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Legal : Screen("legal", "Privacy & Legal", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Account : Screen("account", "Account", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Upgrade : Screen("upgrade", "Upgrade", Icons.Filled.Shield, Icons.Outlined.Shield)
+    data object Diagnostics : Screen("diagnostics", "Diagnostics", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Reports : Screen("reports", "Activity reports", Icons.Filled.Dashboard, Icons.Outlined.Dashboard)
+    data object Backup : Screen("backup", "Backup & restore", Icons.Filled.Settings, Icons.Outlined.Settings)
+    data object ScheduleTemplates : Screen("schedule_templates", "Templates", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
 
     companion object {
-        val navItems: List<Screen>
-            get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
+        val navItems: List<Screen> get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
     }
 }

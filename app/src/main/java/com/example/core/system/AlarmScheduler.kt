@@ -56,9 +56,12 @@ object AlarmScheduler {
                 // The evaluator should always provide a future time. Guard against an
                 // unexpectedly stale value rather than attempting to install a past alarm.
                 if (transitionMillis <= System.currentTimeMillis()) {
-                    Log.w(TAG, "Ignoring a stale transition time")
+                    Log.w(TAG, "Recalculating a stale transition time")
                     alarmManager.cancel(pendingIntent)
                     pendingIntent.cancel()
+                    // Re-query from the current time instead of leaving protection without
+                    // a future boundary alarm if a time change or scheduling race made this stale.
+                    scheduleNextTransition(appContext)
                     return@launch
                 }
 
