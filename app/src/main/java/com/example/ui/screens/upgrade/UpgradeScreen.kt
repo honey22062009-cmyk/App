@@ -104,7 +104,7 @@ fun UpgradeScreen(onNavigateBack: () -> Unit) {
                         if (!supportEmail.contains("@")) message = "Support email is not configured in this build."
                         else {
                             val subject = URLEncoder.encode("Strict Blocker payment verification", "UTF-8")
-                            val body = URLEncoder.encode("Please verify my purchase.\\nTransaction reference: $reference\\nAmount: ${if (validPrice) "₹${price!!.stripTrailingZeros().toPlainString()}" else "not configured"}", "UTF-8")
+                            val body = URLEncoder.encode("Please verify my purchase.\nTransaction reference: $reference\nAmount: ${if (validPrice) "₹${price!!.stripTrailingZeros().toPlainString()}" else "not configured"}", "UTF-8")
                             val uri = Uri.parse("mailto:$supportEmail?subject=$subject&body=$body")
                             runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) }
                                 .onSuccess { message = "Review and send the email draft to request verification." }

@@ -1,6 +1,6 @@
 package com.example.core.backup
 
-import android.util.Base64
+import java.util.Base64
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -21,15 +21,15 @@ object BackupCrypto {
   cipher.init(Cipher.ENCRYPT_MODE,deriveKey(passphrase,salt),GCMParameterSpec(128,iv))
   cipher.updateAAD(HEADER.toByteArray(Charsets.UTF_8))
   val ciphertext=cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-  return listOf(HEADER,Base64.encodeToString(salt,Base64.NO_WRAP),Base64.encodeToString(iv,Base64.NO_WRAP),Base64.encodeToString(ciphertext,Base64.NO_WRAP)).joinToString("\n")
+  return listOf(HEADER,Base64.getEncoder().encodeToString(salt),Base64.getEncoder().encodeToString(iv),Base64.getEncoder().encodeToString(ciphertext)).joinToString("\n")
  }
  fun decrypt(backup:String,passphrase:String):String {
   require(passphrase.length>=8) { "Enter the passphrase used to create this backup." }
   val lines=backup.trim().split("\n")
   require(lines.size==4 && lines[0]==HEADER) { "Unsupported encrypted backup format." }
-  val salt=Base64.decode(lines[1],Base64.NO_WRAP)
-  val iv=Base64.decode(lines[2],Base64.NO_WRAP)
-  val ciphertext=Base64.decode(lines[3],Base64.NO_WRAP)
+  val salt=Base64.getDecoder().decode(lines[1])
+  val iv=Base64.getDecoder().decode(lines[2])
+  val ciphertext=Base64.getDecoder().decode(lines[3])
   require(salt.size==16 && iv.size==12 && ciphertext.size>=16) { "Backup file is incomplete." }
   val cipher=Cipher.getInstance("AES/GCM/NoPadding")
   cipher.init(Cipher.DECRYPT_MODE,deriveKey(passphrase,salt),GCMParameterSpec(128,iv))
