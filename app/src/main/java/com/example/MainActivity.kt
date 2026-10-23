@@ -59,6 +59,12 @@ import com.example.ui.navigation.Screen
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
+import com.example.ui.screens.account.AccountScreen
+import com.example.ui.screens.backup.BackupRestoreScreen
+import com.example.ui.screens.diagnostics.DiagnosticsScreen
+import com.example.ui.screens.reports.ReportsScreen
+import com.example.ui.screens.templates.ScheduleTemplatesScreen
+import com.example.ui.screens.upgrade.UpgradeScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
@@ -358,7 +364,13 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToAccount = { onNavigateToScreen(Screen.Account) },
+                onNavigateToUpgrade = { onNavigateToScreen(Screen.Upgrade) },
+                onNavigateToDiagnostics = { onNavigateToScreen(Screen.Diagnostics) },
+                onNavigateToReports = { onNavigateToScreen(Screen.Reports) },
+                onNavigateToBackup = { onNavigateToScreen(Screen.Backup) },
+                onNavigateToTemplates = { onNavigateToScreen(Screen.ScheduleTemplates) }
             )
         }
         Screen.Apps -> {
@@ -396,9 +408,25 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToAccount = { onNavigateToScreen(Screen.Account) },
+                onNavigateToUpgrade = { onNavigateToScreen(Screen.Upgrade) },
+                onNavigateToDiagnostics = { onNavigateToScreen(Screen.Diagnostics) },
+                onNavigateToReports = { onNavigateToScreen(Screen.Reports) },
+                onNavigateToBackup = { onNavigateToScreen(Screen.Backup) },
+                onNavigateToTemplates = { onNavigateToScreen(Screen.ScheduleTemplates) }
             )
         }
+        Screen.Account -> AccountScreen(onNavigateBack = { onNavigateToScreen(Screen.Dashboard) })
+        Screen.Upgrade -> UpgradeScreen(onNavigateBack = { onNavigateToScreen(Screen.Dashboard) })
+        Screen.Diagnostics -> DiagnosticsScreen(repository = repository, onNavigateBack = { onNavigateToScreen(Screen.Dashboard) })
+        Screen.Reports -> ReportsScreen(repository = repository, onNavigateBack = { onNavigateToScreen(Screen.Dashboard) })
+        Screen.Backup -> BackupRestoreScreen(repository = repository, onNavigateBack = { onNavigateToScreen(Screen.Dashboard) })
+        Screen.ScheduleTemplates -> ScheduleTemplatesScreen(
+            repository = repository,
+            onNavigateBack = { onNavigateToScreen(Screen.Dashboard) },
+            onNavigateToApps = { onNavigateToScreen(Screen.Apps) }
+        )
         Screen.AntiBypassGuide -> {
             AntiBypassGuideScreen(
                 onNavigateBack = { onNavigateToScreen(Screen.Settings) }

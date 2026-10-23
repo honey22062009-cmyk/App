@@ -6,6 +6,12 @@ plugins {
   // alias(libs.plugins.google.services)
 }
 
+fun configuredValue(name: String): String =
+  providers.gradleProperty(name).orElse(providers.environmentVariable(name)).getOrElse("")
+
+fun String.asBuildConfigString(): String =
+  "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -14,8 +20,19 @@ android {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
     minSdk = 26
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.2"
+    versionCode = 4
+    versionName = "1.4"
+
+    // Optional integration settings are supplied at build time; none are hard-coded here.
+    buildConfigField("String", "FIREBASE_API_KEY", configuredValue("FIREBASE_API_KEY").asBuildConfigString())
+    buildConfigField("String", "FIREBASE_APP_ID", configuredValue("FIREBASE_APP_ID").asBuildConfigString())
+    buildConfigField("String", "FIREBASE_PROJECT_ID", configuredValue("FIREBASE_PROJECT_ID").asBuildConfigString())
+    buildConfigField("String", "FIREBASE_MESSAGING_SENDER_ID", configuredValue("FIREBASE_MESSAGING_SENDER_ID").asBuildConfigString())
+    buildConfigField("String", "PAYMENT_UPI_ID", configuredValue("PAYMENT_UPI_ID").asBuildConfigString())
+    buildConfigField("String", "PAYMENT_PAYEE_NAME", configuredValue("PAYMENT_PAYEE_NAME").asBuildConfigString())
+    buildConfigField("String", "PAYMENT_PRICE_INR", configuredValue("PAYMENT_PRICE_INR").asBuildConfigString())
+    buildConfigField("String", "PAYMENT_SUPPORT_EMAIL", configuredValue("PAYMENT_SUPPORT_EMAIL").asBuildConfigString())
+    buildConfigField("String", "PAYMENT_WEBSITE_URL", configuredValue("PAYMENT_WEBSITE_URL").asBuildConfigString())
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -82,6 +99,8 @@ secrets {
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
   implementation(platform(libs.androidx.compose.bom))
   // implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
