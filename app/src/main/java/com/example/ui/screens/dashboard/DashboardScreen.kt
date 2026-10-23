@@ -1,491 +1,179 @@
 package com.example.ui.screens.dashboard
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.example.core.system.PermissionHelper
-import com.example.data.repository.AppBlockerRepository
-import com.example.data.repository.NextTransitionInfo
-import com.example.ui.components.AppIconImage
-import com.example.ui.components.AppSurface
-import com.example.ui.theme.LayoutSpacing
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.launch
+import com.example.core.system.PermissionHelper
+import com.example.data.repository.AppBlockerRepository
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(
-    repository: AppBlockerRepository,
-    onNavigateToApps: () -> Unit,
-    onNavigateToPermissions: () -> Unit,
-    onNavigateToSchedules: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+ repository:AppBlockerRepository,
+ onNavigateToApps:()->Unit,
+ onNavigateToPermissions:()->Unit,
+ onNavigateToSchedules:()->Unit,
+ onNavigateToAdultProtection:()->Unit={},
+ onNavigateToAccount:()->Unit={},
+ onNavigateToUpgrade:()->Unit={},
+ onNavigateToDiagnostics:()->Unit={},
+ onNavigateToReports:()->Unit={},
+ onNavigateToBackup:()->Unit={},
+ onNavigateToTemplates:()->Unit={}
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+ val context=androidx.compose.ui.platform.LocalContext.current
+ val owner=LocalLifecycleOwner.current
+ val scope= rememberCoroutineScope()
+ val protectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial=true)
+ val managedApps by repository.managedAppsFlow.collectAsState(initial=emptyList())
+ val periods by repository.allPeriodsFlow.collectAsState(initial=emptyList())
+ val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial=0)
+ val recentBlocks by repository.recentBlocksFlow.collectAsState(initial=emptyList())
+ val activeApps=managedApps.filter { it.isManaged }
+ var permissionsHealthy by remember { mutableStateOf(false) }
+ var nextTransition by remember { mutableStateOf<com.example.data.repository.NextTransitionInfo?>(null) }
 
-    val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
-    val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
-    val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
-    val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
-    val totalBlocksCount by repository.totalBlocksCountFlow.collectAsState(initial = 0)
-    val recentBlocks by repository.recentBlocksFlow.collectAsState(initial = emptyList())
-    val activeManagedApps = managedApps.filter { it.isManaged }
+ DisposableEffect(context,owner) {
+  fun refresh() {
+   permissionsHealthy=PermissionHelper.isAccessibilityServiceEnabled(context) &&
+    PermissionHelper.isUsageAccessGranted(context) && PermissionHelper.canDrawOverlays(context) &&
+    PermissionHelper.canScheduleExactAlarms(context)
+  }
+  val observer=LifecycleEventObserver { _,event -> if(event==Lifecycle.Event.ON_RESUME) refresh() }
+  owner.lifecycle.addObserver(observer); refresh()
+  onDispose { owner.lifecycle.removeObserver(observer) }
+ }
+ LaunchedEffect(activeApps,periods) { nextTransition=repository.findNextGlobalTransition() }
 
-    var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+  Row(verticalAlignment=Alignment.CenterVertically) {
+   Column(Modifier.weight(1f)) {
+    Text("STRICT BLOCKER",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Bold)
+    Text("Focus dashboard",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold)
+    Text(java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM",Locale.getDefault())),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+   }
+   IconButton(onClick=onNavigateToAccount) { Icon(Icons.Default.Person,contentDescription="Account",modifier=Modifier.size(28.dp)) }
+  }
 
-    var permissionsHealthy by remember(context) { mutableStateOf(false) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Android settings are opened outside this activity. Refresh on resume so the
-    // dashboard never relies on a stale permission snapshot.
-    DisposableEffect(context, lifecycleOwner) {
-        fun refreshPermissions() {
-            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.canScheduleExactAlarms(context)
-        }
-
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        refreshPermissions()
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  Card(shape=RoundedCornerShape(26.dp),colors=CardDefaults.cardColors(containerColor=if(protectionEnabled && permissionsHealthy) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
+   Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    Row(verticalAlignment=Alignment.CenterVertically) {
+     Icon(Icons.Default.Shield,contentDescription=null,modifier=Modifier.size(34.dp))
+     Spacer(Modifier.width(12.dp))
+     Column(Modifier.weight(1f)) {
+      Text(when { !protectionEnabled->"Protection is paused"; !permissionsHealthy->"Setup needs attention"; else->"Protection is ready" },style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Text(when { !protectionEnabled->"Turn it back on to enforce your saved rules."; !permissionsHealthy->"One or more Android permissions are missing."; else->"Your schedules are applied on this device." },style=MaterialTheme.typography.bodyMedium)
+     }
     }
-
-    LaunchedEffect(activeManagedApps) {
-        nextTransition = repository.findNextGlobalTransition()
+    Row(verticalAlignment=Alignment.CenterVertically) {
+     Text("App blocking",modifier=Modifier.weight(1f),fontWeight=FontWeight.SemiBold)
+     Switch(checked=protectionEnabled,onCheckedChange={enabled -> scope.launch { repository.settings.setProtectionEnabled(enabled) }})
     }
-
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        val horizontalPadding = if (maxWidth >= 720.dp) LayoutSpacing.xl else LayoutSpacing.md
-        // Use the extra landscape space instead of forcing tablet content into a narrow
-        // phone-like column. Keep a cap so very large displays remain easy to scan.
-        val contentWidth = when {
-            maxWidth >= 1280.dp -> 1180.dp
-            maxWidth >= 1000.dp -> maxWidth - 72.dp
-            maxWidth >= 720.dp -> maxWidth - 40.dp
-            else -> maxWidth
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = horizontalPadding, vertical = LayoutSpacing.lg)
-                .testTag("dashboard_lazy_column"),
-            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text(
-                        text = "Strict Blocker",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Manage app access, schedules and protection",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            item {
-                AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = if (isProtectionEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = when {
-                                    !isProtectionEnabled -> "Protection paused"
-                                    !permissionsHealthy -> "Setup required"
-                                    else -> "Protection enabled"
-                                },
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(LayoutSpacing.xxs))
-                            Text(
-                                text = "${activeManagedApps.size} managed apps",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = when {
-                                    !isProtectionEnabled -> "App blocking is paused. Turn protection on to enforce your saved rules."
-                                    !permissionsHealthy -> "The setting is on, but required Android permissions need attention."
-                                    else -> "Core permissions are available. Blocking follows your saved app rules."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = isProtectionEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                            },
-                            modifier = Modifier
-                                .testTag("protection_toggle_switch")
-                                .semantics {
-                                    contentDescription = "Protection"
-                                    stateDescription = if (isProtectionEnabled) "On" else "Off"
-                                }
-                        )
-                    }
-                }
-            }
-
-            if (!permissionsHealthy) {
-                item {
-                    AppSurface(
-                        modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                        backgroundColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f),
-                        borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.25f),
-                        onClick = onNavigateToPermissions
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Protection needs attention",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Review Accessibility, Usage access, overlay and exact-alarm access.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    "Review permissions",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Quick access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        QuickAction("Apps", Icons.Default.Apps, onNavigateToApps, Modifier.weight(1f))
-                        QuickAction("Schedules", Icons.Default.CalendarMonth, onNavigateToSchedules, Modifier.weight(1f))
-                        QuickAction("Adult protection", Icons.Default.Security, onNavigateToAdultProtection, Modifier.weight(1.35f))
-                    }
-                }
-            }
-
-            if (activeManagedApps.isEmpty()) {
-                item {
-                    AppSurface(
-                        modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                        onClick = onNavigateToApps
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(LayoutSpacing.md),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Apps,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(Modifier.width(LayoutSpacing.sm))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "No apps managed yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Choose which apps should follow your schedules.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Manage apps",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                AppSurface(
-                    modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                    onClick = onNavigateToAdultProtection
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Security,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Adult Content Protection",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                if (isAdultProtectionEnabled) {
-                                    if (adultBlocksCount > 0) "${adultBlocksCount} restricted attempts blocked"
-                                    else "Web, search and device protection enabled"
-                                } else {
-                                    "Protection is off"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("At a glance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    AppSurface(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            StatusRow(
-                                icon = Icons.Default.CalendarMonth,
-                                title = "Next schedule change",
-                                value = nextTransition?.let {
-                                    val time = it.transitionDateTime.format(
-                                        DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-                                    )
-                                    "$time · ${if (it.isOpening) "opens" else "closes"} · ${it.appName}"
-                                } ?: "No upcoming transition"
-                            )
-                            Spacer(Modifier.height(14.dp))
-                            StatusRow(
-                                icon = Icons.Default.History,
-                                title = "Recorded blocked attempts",
-                                value = totalBlocksCount.toString()
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
-
-            if (recentBlocks.isEmpty()) {
-                item {
-                    AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                        Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    "No blocked attempts yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    "Recent blocked app launches will appear here.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                items(recentBlocks.take(8)) { event ->
-                    AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            AppIconImage(packageName = event.appPackage, size = 36.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    event.appName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    event.reason,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                            Text(
-                                event.formattedTime,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        }
+    if(!permissionsHealthy) Button(onClick=onNavigateToDiagnostics,modifier=Modifier.fillMaxWidth()) {
+     Icon(Icons.Default.Build,contentDescription=null); Spacer(Modifier.width(8.dp)); Text("Run protection check")
     }
+   }
+  }
+
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   SummaryCard("Managed apps",activeApps.size.toString(),Icons.Default.Apps,Modifier.weight(1f))
+   SummaryCard("Schedule windows",periods.count { it.isEnabled }.toString(),Icons.Default.Schedule,Modifier.weight(1f))
+   SummaryCard("Block events",totalBlocks.toString(),Icons.Default.Assessment,Modifier.weight(1f))
+  }
+
+  Card {
+   Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text("Next schedule boundary",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+    Text(nextTransition?.let { "${it.appName} · ${it.transitionDateTime.format(DateTimeFormatter.ofPattern("EEE, h:mm a",Locale.getDefault()))}" } ?: "No upcoming schedule change found",style=MaterialTheme.typography.titleLarge)
+    Text("This is a local schedule calculation. Real-device testing is needed to confirm actual enforcement.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedButton(onClick=onNavigateToSchedules) { Text("Open schedules") }
+   }
+  }
+
+  Text("Quick actions",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   ActionTile("Manage apps","Choose what to manage",Icons.Default.Apps,Modifier.weight(1f),onNavigateToApps)
+   ActionTile("Schedule","Edit allowed hours",Icons.Default.CalendarMonth,Modifier.weight(1f),onNavigateToSchedules)
+  }
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   ActionTile("Templates","Apply a weekly pattern",Icons.Default.Schedule,Modifier.weight(1f),onNavigateToTemplates)
+   ActionTile("Diagnostics","Fix setup problems",Icons.Default.Build,Modifier.weight(1f),onNavigateToDiagnostics)
+  }
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   ActionTile("Activity reports","Review blocked attempts",Icons.Default.Assessment,Modifier.weight(1f),onNavigateToReports)
+   ActionTile("Backup & restore","Protect your setup",Icons.Default.Folder,Modifier.weight(1f),onNavigateToBackup)
+  }
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   ActionTile("Account","Sign in or create account",Icons.Default.Person,Modifier.weight(1f),onNavigateToAccount)
+   ActionTile("Upgrade","Purchase options",Icons.Default.Star,Modifier.weight(1f),onNavigateToUpgrade)
+  }
+  Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   ActionTile("Content protection","Browser and DNS controls",Icons.Default.Security,Modifier.weight(1f),onNavigateToAdultProtection)
+   ActionTile("Permissions","Open setup guide",Icons.Default.Lock,Modifier.weight(1f),onNavigateToPermissions)
+  }
+
+  Text("Recent activity",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+  if(recentBlocks.isEmpty()) {
+   Card { Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+    Text("Nothing recorded yet",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+    Text("When Strict Blocker records a blocked attempt, it will appear here.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+   } }
+  } else {
+   recentBlocks.take(4).forEach { event ->
+    Card { Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically) {
+     Icon(Icons.Default.Shield,contentDescription=null,tint=MaterialTheme.colorScheme.primary); Spacer(Modifier.width(12.dp))
+     Column(Modifier.weight(1f)) {
+      Text(event.appName,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+      Text(event.formattedTime,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+      if(event.reason.isNotBlank()) Text(event.reason,style=MaterialTheme.typography.bodySmall)
+     }
+    } }
+   }
+   TextButton(onClick=onNavigateToReports) { Text("View activity report") }
+  }
+  Text("Strict Blocker works within Android's permission and background-service limits; it cannot guarantee every device and browser state is unbypassable.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+ }
 }
 
-@Composable
-private fun QuickAction(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    AppSurface(
-        modifier = modifier.heightIn(min = 76.dp),
-        backgroundColor = MaterialTheme.colorScheme.surface,
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.xs)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-                maxLines = 2
-            )
-        }
-    }
+@Composable private fun SummaryCard(title:String,value:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier) {
+ Card(modifier=modifier) { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+  Icon(icon,contentDescription=null,tint=MaterialTheme.colorScheme.primary)
+  Text(value,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
+  Text(title,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+ } }
 }
 
-@Composable
-private fun StatusRow(icon: ImageVector, title: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-    }
+@Composable private fun ActionTile(title:String,subtitle:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier,onClick:()->Unit) {
+ Card(modifier=modifier.clickable(onClick=onClick),shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)) {
+  Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+   Icon(icon,contentDescription=null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(24.dp))
+   Text(title,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold)
+   Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+  }
+ }
 }
