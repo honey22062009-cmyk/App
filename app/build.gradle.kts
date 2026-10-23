@@ -33,6 +33,7 @@ android {
     buildConfigField("String", "PAYMENT_PRICE_INR", configuredValue("PAYMENT_PRICE_INR").asBuildConfigString())
     buildConfigField("String", "PAYMENT_SUPPORT_EMAIL", configuredValue("PAYMENT_SUPPORT_EMAIL").asBuildConfigString())
     buildConfigField("String", "PAYMENT_WEBSITE_URL", configuredValue("PAYMENT_WEBSITE_URL").asBuildConfigString())
+    buildConfigField("boolean", "PAYMENT_CHECKOUT_ENABLED", configuredValue("PAYMENT_CHECKOUT_ENABLED").equals("true", ignoreCase = true).toString())
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

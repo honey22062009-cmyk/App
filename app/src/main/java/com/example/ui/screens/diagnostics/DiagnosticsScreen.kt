@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.BuildConfig
 import com.example.MainActivity
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
@@ -51,6 +52,18 @@ fun DiagnosticsScreen(repository: AppBlockerRepository, onNavigateBack: () -> Un
     }
     val requiredHealthy = protectionEnabled && checks.filter { it.required && it.title != "App blocking switch" }.all { it.healthy }
     val warningCount = checks.count { !it.healthy }
+    val diagnosticText = remember(checks, protectionEnabled) {
+        buildString {
+            appendLine("Strict Blocker diagnostics")
+            appendLine("Version: ${BuildConfig.VERSION_NAME}")
+            appendLine("Protection switch: ${if (protectionEnabled) "on" else "paused"}")
+            checks.forEach { check ->
+                appendLine("${check.title}: ${if (check.healthy) "available" else "needs review"}")
+            }
+            appendLine()
+            appendLine("This report excludes schedules, installed-app names, browser content, account data and payment details.")
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -91,6 +104,17 @@ fun DiagnosticsScreen(repository: AppBlockerRepository, onNavigateBack: () -> Un
                 }
             }
         }
-        Text("These checks report settings, not proof that every app or browser can be blocked in every device state.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(
+            onClick = {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "Strict Blocker diagnostic report")
+                    putExtra(Intent.EXTRA_TEXT, diagnosticText)
+                }
+                context.startActivity(Intent.createChooser(intent, "Share diagnostic report"))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Share diagnostic report") }
+        Text("The report includes only app version, protection switch and permission status. These checks are not proof that every app or browser can be blocked in every device state.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

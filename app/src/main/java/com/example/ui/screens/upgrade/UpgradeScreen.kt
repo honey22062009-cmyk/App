@@ -31,7 +31,7 @@ fun UpgradeScreen(onNavigateBack: () -> Unit) {
     val price = BuildConfig.PAYMENT_PRICE_INR.toBigDecimalOrNull()
     val validUpi = Regex("^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$").matches(upiId)
     val validPrice = price != null && price > BigDecimal.ZERO && price <= BigDecimal("100000")
-    val paymentReady = validUpi && payee.isNotBlank() && validPrice
+    val paymentReady = BuildConfig.PAYMENT_CHECKOUT_ENABLED && validUpi && payee.isNotBlank() && validPrice && supportEmail.contains("@")
     var reference by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
 
@@ -63,7 +63,7 @@ fun UpgradeScreen(onNavigateBack: () -> Unit) {
         Card {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Pay with UPI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(if (paymentReady) "Confirm the payee and amount inside your UPI app before authorizing payment." else "The payment screen is present, but live checkout is disabled in this build until the genuine receiving UPI ID, verified payee name, and final price are configured.")
+                Text(if (paymentReady) "Confirm the payee and amount inside your UPI app before authorizing payment." else "Checkout is disabled until the receiving UPI ID, verified payee, final price, support email, and explicit release enablement are configured and reviewed.")
                 Text("Payee: ${payee.ifBlank { "Not configured" }}")
                 Text("UPI ID: ${if (validUpi) upiId else "Not configured"}")
                 Button(
@@ -80,7 +80,7 @@ fun UpgradeScreen(onNavigateBack: () -> Unit) {
                             .onFailure { message = "No compatible UPI app was found." }
                     }
                 ) { Text("Continue to UPI payment") }
-                if (!paymentReady) Text("Configure PAYMENT_UPI_ID, PAYMENT_PAYEE_NAME and PAYMENT_PRICE_INR for a reviewed release build. Never use placeholder payment details.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                if (!paymentReady) Text("Configure PAYMENT_UPI_ID, PAYMENT_PAYEE_NAME, PAYMENT_PRICE_INR, and PAYMENT_SUPPORT_EMAIL. Then set PAYMENT_CHECKOUT_ENABLED=true only after verifying the receiving account, seller/refund terms, and test flow. The app still cannot automatically verify payments or grant Premium.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 if (websiteUrl.isNotBlank()) TextButton(onClick = {
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(websiteUrl))) }
                         .onFailure { message = "Unable to open payment website." }

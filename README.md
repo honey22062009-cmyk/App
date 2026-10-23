@@ -210,6 +210,7 @@ Set the following Gradle properties or environment variables in a reviewed build
 - PAYMENT_PRICE_INR: final price.
 - PAYMENT_SUPPORT_EMAIL: monitored support inbox.
 - PAYMENT_WEBSITE_URL: optional HTTPS storefront URL.
+- PAYMENT_CHECKOUT_ENABLED: leave unset/false until the receiving account, seller/refund terms, support contact and payment flow have been reviewed; set to `true` only for the approved release.
 
 No payment details are committed by default. Missing details keep the UPI action disabled. Manual email is not automatic transaction verification and does not unlock Premium. Automated unlock requires a backend that verifies transactions server-side. Have the adult/guardian responsible for the payment account review eligibility, seller details, terms, refund policy, and applicable obligations before taking payments.
 
