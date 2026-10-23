@@ -352,18 +352,17 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.2")
+            SettingsDescription("Version 1.3")
             Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { },
-                enabled = false,
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Text("Update to v1.3")
-            }
+            Text(
+                text = "Payment and delivery setup",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsDescription(
+                "UPI checkout is not active in this build. A real receiving UPI ID or QR, verified payee name, monitored support email, and seller/refund terms must be configured before payments can be enabled. Do not pay a placeholder QR."
+            )
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
         }
