@@ -39,7 +39,6 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,7 +53,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.billing.ProBillingManager
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
@@ -67,6 +65,7 @@ import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
+import com.example.ui.screens.owner.OwnerConsoleScreen
 import com.example.ui.screens.pro.BlockerCustomizationScreen
 import com.example.ui.screens.pro.PaywallDialog
 import com.example.ui.screens.pro.PaywallScreen
@@ -202,7 +201,8 @@ fun MainAppScaffold(
             Screen.Paywall,
             Screen.BlockerCustomization,
             Screen.Account,
-            Screen.Insights -> currentScreen = Screen.Settings
+            Screen.Insights,
+            Screen.OwnerConsole -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -466,7 +466,8 @@ fun ScreenContent(
                 onNavigateToPaywall = onOpenPaywallDialog,
                 onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
                 onNavigateToAccount = onOpenAccountDialog,
-                onNavigateToInsights = { onNavigateToScreen(Screen.Insights) }
+                onNavigateToInsights = { onNavigateToScreen(Screen.Insights) },
+                onNavigateToOwnerConsole = { onNavigateToScreen(Screen.OwnerConsole) }
             )
         }
         Screen.Account -> {
@@ -483,16 +484,7 @@ fun ScreenContent(
             )
         }
         Screen.Paywall -> {
-            // Billing is intentionally initialized only when the paywall is opened.
-            // Billing availability must never be a dependency of normal app startup.
-            val billingManager = remember(context, repository) {
-                ProBillingManager(context.applicationContext, repository.settings)
-            }
-            DisposableEffect(billingManager) {
-                onDispose { billingManager.close() }
-            }
             PaywallScreen(
-                billingManager = billingManager,
                 settings = repository.settings,
                 onBack = { onNavigateToScreen(Screen.Settings) },
                 onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
@@ -514,6 +506,12 @@ fun ScreenContent(
             LegalComplianceScreen(
                 repository = repository,
                 onNavigateBack = { onNavigateToScreen(Screen.Settings) }
+            )
+        }
+        Screen.OwnerConsole -> {
+            OwnerConsoleScreen(
+                settings = repository.settings,
+                onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
     }
