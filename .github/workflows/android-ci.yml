@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: ["main", "fix/build-errors"]
+    branches: ["main", "fix/build-errors", "ui/polish-v1-3"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
