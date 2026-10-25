@@ -709,6 +709,9 @@ fun AdultProtectionScreen(
     // Confirmation Dialog before turning off protection
     if (showDisableConfirmDialog) {
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(28.dp),
             onDismissRequest = { showDisableConfirmDialog = false },
             icon = {
                 Icon(
