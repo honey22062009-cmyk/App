@@ -31,7 +31,7 @@ class GoogleAuthManager(
         if (clientId.isBlank() || clientId == "CHANGE_ME") {
             return Result.failure(
                 IllegalStateException(
-                    "Google Sign-In is not configured. Set GOOGLE_WEB_CLIENT_ID in .env."
+                    "Google Sign-In is not configured for this build."
                 )
             )
         }
