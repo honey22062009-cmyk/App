@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "374802923953",
+    "project_id": "block-app-abb6b",
+    "storage_bucket": "block-app-abb6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:374802923953:android:61511c6cb73a8790f83d90",
+        "android_client_info": {
+          "package_name": "com.aistudio.strictblocker.kzvwpq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5vufI5d4wX8mdVZZ3ETJl37i45siwekk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
