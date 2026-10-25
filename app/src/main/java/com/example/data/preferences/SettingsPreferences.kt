@@ -42,6 +42,9 @@ class SettingsPreferences(private val context: Context) {
 
         // Pro / premium blocker customization
         val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
+        val PRO_EXPIRES_AT = longPreferencesKey("pro_expires_at")
+        val PRO_PAYMENT_REQUEST_ID = stringPreferencesKey("pro_payment_request_id")
+        val LAST_PAYMENT_REQUEST_ID = stringPreferencesKey("last_payment_request_id")
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
         val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
         val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
@@ -121,7 +124,17 @@ class SettingsPreferences(private val context: Context) {
     }
 
     val isProEntitledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.PRO_ENTITLED] ?: false
+        val entitled = preferences[PreferencesKeys.PRO_ENTITLED] ?: false
+        val expiresAt = preferences[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
+        entitled && (expiresAt == 0L || expiresAt > System.currentTimeMillis())
+    }
+
+    val proExpiresAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
+    }
+
+    val lastPaymentRequestIdFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] ?: ""
     }
 
     val blockerStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -283,9 +296,35 @@ class SettingsPreferences(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.PRO_ENTITLED] = enabled
             if (!enabled) {
+                preferences.remove(PreferencesKeys.PRO_EXPIRES_AT)
+                preferences.remove(PreferencesKeys.PRO_PAYMENT_REQUEST_ID)
                 preferences[PreferencesKeys.BLOCKER_STYLE] = "classic"
                 preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
             }
+        }
+    }
+
+    suspend fun setLastPaymentRequestId(requestId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] = requestId.trim()
+        }
+    }
+
+    suspend fun setManualProEntitlement(requestId: String, expiresAtMillis: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PRO_ENTITLED] = true
+            preferences[PreferencesKeys.PRO_EXPIRES_AT] = expiresAtMillis
+            preferences[PreferencesKeys.PRO_PAYMENT_REQUEST_ID] = requestId
+            preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] = requestId
+        }
+    }
+
+    suspend fun refreshExpiredProEntitlement() {
+        val snapshot = context.dataStore.data.first()
+        val entitled = snapshot[PreferencesKeys.PRO_ENTITLED] ?: false
+        val expiresAt = snapshot[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
+        if (entitled && expiresAt > 0L && expiresAt <= System.currentTimeMillis()) {
+            setProEntitled(false)
         }
     }
 
