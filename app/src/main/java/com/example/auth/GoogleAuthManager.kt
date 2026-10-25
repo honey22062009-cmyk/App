@@ -7,6 +7,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.example.BuildConfig
 import com.example.data.preferences.SettingsPreferences
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -35,21 +36,25 @@ class GoogleAuthManager(
             )
         }
 
-        val option = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(clientId)
-            .setAutoSelectEnabled(false)
-            .build()
-
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(option)
-            .build()
-
         return try {
-            val response = credentialManager.getCredential(
-                request = request,
-                context = activity
-            )
+            // Smooth path for returning users: try an already-authorized Google
+            // account first, then fall back to the full account picker.
+            val response = try {
+                requestCredential(
+                    activity = activity,
+                    clientId = clientId,
+                    authorizedOnly = true,
+                    autoSelect = true
+                )
+            } catch (_: NoCredentialException) {
+                requestCredential(
+                    activity = activity,
+                    clientId = clientId,
+                    authorizedOnly = false,
+                    autoSelect = false
+                )
+            }
+
             val credential = response.credential
             if (
                 credential is CustomCredential &&
@@ -78,6 +83,24 @@ class GoogleAuthManager(
             Result.failure(t)
         }
     }
+
+    private suspend fun requestCredential(
+        activity: Activity,
+        clientId: String,
+        authorizedOnly: Boolean,
+        autoSelect: Boolean
+    ) = credentialManager.getCredential(
+        request = GetCredentialRequest.Builder()
+            .addCredentialOption(
+                GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(authorizedOnly)
+                    .setServerClientId(clientId)
+                    .setAutoSelectEnabled(autoSelect)
+                    .build()
+            )
+            .build(),
+        context = activity
+    )
 
     suspend fun signOut() {
         try {
