@@ -220,6 +220,10 @@ fun SettingsScreen(
                                     themeMode = themeMode,
                                     delayMinutes = delayMinutes,
                                     isProtectionEnabled = isProtectionEnabled,
+                                    reduceMotion = reduceMotion,
+                                    showPackageOnBlocker = showPackageOnBlocker,
+                                    accountSignedIn = accountSignedIn,
+                                    accountEmail = accountEmail,
                                     onThemeChange = { mode ->
                                         scope.launch { repository.settings.setThemeMode(mode) }
                                     },
@@ -234,7 +238,15 @@ fun SettingsScreen(
                                     onNavigateToLegal = onNavigateToLegal,
                                     onNavigateToAdultProtection = onNavigateToAdultProtection,
                                     onNavigateToPaywall = onNavigateToPaywall,
-                                    onNavigateToBlockerCustomization = onNavigateToBlockerCustomization
+                                    onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
+                                    onNavigateToAccount = onNavigateToAccount,
+                                    onNavigateToInsights = onNavigateToInsights,
+                                    onReduceMotionChange = { enabled ->
+                                        scope.launch { repository.settings.setReduceMotion(enabled) }
+                                    },
+                                    onShowPackageOnBlockerChange = { enabled ->
+                                        scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                    }
                                 )
                             }
                         }
