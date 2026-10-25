@@ -33,7 +33,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun SplashScreen(onSplashComplete: () -> Unit) {
+fun SplashScreen(
+    reduceMotion: Boolean = false,
+    onSplashComplete: () -> Unit
+) {
     val logoScale = remember { Animatable(0.72f) }
     val logoAlpha = remember { Animatable(0f) }
     val logoRotation = remember { Animatable(-8f) }
@@ -43,7 +46,20 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     val copyOffset = remember { Animatable(10f) }
     val exitAlpha = remember { Animatable(1f) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reduceMotion) {
+        if (reduceMotion) {
+            logoScale.snapTo(1f)
+            logoAlpha.snapTo(1f)
+            logoRotation.snapTo(0f)
+            ringScale.snapTo(1f)
+            ringAlpha.snapTo(1f)
+            copyAlpha.snapTo(1f)
+            copyOffset.snapTo(0f)
+            delay(120)
+            onSplashComplete()
+            return@LaunchedEffect
+        }
+
         coroutineScope {
             launch { logoAlpha.animateTo(1f, tween(180)) }
             launch { logoScale.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
