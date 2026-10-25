@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import com.example.payments.ManualPaymentManager
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.account.AccountDialog
 import com.example.ui.screens.account.AccountScreen
@@ -156,6 +157,7 @@ fun MainAppScaffold(
     initialTargetPackage: String?,
     reduceMotion: Boolean
 ) {
+    val context = LocalContext.current
     var currentScreen by remember {
         mutableStateOf<Screen>(
             if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
@@ -173,6 +175,15 @@ fun MainAppScaffold(
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
     LaunchedEffect(repository, initialTargetPackage) {
+        repository.settings.refreshExpiredProEntitlement()
+        val lastPaymentRequestId = repository.settings.lastPaymentRequestIdFlow.first()
+        if (lastPaymentRequestId.isNotBlank()) {
+            ManualPaymentManager(
+                context.applicationContext,
+                repository.settings
+            ).refreshUserRequestOnce(lastPaymentRequestId)
+        }
+
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
         if (!initialTargetPackage.isNullOrEmpty()) {
             selectedSchedulePackage = initialTargetPackage
