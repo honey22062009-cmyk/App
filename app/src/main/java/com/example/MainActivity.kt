@@ -282,7 +282,6 @@ fun MainAppScaffold(
         )
     }
 }
-}
 
 @Composable
 fun ScreenContent(
