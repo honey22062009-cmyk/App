@@ -261,6 +261,9 @@ fun LegalComplianceScreen(
     // Confirmation Dialog for Data Deletion
     if (showDeleteConfirmDialog) {
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(28.dp),
             onDismissRequest = { showDeleteConfirmDialog = false },
             icon = {
                 Icon(
