@@ -16,15 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
       - name: Configure Google Sign-In
@@ -35,6 +35,26 @@ jobs:
             printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
           else
             printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
+          fi
+      - name: Require Google Sign-In configuration
+        run: |
+          if grep -q '^GOOGLE_WEB_CLIENT_ID=CHANGE_ME        run: node --check website/config.js && node --check website/app.js
+      - name: Run Android lint
+        run: gradle :app:lintDebug --stacktrace --no-daemon
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-blocker-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+ .env; then
+            echo "::error::GOOGLE_WEB_CLIENT_ID GitHub Actions secret is missing. Configure the OAuth Web client ID before distributing this build."
+            exit 1
           fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
