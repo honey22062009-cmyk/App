@@ -44,6 +44,17 @@ class SettingsPreferences(private val context: Context) {
         val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
         val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
+        val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
+        val SHOW_PACKAGE_ON_BLOCKER = booleanPreferencesKey("show_package_on_blocker")
+        val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+
+        // Remembered Google account identity. Signing out clears the session flag
+        // but deliberately keeps these display fields for faster re-login.
+        val ACCOUNT_SIGNED_IN = booleanPreferencesKey("account_signed_in")
+        val ACCOUNT_ID = stringPreferencesKey("account_id")
+        val ACCOUNT_EMAIL = stringPreferencesKey("account_email")
+        val ACCOUNT_DISPLAY_NAME = stringPreferencesKey("account_display_name")
+        val ACCOUNT_PHOTO_URI = stringPreferencesKey("account_photo_uri")
     }
 
     val themeModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -118,6 +129,38 @@ class SettingsPreferences(private val context: Context) {
 
     val blockerPhotoUriFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.BLOCKER_PHOTO_URI] ?: ""
+    }
+
+    val blockerMessageFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BLOCKER_MESSAGE] ?: "Stay with the plan. This can wait."
+    }
+
+    val showPackageOnBlockerFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.SHOW_PACKAGE_ON_BLOCKER] ?: false
+    }
+
+    val reduceMotionFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.REDUCE_MOTION] ?: false
+    }
+
+    val isAccountSignedInFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCOUNT_SIGNED_IN] ?: false
+    }
+
+    val accountIdFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCOUNT_ID] ?: ""
+    }
+
+    val accountEmailFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCOUNT_EMAIL] ?: ""
+    }
+
+    val accountDisplayNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCOUNT_DISPLAY_NAME] ?: ""
+    }
+
+    val accountPhotoUriFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCOUNT_PHOTO_URI] ?: ""
     }
 
     suspend fun setProtectionEnabled(enabled: Boolean) {
@@ -255,6 +298,56 @@ class SettingsPreferences(private val context: Context) {
             val value = uri?.trim().orEmpty()
             if (value.isBlank()) preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
             else preferences[PreferencesKeys.BLOCKER_PHOTO_URI] = value
+        }
+    }
+
+    suspend fun setBlockerMessage(message: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BLOCKER_MESSAGE] =
+                message.trim().take(120).ifBlank { "Stay with the plan. This can wait." }
+        }
+    }
+
+    suspend fun setShowPackageOnBlocker(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SHOW_PACKAGE_ON_BLOCKER] = enabled
+        }
+    }
+
+    suspend fun setReduceMotion(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.REDUCE_MOTION] = enabled
+        }
+    }
+
+    suspend fun saveSignedInAccount(
+        id: String,
+        email: String,
+        displayName: String?,
+        photoUri: String?
+    ) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ACCOUNT_SIGNED_IN] = true
+            preferences[PreferencesKeys.ACCOUNT_ID] = id
+            preferences[PreferencesKeys.ACCOUNT_EMAIL] = email
+            preferences[PreferencesKeys.ACCOUNT_DISPLAY_NAME] = displayName?.trim().orEmpty()
+            preferences[PreferencesKeys.ACCOUNT_PHOTO_URI] = photoUri?.trim().orEmpty()
+        }
+    }
+
+    suspend fun signOutKeepRememberedAccount() {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ACCOUNT_SIGNED_IN] = false
+        }
+    }
+
+    suspend fun forgetRememberedAccount() {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ACCOUNT_SIGNED_IN] = false
+            preferences.remove(PreferencesKeys.ACCOUNT_ID)
+            preferences.remove(PreferencesKeys.ACCOUNT_EMAIL)
+            preferences.remove(PreferencesKeys.ACCOUNT_DISPLAY_NAME)
+            preferences.remove(PreferencesKeys.ACCOUNT_PHOTO_URI)
         }
     }
 
