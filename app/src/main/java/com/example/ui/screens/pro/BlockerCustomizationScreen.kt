@@ -23,10 +23,14 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +54,10 @@ fun BlockerCustomizationScreen(
     val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
     val style by settings.blockerStyleFlow.collectAsState(initial = "classic")
     val photoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
+    val savedMessage by settings.blockerMessageFlow.collectAsState(
+        initial = "Stay with the plan. This can wait."
+    )
+    var messageDraft by remember(savedMessage) { mutableStateOf(savedMessage) }
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -136,6 +144,42 @@ fun BlockerCustomizationScreen(
                                     label = { Text(label) }
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            item {
+                AppSurface(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "Block message",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Write a short message your future self will see when a blocked app opens.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = messageDraft,
+                            onValueChange = { messageDraft = it.take(120) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            minLines = 2,
+                            maxLines = 3,
+                            supportingText = { Text(messageDraft.length.toString() + "/120") }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                scope.launch { settings.setBlockerMessage(messageDraft) }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Save message")
                         }
                     }
                 }
