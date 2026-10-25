@@ -153,15 +153,33 @@ fun GlassCard(
         borderWidth = borderWidth
     )
 
-    val base = modifier
-        .clip(shape)
-        .border(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant, shape)
-        .background(spec.backgroundColor, shape)
-
-    Box(
-        modifier = if (onClick != null) base.clickable(onClick = onClick) else base
-    ) {
-        content()
+    // Use Material Surface instead of a raw Box so every child receives a
+    // contrast-safe LocalContentColor in both light and dark themes.
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape,
+            color = spec.backgroundColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = elevation,
+            shadowElevation = elevation,
+            border = BorderStroke(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            content()
+        }
+    } else {
+        Surface(
+            modifier = modifier,
+            shape = shape,
+            color = spec.backgroundColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = elevation,
+            shadowElevation = elevation,
+            border = BorderStroke(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            content()
+        }
     }
 }
 
