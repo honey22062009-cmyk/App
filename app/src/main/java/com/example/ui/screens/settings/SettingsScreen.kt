@@ -74,7 +74,8 @@ fun SettingsScreen(
     onNavigateToPaywall: () -> Unit = {},
     onNavigateToBlockerCustomization: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
-    onNavigateToInsights: () -> Unit = {}
+    onNavigateToInsights: () -> Unit = {},
+    onNavigateToOwnerConsole: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -172,6 +173,7 @@ fun SettingsScreen(
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
+                                onNavigateToOwnerConsole = onNavigateToOwnerConsole,
                                 onReduceMotionChange = { enabled ->
                                     scope.launch { repository.settings.setReduceMotion(enabled) }
                                 },
@@ -263,6 +265,7 @@ fun SettingsScreen(
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
+                                onNavigateToOwnerConsole = onNavigateToOwnerConsole,
                                 onReduceMotionChange = { enabled ->
                                     scope.launch { repository.settings.setReduceMotion(enabled) }
                                 },
@@ -342,6 +345,7 @@ private fun SettingsSectionContent(
     onNavigateToBlockerCustomization: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToInsights: () -> Unit,
+    onNavigateToOwnerConsole: () -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onShowPackageOnBlockerChange: (Boolean) -> Unit,
     onHistoryRetentionChange: (Int) -> Unit
@@ -493,6 +497,12 @@ private fun SettingsSectionContent(
             }
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
+            Spacer(modifier = Modifier.height(14.dp))
+            SettingsLinkRow(
+                title = "Owner payment console",
+                subtitle = "Review pending UPI payments and approve Pro manually",
+                onClick = onNavigateToOwnerConsole
+            )
         }
     }
 }
