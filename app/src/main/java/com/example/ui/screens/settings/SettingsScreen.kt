@@ -59,7 +59,6 @@ private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Appearance("Appearance", Icons.Default.Palette),
     Blocking("Blocking", Icons.Default.HourglassBottom),
     Protection("Protection", Icons.Default.Shield),
-    Pro("Strict Blocker Pro", Icons.Default.Star),
     Permissions("Permissions", Icons.Default.Security),
     Privacy("Privacy & legal", Icons.Default.PrivacyTip),
     About("About", Icons.Default.Info)
@@ -421,28 +420,6 @@ private fun SettingsSectionContent(
                 title = "Anti-bypass information",
                 subtitle = "Understand Android limits and stronger device-owner options",
                 onClick = onNavigateToAntiBypassGuide
-            )
-        }
-
-        SettingsSection.Pro -> {
-            SettingsDescription("Unlock custom blocker photos, animated blocker styles and premium personalization.")
-            Spacer(modifier = Modifier.height(12.dp))
-            SettingsLinkRow(
-                title = "View Strict Blocker Pro",
-                subtitle = "See subscription options and restore purchases",
-                onClick = onNavigateToPaywall
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsLinkRow(
-                title = "Customize block screen",
-                subtitle = "Choose animations, focus styles or your own photo",
-                onClick = onNavigateToBlockerCustomization
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsLinkRow(
-                title = "Focus insights",
-                subtitle = "Daily, weekly and monthly block statistics",
-                onClick = onNavigateToInsights
             )
         }
 
