@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HourglassBottom
@@ -53,6 +55,7 @@ import com.example.ui.components.GlassCard
 import kotlinx.coroutines.launch
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
+    Account("Account", Icons.Default.AccountCircle),
     Appearance("Appearance", Icons.Default.Palette),
     Blocking("Blocking", Icons.Default.HourglassBottom),
     Protection("Protection", Icons.Default.Shield),
@@ -70,12 +73,18 @@ fun SettingsScreen(
     onNavigateToLegal: () -> Unit,
     onNavigateToAdultProtection: () -> Unit = {},
     onNavigateToPaywall: () -> Unit = {},
-    onNavigateToBlockerCustomization: () -> Unit = {}
+    onNavigateToBlockerCustomization: () -> Unit = {},
+    onNavigateToAccount: () -> Unit = {},
+    onNavigateToInsights: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val delayMinutes by repository.settings.strictChangeDelayMinutesFlow.collectAsState(initial = 0)
     val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+    val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
+    val showPackageOnBlocker by repository.settings.showPackageOnBlockerFlow.collectAsState(initial = false)
+    val accountSignedIn by repository.settings.isAccountSignedInFlow.collectAsState(initial = false)
+    val accountEmail by repository.settings.accountEmailFlow.collectAsState(initial = "")
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
 
     BoxWithConstraints(
@@ -141,6 +150,10 @@ fun SettingsScreen(
                                 themeMode = themeMode,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
+                                reduceMotion = reduceMotion,
+                                showPackageOnBlocker = showPackageOnBlocker,
+                                accountSignedIn = accountSignedIn,
+                                accountEmail = accountEmail,
                                 onThemeChange = { mode ->
                                     scope.launch { repository.settings.setThemeMode(mode) }
                                 },
@@ -155,7 +168,15 @@ fun SettingsScreen(
                                 onNavigateToLegal = onNavigateToLegal,
                                 onNavigateToAdultProtection = onNavigateToAdultProtection,
                                 onNavigateToPaywall = onNavigateToPaywall,
-                                onNavigateToBlockerCustomization = onNavigateToBlockerCustomization
+                                onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
+                                onNavigateToAccount = onNavigateToAccount,
+                                onNavigateToInsights = onNavigateToInsights,
+                                onReduceMotionChange = { enabled ->
+                                    scope.launch { repository.settings.setReduceMotion(enabled) }
+                                },
+                                onShowPackageOnBlockerChange = { enabled ->
+                                    scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                }
                             )
                         }
                     }
@@ -266,6 +287,10 @@ private fun SettingsSectionContent(
     themeMode: String,
     delayMinutes: Int,
     isProtectionEnabled: Boolean,
+    reduceMotion: Boolean,
+    showPackageOnBlocker: Boolean,
+    accountSignedIn: Boolean,
+    accountEmail: String,
     onThemeChange: (String) -> Unit,
     onDelayChange: (Int) -> Unit,
     onProtectionChange: (Boolean) -> Unit,
@@ -274,9 +299,27 @@ private fun SettingsSectionContent(
     onNavigateToLegal: () -> Unit,
     onNavigateToAdultProtection: () -> Unit,
     onNavigateToPaywall: () -> Unit,
-    onNavigateToBlockerCustomization: () -> Unit
+    onNavigateToBlockerCustomization: () -> Unit,
+    onNavigateToAccount: () -> Unit,
+    onNavigateToInsights: () -> Unit,
+    onReduceMotionChange: (Boolean) -> Unit,
+    onShowPackageOnBlockerChange: (Boolean) -> Unit
 ) {
     when (section) {
+        SettingsSection.Account -> {
+            SettingsDescription(
+                if (accountSignedIn) "Signed in as " + accountEmail
+                else if (accountEmail.isNotBlank()) "Signed out • remembered account: " + accountEmail
+                else "Connect a Google account for identity and future sync features."
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            SettingsLinkRow(
+                title = if (accountSignedIn) "Manage account" else "Sign in with Google",
+                subtitle = "Account identity, sign-out and remembered account controls",
+                onClick = onNavigateToAccount
+            )
+        }
+
         SettingsSection.Appearance -> {
             SettingsDescription("Choose how the app follows your device theme.")
             Spacer(modifier = Modifier.height(12.dp))
@@ -296,6 +339,13 @@ private fun SettingsSectionContent(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(18.dp))
+            SettingsToggleRow(
+                title = "Reduce motion",
+                subtitle = "Uses simpler transitions and disables decorative blocker animation.",
+                checked = reduceMotion,
+                onCheckedChange = onReduceMotionChange
+            )
         }
 
         SettingsSection.Blocking -> {
@@ -312,6 +362,13 @@ private fun SettingsSectionContent(
                 fontWeight = FontWeight.SemiBold
             )
             SettingsDescription("Adds a waiting period before schedule changes take effect.")
+            Spacer(modifier = Modifier.height(18.dp))
+            SettingsToggleRow(
+                title = "Show technical app ID",
+                subtitle = "Display the package name on the block screen for diagnostics.",
+                checked = showPackageOnBlocker,
+                onCheckedChange = onShowPackageOnBlockerChange
+            )
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0 to "Instant", 5 to "5 min", 15 to "15 min", 30 to "30 min").forEach { (mins, label) ->
@@ -351,6 +408,12 @@ private fun SettingsSectionContent(
                 title = "Customize block screen",
                 subtitle = "Choose animations, focus styles or your own photo",
                 onClick = onNavigateToBlockerCustomization
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsLinkRow(
+                title = "Focus insights",
+                subtitle = "Daily, weekly and monthly block statistics",
+                onClick = onNavigateToInsights
             )
         }
 
