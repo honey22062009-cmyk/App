@@ -52,7 +52,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.example.core.system.PermissionHelper
+import com.example.core.system.ProtectionHealth
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
@@ -86,26 +86,28 @@ fun DashboardScreen(
 
     var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
 
-    var permissionsHealthy by remember(context) { mutableStateOf(false) }
+    var protectionHealth by remember(context) {
+        mutableStateOf(ProtectionHealth.snapshot(context))
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Android settings are opened outside this activity. Refresh on resume so the
-    // dashboard never relies on a stale permission snapshot.
+    // Android can revoke special access after install. Refresh whenever the app
+    // returns to the foreground so degraded reliability is visible immediately.
     DisposableEffect(context, lifecycleOwner) {
-        fun refreshPermissions() {
-            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.canScheduleExactAlarms(context)
+        fun refreshHealth() {
+            protectionHealth = ProtectionHealth.snapshot(context)
         }
 
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
+            if (event == Lifecycle.Event.ON_RESUME) refreshHealth()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        refreshPermissions()
+        refreshHealth()
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
+    val coreProtectionReady = protectionHealth.coreReady
+    val fullyReliable = protectionHealth.reliabilityScore == 100
 
     LaunchedEffect(activeManagedApps) {
         nextTransition = repository.findNextGlobalTransition()
@@ -168,7 +170,8 @@ fun DashboardScreen(
                             Text(
                                 text = when {
                                     !isProtectionEnabled -> "Protection paused"
-                                    !permissionsHealthy -> "Setup required"
+                                    !coreProtectionReady -> "Setup required"
+                                    !fullyReliable -> "Protection enabled • reduced reliability"
                                     else -> "Protection enabled"
                                 },
                                 style = MaterialTheme.typography.titleLarge,
@@ -183,7 +186,8 @@ fun DashboardScreen(
                             Text(
                                 text = when {
                                     !isProtectionEnabled -> "App blocking is paused. Turn protection on to enforce your saved rules."
-                                    !permissionsHealthy -> "The setting is on, but required Android permissions need attention."
+                                    !coreProtectionReady -> "The setting is on, but required Android permissions need attention."
+                                    !fullyReliable -> "Blocking is active, but Android reliability settings can be improved."
                                     else -> "Core permissions are available. Blocking follows your saved app rules."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
@@ -206,30 +210,55 @@ fun DashboardScreen(
                 }
             }
 
-            if (!permissionsHealthy) {
+            if (!coreProtectionReady || !fullyReliable) {
                 item {
                     AppSurface(
                         modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                        backgroundColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f),
-                        borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.25f),
+                        backgroundColor = if (!coreProtectionReady) {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        },
+                        borderColor = if (!coreProtectionReady) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        },
                         onClick = onNavigateToPermissions
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (!coreProtectionReady) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            )
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "Protection needs attention",
+                                    if (!coreProtectionReady) {
+                                        "Core protection needs attention"
+                                    } else {
+                                        "Protection reliability: ${protectionHealth.reliabilityScore}%"
+                                    },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    "Review Accessibility, Usage access, overlay and exact-alarm access.",
+                                    if (!coreProtectionReady) {
+                                        "Accessibility and Usage Access are the two core enforcement paths."
+                                    } else {
+                                        protectionHealth.degradedReasons.firstOrNull()
+                                            ?: "Optional Android reliability settings can be improved."
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    "Review permissions",
+                                    "Review protection health",
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary
                                 )
