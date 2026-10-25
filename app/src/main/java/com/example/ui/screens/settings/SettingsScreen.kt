@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -55,6 +56,7 @@ private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Appearance("Appearance", Icons.Default.Palette),
     Blocking("Blocking", Icons.Default.HourglassBottom),
     Protection("Protection", Icons.Default.Shield),
+    Pro("Strict Blocker Pro", Icons.Default.Star),
     Permissions("Permissions", Icons.Default.Security),
     Privacy("Privacy & legal", Icons.Default.PrivacyTip),
     About("About", Icons.Default.Info)
@@ -66,7 +68,9 @@ fun SettingsScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+    onNavigateToAdultProtection: () -> Unit = {},
+    onNavigateToPaywall: () -> Unit = {},
+    onNavigateToBlockerCustomization: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -149,7 +153,9 @@ fun SettingsScreen(
                                 onNavigateToPermissions = onNavigateToPermissions,
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
-                                onNavigateToAdultProtection = onNavigateToAdultProtection
+                                onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                onNavigateToPaywall = onNavigateToPaywall,
+                                onNavigateToBlockerCustomization = onNavigateToBlockerCustomization
                             )
                         }
                     }
@@ -264,7 +270,9 @@ private fun SettingsSectionContent(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit
+    onNavigateToAdultProtection: () -> Unit,
+    onNavigateToPaywall: () -> Unit,
+    onNavigateToBlockerCustomization: () -> Unit
 ) {
     when (section) {
         SettingsSection.Appearance -> {
@@ -328,6 +336,22 @@ private fun SettingsSectionContent(
             )
         }
 
+        SettingsSection.Pro -> {
+            SettingsDescription("Unlock custom blocker photos, animated blocker styles and premium personalization.")
+            Spacer(modifier = Modifier.height(12.dp))
+            SettingsLinkRow(
+                title = "View Strict Blocker Pro",
+                subtitle = "See subscription options and restore purchases",
+                onClick = onNavigateToPaywall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsLinkRow(
+                title = "Customize block screen",
+                subtitle = "Choose animations, focus styles or your own photo",
+                onClick = onNavigateToBlockerCustomization
+            )
+        }
+
         SettingsSection.Permissions -> {
             SettingsDescription("Review the Android permissions used for blocking and background reliability.")
             Spacer(modifier = Modifier.height(12.dp))
@@ -352,7 +376,7 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.2")
+            SettingsDescription("Version 1.3")
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { },
@@ -362,7 +386,7 @@ private fun SettingsSectionContent(
                     disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             ) {
-                Text("Update to v1.3")
+                Text("Version 1.3")
             }
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
