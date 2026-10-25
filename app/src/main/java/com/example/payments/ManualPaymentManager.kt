@@ -47,6 +47,7 @@ class ManualPaymentManager(
 ) {
     companion object {
         const val UPI_ID = "honey22062009@oksbi"
+        const val OWNER_EMAIL = "honey22062009@gmail.com"
         private const val COLLECTION = "payment_requests"
         private const val ADMINS = "admins"
         private const val STATUS_PENDING = "pending"
@@ -179,6 +180,50 @@ class ManualPaymentManager(
                         }
                     }
                 }
+        }
+    }
+
+    fun refreshUserRequestOnce(
+        requestId: String,
+        onResult: (Result<PaymentRequest?>) -> Unit = {}
+    ) {
+        if (requestId.isBlank()) {
+            onResult(Result.success(null))
+            return
+        }
+
+        ensureUserSession { authResult ->
+            authResult.fold(
+                onSuccess = {
+                    firestore.collection(COLLECTION)
+                        .document(requestId)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            if (!snapshot.exists()) {
+                                onResult(Result.success(null))
+                                return@addOnSuccessListener
+                            }
+
+                            val request = snapshot.toPaymentRequest()
+                            if (
+                                request != null &&
+                                request.status == STATUS_APPROVED &&
+                                request.deviceHash == deviceHash() &&
+                                request.expiresAtMillis != null
+                            ) {
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                    settings.setManualProEntitlement(
+                                        requestId = request.id,
+                                        expiresAtMillis = request.expiresAtMillis
+                                    )
+                                }
+                            }
+                            onResult(Result.success(request))
+                        }
+                        .addOnFailureListener { onResult(Result.failure(it)) }
+                },
+                onFailure = { onResult(Result.failure(it)) }
+            )
         }
     }
 
