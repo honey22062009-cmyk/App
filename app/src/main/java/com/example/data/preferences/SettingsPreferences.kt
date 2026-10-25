@@ -47,6 +47,7 @@ class SettingsPreferences(private val context: Context) {
         val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
         val SHOW_PACKAGE_ON_BLOCKER = booleanPreferencesKey("show_package_on_blocker")
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+        val BLOCK_HISTORY_RETENTION_DAYS = intPreferencesKey("block_history_retention_days")
 
         // Remembered Google account identity. Signing out clears the session flag
         // but deliberately keeps these display fields for faster re-login.
@@ -141,6 +142,10 @@ class SettingsPreferences(private val context: Context) {
 
     val reduceMotionFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.REDUCE_MOTION] ?: false
+    }
+
+    val blockHistoryRetentionDaysFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BLOCK_HISTORY_RETENTION_DAYS] ?: 30
     }
 
     val isAccountSignedInFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -317,6 +322,13 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setReduceMotion(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.REDUCE_MOTION] = enabled
+        }
+    }
+
+    suspend fun setBlockHistoryRetentionDays(days: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BLOCK_HISTORY_RETENTION_DAYS] =
+                days.coerceIn(7, 365)
         }
     }
 
