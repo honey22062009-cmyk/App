@@ -53,18 +53,27 @@ class ProBillingManager(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    private val billingClient = BillingClient.newBuilder(context.applicationContext)
-        .setListener(this)
-        .enablePendingPurchases(
-            PendingPurchasesParams.newBuilder()
-                .enableOneTimeProducts()
-                .build()
-        )
-        .enableAutoServiceReconnection()
-        .build()
+    private val billingClientDelegate = lazy {
+        BillingClient.newBuilder(context.applicationContext)
+            .setListener(this)
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
+            .enableAutoServiceReconnection()
+            .build()
+    }
+
+    private val billingClient: BillingClient
+        get() = billingClientDelegate.value
 
     init {
-        connect()
+        runCatching { connect() }
+            .onFailure {
+                _isReady.value = false
+                _message.value = "Google Play Billing is unavailable on this device."
+            }
     }
 
     private fun connect() {
@@ -265,6 +274,8 @@ class ProBillingManager(
     }
 
     fun close() {
-        billingClient.endConnection()
+        if (billingClientDelegate.isInitialized()) {
+            runCatching { billingClient.endConnection() }
+        }
     }
 }
