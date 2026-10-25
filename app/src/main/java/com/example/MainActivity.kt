@@ -58,10 +58,12 @@ import com.example.billing.ProBillingManager
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
+import com.example.ui.screens.account.AccountScreen
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.pro.BlockerCustomizationScreen
@@ -190,7 +192,9 @@ fun MainAppScaffold(
             Screen.AntiBypassGuide,
             Screen.Legal,
             Screen.Paywall,
-            Screen.BlockerCustomization -> currentScreen = Screen.Settings
+            Screen.BlockerCustomization,
+            Screen.Account,
+            Screen.Insights -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -416,7 +420,22 @@ fun ScreenContent(
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
                 onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) },
-                onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
+                onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
+                onNavigateToAccount = { onNavigateToScreen(Screen.Account) },
+                onNavigateToInsights = { onNavigateToScreen(Screen.Insights) }
+            )
+        }
+        Screen.Account -> {
+            AccountScreen(
+                settings = repository.settings,
+                onBack = { onNavigateToScreen(Screen.Settings) }
+            )
+        }
+        Screen.Insights -> {
+            InsightsScreen(
+                repository = repository,
+                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
+                onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
         Screen.Paywall -> {
