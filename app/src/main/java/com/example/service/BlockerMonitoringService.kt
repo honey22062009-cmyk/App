@@ -131,6 +131,7 @@ class BlockerMonitoringService : Service() {
         serviceScope.launch {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
 
+            var consecutiveFailures = 0
             while (isActive) {
                 try {
                     val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
@@ -158,11 +159,27 @@ class BlockerMonitoringService : Service() {
                             }
                         }
                     }
-                } catch (_: Exception) {
-                    // Safe execution loop
+                    consecutiveFailures = 0
+                } catch (t: Exception) {
+                    consecutiveFailures++
+                    Log.w("BlockerService", "Fallback monitoring pass failed", t)
+                    if (consecutiveFailures >= 3) {
+                        val manager = getSystemService(NotificationManager::class.java)
+                        manager?.notify(
+                            NOTIFICATION_ID,
+                            buildNotification("Protection fallback needs attention")
+                        )
+                    }
                 }
 
-                delay(1500L) // Lightweight verification cadence
+                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                val interactive = powerManager?.isInteractive != false
+                val cadenceMs = when {
+                    !interactive -> 5_000L
+                    consecutiveFailures > 0 -> 2_000L
+                    else -> 900L
+                }
+                delay(cadenceMs)
             }
         }
     }
