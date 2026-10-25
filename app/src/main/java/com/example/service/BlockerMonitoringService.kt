@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.core.system.ProtectionHealth
 import com.example.core.system.SafetyWhitelist
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
@@ -132,8 +133,22 @@ class BlockerMonitoringService : Service() {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
 
             var consecutiveFailures = 0
+            var lastHealthCheckAt = 0L
             while (isActive) {
                 try {
+                    val now = System.currentTimeMillis()
+                    if (now - lastHealthCheckAt >= 30_000L) {
+                        lastHealthCheckAt = now
+                        val health = ProtectionHealth.snapshot(this@BlockerMonitoringService)
+                        val manager = getSystemService(NotificationManager::class.java)
+                        val status = when {
+                            !health.coreReady -> "Core protection needs attention"
+                            health.reliabilityScore < 100 -> "Protection active with reduced reliability"
+                            else -> "Strict protection active"
+                        }
+                        manager?.notify(NOTIFICATION_ID, buildNotification(status))
+                    }
+
                     val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
                     if (protectionEnabled && usageStatsManager != null) {
                         val currentForegroundPkg = getForegroundPackage(usageStatsManager)
