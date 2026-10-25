@@ -232,6 +232,7 @@ fun SettingsScreen(
                                     showPackageOnBlocker = showPackageOnBlocker,
                                     accountSignedIn = accountSignedIn,
                                     accountEmail = accountEmail,
+                                    historyRetentionDays = historyRetentionDays,
                                     onThemeChange = { mode ->
                                         scope.launch { repository.settings.setThemeMode(mode) }
                                     },
@@ -254,6 +255,12 @@ fun SettingsScreen(
                                     },
                                     onShowPackageOnBlockerChange = { enabled ->
                                         scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                    },
+                                    onHistoryRetentionChange = { days ->
+                                        scope.launch {
+                                            repository.settings.setBlockHistoryRetentionDays(days)
+                                            repository.pruneBlockHistoryNow()
+                                        }
                                     }
                                 )
                             }
