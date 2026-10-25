@@ -40,6 +40,15 @@ class SettingsPreferences(private val context: Context) {
         val ADULT_BLOCKS_COUNT = intPreferencesKey("adult_blocks_count")
         val APP_GROUPS = stringSetPreferencesKey("app_groups")
 
+        // Personal streak tracker. This is entirely user-entered; the app does not
+        // attempt to infer or monitor sexual activity.
+        val TRACKER_STARTED_AT = longPreferencesKey("tracker_started_at")
+        val LAST_FAP_AT = longPreferencesKey("last_fap_at")
+        val PREVIOUS_FAP_STREAK_DAYS = intPreferencesKey("previous_fap_streak_days")
+        val BEST_FAP_STREAK_DAYS = intPreferencesKey("best_fap_streak_days")
+        val FAP_LOG_COUNT = intPreferencesKey("fap_log_count")
+        val FAP_EVENT_TIMESTAMPS = stringSetPreferencesKey("fap_event_timestamps")
+
         // Pro / premium blocker customization
         val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
         val PRO_EXPIRES_AT = longPreferencesKey("pro_expires_at")
@@ -121,6 +130,32 @@ class SettingsPreferences(private val context: Context) {
 
     val appGroupsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.APP_GROUPS] ?: emptySet()
+    }
+
+    val trackerStartedAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: 0L
+    }
+
+    val lastFapAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LAST_FAP_AT] ?: 0L
+    }
+
+    val previousFapStreakDaysFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.PREVIOUS_FAP_STREAK_DAYS] ?: 0
+    }
+
+    val bestFapStreakDaysFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] ?: 0
+    }
+
+    val fapLogCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.FAP_LOG_COUNT] ?: 0
+    }
+
+    val fapEventTimestampsFlow: Flow<Set<Long>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
+            .mapNotNull { it.toLongOrNull() }
+            .toSet()
     }
 
     val isProEntitledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -289,6 +324,54 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setAppGroups(groups: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_GROUPS] = groups
+        }
+    }
+
+    suspend fun ensureStreakTrackerStarted(nowMillis: Long = System.currentTimeMillis()) {
+        context.dataStore.edit { preferences ->
+            if ((preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: 0L) <= 0L) {
+                preferences[PreferencesKeys.TRACKER_STARTED_AT] = nowMillis
+            }
+        }
+    }
+
+    suspend fun recordFapReset(nowMillis: Long = System.currentTimeMillis()) {
+        context.dataStore.edit { preferences ->
+            val start = preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: nowMillis
+            val previousLast = preferences[PreferencesKeys.LAST_FAP_AT] ?: 0L
+            val baseline = if (previousLast > 0L) previousLast else start
+            val streakDays = ((nowMillis - baseline).coerceAtLeast(0L) / 86_400_000L).toInt()
+            val previousBest = preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] ?: 0
+
+            preferences[PreferencesKeys.TRACKER_STARTED_AT] = start
+            preferences[PreferencesKeys.LAST_FAP_AT] = nowMillis
+            preferences[PreferencesKeys.PREVIOUS_FAP_STREAK_DAYS] = streakDays
+            preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] = maxOf(previousBest, streakDays)
+            preferences[PreferencesKeys.FAP_LOG_COUNT] =
+                (preferences[PreferencesKeys.FAP_LOG_COUNT] ?: 0) + 1
+
+            val currentEvents = preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS]
+                ?.mapNotNull { it.toLongOrNull() }
+                ?.toMutableList()
+                ?: mutableListOf()
+            currentEvents.add(nowMillis)
+            val retained = currentEvents
+                .sortedDescending()
+                .take(120)
+                .map { it.toString() }
+                .toSet()
+            preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = retained
+        }
+    }
+
+    suspend fun resetStreakTracker(nowMillis: Long = System.currentTimeMillis()) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TRACKER_STARTED_AT] = nowMillis
+            preferences.remove(PreferencesKeys.LAST_FAP_AT)
+            preferences.remove(PreferencesKeys.PREVIOUS_FAP_STREAK_DAYS)
+            preferences.remove(PreferencesKeys.BEST_FAP_STREAK_DAYS)
+            preferences.remove(PreferencesKeys.FAP_LOG_COUNT)
+            preferences.remove(PreferencesKeys.FAP_EVENT_TIMESTAMPS)
         }
     }
 
