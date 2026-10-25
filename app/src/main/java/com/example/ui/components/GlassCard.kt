@@ -63,13 +63,13 @@ object GlassDefaults {
         borderWidth: Dp = 1.dp
     ): GlassSpec {
         val background = customBackground ?: when (variant) {
-            GlassVariant.Standard -> MaterialTheme.colorScheme.surface
-            GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-            GlassVariant.Elevated -> MaterialTheme.colorScheme.surface
-            GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-            GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
-            GlassVariant.Warning -> MaterialTheme.colorScheme.surfaceVariant
-            GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
+            GlassVariant.Standard -> MaterialTheme.colorScheme.surface.copy(alpha = if (isDarkTheme()) 0.66f else 0.74f)
+            GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkTheme()) 0.46f else 0.58f)
+            GlassVariant.Elevated -> MaterialTheme.colorScheme.surface.copy(alpha = if (isDarkTheme()) 0.78f else 0.84f)
+            GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDarkTheme()) 0.44f else 0.52f)
+            GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isDarkTheme()) 0.40f else 0.50f)
+            GlassVariant.Warning -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (isDarkTheme()) 0.40f else 0.52f)
+            GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (isDarkTheme()) 0.46f else 0.58f)
         }
         val border = customBorder ?: when (variant) {
             GlassVariant.Accent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
@@ -79,9 +79,21 @@ object GlassDefaults {
         }
         return GlassSpec(
             backgroundColor = background,
-            borderBrush = Brush.linearGradient(listOf(border, border)),
-            specularBrush = null,
-            blurRadius = customBlur ?: 0.dp,
+            borderBrush = Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDarkTheme()) 0.18f else 0.72f),
+                    border.copy(alpha = 0.34f),
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                )
+            ),
+            specularBrush = Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDarkTheme()) 0.09f else 0.34f),
+                    Color.Transparent,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.035f)
+                )
+            ),
+            blurRadius = customBlur ?: 18.dp,
             borderWidth = borderWidth
         )
     }
@@ -134,13 +146,13 @@ fun AppSurface(
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(14.dp),
+    shape: Shape = RoundedCornerShape(22.dp),
     variant: GlassVariant = GlassVariant.Standard,
     borderWidth: Dp = 1.dp,
     borderColor: Color? = null,
     backgroundColor: Color? = null,
     blurRadius: Dp? = null,
-    specularHighlight: Boolean = false,
+    specularHighlight: Boolean = true,
     elevation: Dp = 0.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -152,34 +164,62 @@ fun GlassCard(
         customBlur = blurRadius,
         borderWidth = borderWidth
     )
+    val glassModifier = modifier.clip(shape)
+    val border = BorderStroke(
+        spec.borderWidth,
+        if (borderColor != null) Brush.linearGradient(listOf(borderColor, borderColor))
+        else spec.borderBrush
+    )
 
-    // Use Material Surface instead of a raw Box so every child receives a
-    // contrast-safe LocalContentColor in both light and dark themes.
+    val body: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .background(
+                    if (specularHighlight && spec.specularBrush != null) {
+                        spec.specularBrush
+                    } else {
+                        Brush.linearGradient(listOf(spec.backgroundColor, spec.backgroundColor))
+                    }
+                )
+        ) {
+            Box(
+                modifier = Modifier.background(
+                    Brush.linearGradient(
+                        listOf(
+                            spec.backgroundColor,
+                            spec.backgroundColor.copy(alpha = (spec.backgroundColor.alpha * 0.84f).coerceIn(0f, 1f))
+                        )
+                    )
+                )
+            ) {
+                content()
+            }
+        }
+    }
+
     if (onClick != null) {
         Surface(
             onClick = onClick,
-            modifier = modifier,
+            modifier = glassModifier,
             shape = shape,
-            color = spec.backgroundColor,
+            color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = elevation,
-            shadowElevation = elevation,
-            border = BorderStroke(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            content()
-        }
+            tonalElevation = 0.dp,
+            shadowElevation = if (elevation > 0.dp) elevation else 8.dp,
+            border = border,
+            content = body
+        )
     } else {
         Surface(
-            modifier = modifier,
+            modifier = glassModifier,
             shape = shape,
-            color = spec.backgroundColor,
+            color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = elevation,
-            shadowElevation = elevation,
-            border = BorderStroke(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            content()
-        }
+            tonalElevation = 0.dp,
+            shadowElevation = if (elevation > 0.dp) elevation else 8.dp,
+            border = border,
+            content = body
+        )
     }
 }
 
