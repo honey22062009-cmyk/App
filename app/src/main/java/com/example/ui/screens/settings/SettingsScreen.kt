@@ -85,6 +85,7 @@ fun SettingsScreen(
     val showPackageOnBlocker by repository.settings.showPackageOnBlockerFlow.collectAsState(initial = false)
     val accountSignedIn by repository.settings.isAccountSignedInFlow.collectAsState(initial = false)
     val accountEmail by repository.settings.accountEmailFlow.collectAsState(initial = "")
+    val historyRetentionDays by repository.settings.blockHistoryRetentionDaysFlow.collectAsState(initial = 30)
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
 
     BoxWithConstraints(
@@ -154,6 +155,7 @@ fun SettingsScreen(
                                 showPackageOnBlocker = showPackageOnBlocker,
                                 accountSignedIn = accountSignedIn,
                                 accountEmail = accountEmail,
+                                historyRetentionDays = historyRetentionDays,
                                 onThemeChange = { mode ->
                                     scope.launch { repository.settings.setThemeMode(mode) }
                                 },
@@ -176,6 +178,12 @@ fun SettingsScreen(
                                 },
                                 onShowPackageOnBlockerChange = { enabled ->
                                     scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                },
+                                onHistoryRetentionChange = { days ->
+                                    scope.launch {
+                                        repository.settings.setBlockHistoryRetentionDays(days)
+                                        repository.pruneBlockHistoryNow()
+                                    }
                                 }
                             )
                         }
@@ -303,6 +311,7 @@ private fun SettingsSectionContent(
     showPackageOnBlocker: Boolean,
     accountSignedIn: Boolean,
     accountEmail: String,
+    historyRetentionDays: Int,
     onThemeChange: (String) -> Unit,
     onDelayChange: (Int) -> Unit,
     onProtectionChange: (Boolean) -> Unit,
@@ -315,7 +324,8 @@ private fun SettingsSectionContent(
     onNavigateToAccount: () -> Unit,
     onNavigateToInsights: () -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
-    onShowPackageOnBlockerChange: (Boolean) -> Unit
+    onShowPackageOnBlockerChange: (Boolean) -> Unit,
+    onHistoryRetentionChange: (Int) -> Unit
 ) {
     when (section) {
         SettingsSection.Account -> {
@@ -445,6 +455,25 @@ private fun SettingsSectionContent(
                 subtitle = "Read policies and manage local data",
                 onClick = onNavigateToLegal
             )
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                text = "Block history retention",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            SettingsDescription(
+                "Choose how long local block events are kept on this device."
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(7 to "7d", 30 to "30d", 90 to "90d", 365 to "1y").forEach { (days, label) ->
+                    FilterChip(
+                        selected = historyRetentionDays == days,
+                        onClick = { onHistoryRetentionChange(days) },
+                        label = { Text(label) }
+                    )
+                }
+            }
         }
 
         SettingsSection.About -> {
