@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.payments.ManualPaymentManager
+import com.example.ui.components.FloatingGlassDock
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.account.AccountDialog
 import com.example.ui.screens.account.AccountScreen
@@ -228,163 +229,52 @@ fun MainAppScaffold(
             CircularProgressIndicator()
         }
     } else {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isTablet = maxWidth >= 720.dp
-
-        if (isTablet) {
-            // Tablet Layout with NavigationRail
-            Row(
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = MaterialTheme.colorScheme.background,
+            bottomBar = {
+                FloatingGlassDock(
+                    currentScreen = currentScreen,
+                    onSelect = { screen -> currentScreen = screen },
+                    reduceMotion = reduceMotion
+                )
+            }
+        ) { innerPadding ->
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(
+                        top = innerPadding.calculateTopPadding()
+                    )
                     .background(MaterialTheme.colorScheme.background)
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
             ) {
-                NavigationRail(
-                    modifier = Modifier.testTag("tablet_navigation_rail"),
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    header = {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = "Strict Blocker",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .padding(vertical = 4.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                ) {
-                    Screen.navItems.forEach { screen ->
-                        val isSelected = currentScreen.route == screen.route
-                        NavigationRailItem(
-                            selected = isSelected,
-                            onClick = { currentScreen = screen },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                    contentDescription = screen.title
-                                )
-                            },
-                            label = {
-                                Text(
-                                    screen.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            },
-                            colors = NavigationRailItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier.testTag("nav_item_${screen.route}")
-                        )
-                    }
-                }
-
-                Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            if (reduceMotion) {
-                                fadeIn(tween(80)) togetherWith fadeOut(tween(80))
-                            } else {
-                                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
-                            }
-                        },
-                        label = "tablet_screen_transition"
-                    ) { targetScreen ->
-                        ScreenContent(
-                            currentScreen = targetScreen,
-                            repository = repository,
-                            selectedSchedulePackage = selectedSchedulePackage,
-                            onNavigateToScreen = { screen -> currentScreen = screen },
-                            onOpenAccountDialog = { firstRunAccountPrompt = false; showAccountDialog = true },
-                            onOpenPaywallDialog = { showPaywallDialog = true },
-                            onConfigureScheduleForApp = { pkg ->
-                                selectedSchedulePackage = pkg
-                                currentScreen = Screen.Schedules
-                            }
-                        )
-                    }
-                }
-            }
-        } else {
-            // Phone Layout with Bottom NavigationBar
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                bottomBar = {
-                    NavigationBar(
-                        modifier = Modifier.testTag("phone_bottom_navigation"),
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 3.dp
-                    ) {
-                        Screen.navItems.forEach { screen ->
-                            val isSelected = currentScreen.route == screen.route
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { currentScreen = screen },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                        contentDescription = screen.title
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        screen.title,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                modifier = Modifier.testTag("nav_item_${screen.route}")
-                            )
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = {
+                        if (reduceMotion) {
+                            fadeIn(tween(80)) togetherWith fadeOut(tween(80))
+                        } else {
+                            (fadeIn(tween(210)) + scaleIn(tween(210), initialScale = 0.988f)) togetherWith
+                                (fadeOut(tween(130)) + scaleOut(tween(130), targetScale = 0.996f))
                         }
-                    }
-                }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            if (reduceMotion) {
-                                fadeIn(tween(80)) togetherWith fadeOut(tween(80))
-                            } else {
-                                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
-                            }
+                    },
+                    label = "screen_transition"
+                ) { targetScreen ->
+                    ScreenContent(
+                        currentScreen = targetScreen,
+                        repository = repository,
+                        selectedSchedulePackage = selectedSchedulePackage,
+                        onNavigateToScreen = { screen -> currentScreen = screen },
+                        onOpenAccountDialog = {
+                            firstRunAccountPrompt = false
+                            showAccountDialog = true
                         },
-                        label = "phone_screen_transition"
-                    ) { targetScreen ->
-                        ScreenContent(
-                            currentScreen = targetScreen,
-                            repository = repository,
-                            selectedSchedulePackage = selectedSchedulePackage,
-                            onNavigateToScreen = { screen -> currentScreen = screen },
-                            onOpenAccountDialog = { firstRunAccountPrompt = false; showAccountDialog = true },
-                            onOpenPaywallDialog = { showPaywallDialog = true },
-                            onConfigureScheduleForApp = { pkg ->
-                                selectedSchedulePackage = pkg
-                                currentScreen = Screen.Schedules
-                            }
-                        )
-                    }
+                        onOpenPaywallDialog = { showPaywallDialog = true },
+                        onConfigureScheduleForApp = { pkg ->
+                            selectedSchedulePackage = pkg
+                            currentScreen = Screen.Schedules
+                        }
+                    )
                 }
             }
         }
@@ -411,7 +301,7 @@ fun MainAppScaffold(
             }
         )
     }
-    }
+}
 }
 
 @Composable
