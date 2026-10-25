@@ -10,6 +10,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 enum class ManualPlan(
     val id: String,
