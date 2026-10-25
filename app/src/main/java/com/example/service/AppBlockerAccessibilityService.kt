@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.core.evaluator.AdultContentEvaluator
+import com.example.core.system.AlarmScheduler
 import com.example.core.system.SafetyWhitelist
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
@@ -43,6 +44,14 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         repository = AppBlockerRepository(applicationContext)
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        // Enabling Accessibility is a strong signal that the user wants enforcement
+        // active now. Rebuild the secondary protection paths immediately.
+        AlarmScheduler.scheduleNextTransition(this)
+        BlockerMonitoringService.start(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -113,7 +122,12 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                     // Record block event
                     repository.recordBlockEvent(packageName, appLabel, evaluation.reason)
 
-                    // Launch Fullscreen Shield Activity
+                    // Remove the blocked app from view first. If a modern Android
+                    // background-activity rule suppresses the custom blocker Activity,
+                    // the enforcement still succeeds by returning the user Home.
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    delay(90)
+
                     val intent = Intent(this@AppBlockerAccessibilityService, BlockerActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
                         putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
@@ -121,7 +135,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                         putExtra(BlockerActivity.EXTRA_NEXT_ALLOWED, evaluation.formattedNextAllowedTime)
                         putExtra(BlockerActivity.EXTRA_BLOCK_TYPE, BlockerActivity.BLOCK_TYPE_SCHEDULE)
                     }
-                    startActivity(intent)
+                    runCatching { startActivity(intent) }
                 }
             }
         }
@@ -359,7 +373,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             putExtra(BlockerActivity.EXTRA_ADULT_REASON, reason)
             putExtra(BlockerActivity.EXTRA_ADULT_COOLDOWN_SECONDS, cooldownSeconds)
         }
-        startActivity(intent)
+        runCatching { startActivity(intent) }
     }
 
     private suspend fun reassertAdultBlock(packageName: String) {
@@ -384,7 +398,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             putExtra(BlockerActivity.EXTRA_ADULT_REASON, "Restricted content was recently detected")
             putExtra(BlockerActivity.EXTRA_ADULT_COOLDOWN_SECONDS, remainingSeconds)
         }
-        startActivity(intent)
+        runCatching { startActivity(intent) }
     }
 
     override fun onInterrupt() {
