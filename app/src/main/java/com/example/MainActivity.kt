@@ -444,7 +444,16 @@ fun ScreenContent(
             )
         }
         Screen.Paywall -> {
+            // Billing is intentionally initialized only when the paywall is opened.
+            // Billing availability must never be a dependency of normal app startup.
+            val billingManager = remember(context, repository) {
+                ProBillingManager(context.applicationContext, repository.settings)
+            }
+            DisposableEffect(billingManager) {
+                onDispose { billingManager.close() }
+            }
             PaywallScreen(
+                billingManager = billingManager,
                 settings = repository.settings,
                 onBack = { onNavigateToScreen(Screen.Settings) },
                 onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
