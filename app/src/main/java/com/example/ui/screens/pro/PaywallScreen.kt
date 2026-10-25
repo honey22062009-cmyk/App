@@ -1,6 +1,8 @@
 package com.example.ui.screens.pro
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Arrangement
@@ -187,6 +189,25 @@ fun PaywallScreen(
                 }
             }
 
+            if (isPro) {
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            val uri = Uri.parse(
+                                "https://play.google.com/store/account/subscriptions?package=" +
+                                    context.packageName
+                            )
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Manage subscription")
+                    }
+                }
+            }
+
             item {
                 FilledTonalButton(
                     onClick = onBack,
@@ -245,7 +266,12 @@ private fun PlanCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (recommended) plan.title + " • Best value" else plan.title,
+                    text = when {
+                        plan.productId == ProBillingManager.LIFETIME_PRODUCT_ID ->
+                            "Lifetime • One-time purchase"
+                        recommended -> plan.title + " • Best value"
+                        else -> plan.title
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
