@@ -29,6 +29,8 @@ jobs:
           node-version: "22"
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
+      - name: Run Android lint
+        run: gradle :app:lintDebug --stacktrace --no-daemon
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
       - name: Upload debug APK
