@@ -58,6 +58,7 @@ import com.example.billing.ProBillingManager
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
+import com.example.ui.screens.account.AccountDialog
 import com.example.ui.screens.account.AccountScreen
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
@@ -67,6 +68,7 @@ import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.pro.BlockerCustomizationScreen
+import com.example.ui.screens.pro.PaywallDialog
 import com.example.ui.screens.pro.PaywallScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
@@ -165,6 +167,9 @@ fun MainAppScaffold(
         mutableStateOf(initialTargetPackage)
     }
     var isInitialRouteResolved by remember { mutableStateOf(false) }
+    var showAccountDialog by remember { mutableStateOf(false) }
+    var showPaywallDialog by remember { mutableStateOf(false) }
+    var firstRunAccountPrompt by remember { mutableStateOf(false) }
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
@@ -177,6 +182,11 @@ fun MainAppScaffold(
             currentScreen = Screen.Dashboard
         } else {
             currentScreen = Screen.Permissions
+            val signedIn = repository.settings.isAccountSignedInFlow.first()
+            if (!signedIn) {
+                firstRunAccountPrompt = true
+                showAccountDialog = true
+            }
         }
         isInitialRouteResolved = true
     }
@@ -282,6 +292,8 @@ fun MainAppScaffold(
                             repository = repository,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
+                            onOpenAccountDialog = { firstRunAccountPrompt = false; showAccountDialog = true },
+                            onOpenPaywallDialog = { showPaywallDialog = true },
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
@@ -354,6 +366,8 @@ fun MainAppScaffold(
                             repository = repository,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
+                            onOpenAccountDialog = { firstRunAccountPrompt = false; showAccountDialog = true },
+                            onOpenPaywallDialog = { showPaywallDialog = true },
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
@@ -364,6 +378,28 @@ fun MainAppScaffold(
             }
         }
     }
+
+    if (showAccountDialog) {
+        AccountDialog(
+            settings = repository.settings,
+            firstRun = firstRunAccountPrompt,
+            onDismiss = {
+                showAccountDialog = false
+                firstRunAccountPrompt = false
+            }
+        )
+    }
+
+    if (showPaywallDialog) {
+        PaywallDialog(
+            settings = repository.settings,
+            onDismiss = { showPaywallDialog = false },
+            onOpenCustomization = {
+                showPaywallDialog = false
+                currentScreen = Screen.BlockerCustomization
+            }
+        )
+    }
     }
 }
 
@@ -373,6 +409,8 @@ fun ScreenContent(
     repository: AppBlockerRepository,
     selectedSchedulePackage: String?,
     onNavigateToScreen: (Screen) -> Unit,
+    onOpenAccountDialog: () -> Unit,
+    onOpenPaywallDialog: () -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -384,14 +422,15 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onOpenPro = onOpenPaywallDialog
             )
         }
         Screen.Apps -> {
             AppsScreen(
                 repository = repository,
                 onConfigureScheduleForApp = onConfigureScheduleForApp,
-                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) }
+                onNavigateToPaywall = onOpenPaywallDialog
             )
         }
         Screen.Schedules -> {
@@ -424,9 +463,9 @@ fun ScreenContent(
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) },
+                onNavigateToPaywall = onOpenPaywallDialog,
                 onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
-                onNavigateToAccount = { onNavigateToScreen(Screen.Account) },
+                onNavigateToAccount = onOpenAccountDialog,
                 onNavigateToInsights = { onNavigateToScreen(Screen.Insights) }
             )
         }
@@ -439,7 +478,7 @@ fun ScreenContent(
         Screen.Insights -> {
             InsightsScreen(
                 repository = repository,
-                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
+                onUpgrade = onOpenPaywallDialog,
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
@@ -462,7 +501,7 @@ fun ScreenContent(
         Screen.BlockerCustomization -> {
             BlockerCustomizationScreen(
                 settings = repository.settings,
-                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
+                onUpgrade = onOpenPaywallDialog,
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
