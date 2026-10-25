@@ -49,11 +49,15 @@ class StrictBlockerApplication : Application() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
-                registerReceiver(
-                    exactAlarmPermissionReceiver,
-                    IntentFilter(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED),
-                    RECEIVER_NOT_EXPORTED
+                val filter = IntentFilter(
+                    AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
                 )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(exactAlarmPermissionReceiver, filter, RECEIVER_NOT_EXPORTED)
+                } else {
+                    @Suppress("DEPRECATION")
+                    registerReceiver(exactAlarmPermissionReceiver, filter)
+                }
             } catch (t: Throwable) {
                 Log.w("StrictBlockerApp", "Could not register exact-alarm state receiver", t)
             }
