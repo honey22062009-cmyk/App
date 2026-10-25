@@ -27,6 +27,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Configure Google Sign-In
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
+          else
+            printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
+          fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
       - name: Run Android lint
