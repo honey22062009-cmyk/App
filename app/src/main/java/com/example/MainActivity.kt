@@ -39,6 +39,7 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +54,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.billing.ProBillingManager
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
@@ -62,6 +64,8 @@ import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
+import com.example.ui.screens.pro.BlockerCustomizationScreen
+import com.example.ui.screens.pro.PaywallScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
@@ -143,6 +147,14 @@ fun MainAppScaffold(
     repository: AppBlockerRepository,
     initialTargetPackage: String?
 ) {
+    val context = LocalContext.current
+    val billingManager = remember(context, repository) {
+        ProBillingManager(context.applicationContext, repository.settings)
+    }
+    DisposableEffect(billingManager) {
+        onDispose { billingManager.close() }
+    }
+
     var currentScreen by remember {
         mutableStateOf<Screen>(
             if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
@@ -175,7 +187,10 @@ fun MainAppScaffold(
         enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
     ) {
         when (currentScreen) {
-            Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
+            Screen.AntiBypassGuide,
+            Screen.Legal,
+            Screen.Paywall,
+            Screen.BlockerCustomization -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -259,6 +274,7 @@ fun MainAppScaffold(
                         ScreenContent(
                             currentScreen = targetScreen,
                             repository = repository,
+                            billingManager = billingManager,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
                             onConfigureScheduleForApp = { pkg ->
@@ -327,6 +343,7 @@ fun MainAppScaffold(
                         ScreenContent(
                             currentScreen = targetScreen,
                             repository = repository,
+                            billingManager = billingManager,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
                             onConfigureScheduleForApp = { pkg ->
@@ -346,6 +363,7 @@ fun MainAppScaffold(
 fun ScreenContent(
     currentScreen: Screen,
     repository: AppBlockerRepository,
+    billingManager: ProBillingManager,
     selectedSchedulePackage: String?,
     onNavigateToScreen: (Screen) -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
@@ -396,7 +414,24 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) },
+                onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
+            )
+        }
+        Screen.Paywall -> {
+            PaywallScreen(
+                billingManager = billingManager,
+                settings = repository.settings,
+                onBack = { onNavigateToScreen(Screen.Settings) },
+                onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
+            )
+        }
+        Screen.BlockerCustomization -> {
+            BlockerCustomizationScreen(
+                settings = repository.settings,
+                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
+                onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
         Screen.AntiBypassGuide -> {
