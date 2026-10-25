@@ -77,6 +77,20 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.Security
     )
 
+    data object Paywall : Screen(
+        route = "paywall",
+        title = "Strict Blocker Pro",
+        selectedIcon = Icons.Filled.Shield,
+        unselectedIcon = Icons.Outlined.Shield
+    )
+
+    data object BlockerCustomization : Screen(
+        route = "blocker_customization",
+        title = "Block screen",
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings
+    )
+
     companion object {
         val navItems: List<Screen>
             get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
