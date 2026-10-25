@@ -2,8 +2,6 @@ package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -140,8 +138,8 @@ fun AppSurface(
 }
 
 /**
- * Compatibility wrapper for existing screens. The old glass effects were deliberately
- * removed: no blur, specular shine, gradient border, or brand-tinted shadow.
+ * Compatibility wrapper for existing screens. It now renders a restrained,
+ * theme-aware translucent surface with a soft specular layer and gradient edge.
  */
 @Composable
 fun GlassCard(
