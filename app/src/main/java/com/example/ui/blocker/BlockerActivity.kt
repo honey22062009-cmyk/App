@@ -113,6 +113,11 @@ class BlockerActivity : ComponentActivity() {
             val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
             val blockerStyle by settings.blockerStyleFlow.collectAsState(initial = "classic")
             val blockerPhotoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
+            val blockerMessage by settings.blockerMessageFlow.collectAsState(
+                initial = "Stay with the plan. This can wait."
+            )
+            val showPackageOnBlocker by settings.showPackageOnBlockerFlow.collectAsState(initial = false)
+            val reduceMotion by settings.reduceMotionFlow.collectAsState(initial = false)
 
             StrictBlockerTheme {
                 // During an adult-content cooldown Back is intentionally ignored.
@@ -137,6 +142,9 @@ class BlockerActivity : ComponentActivity() {
                         isPro = isPro,
                         blockerStyle = blockerStyle,
                         blockerPhotoUri = blockerPhotoUri,
+                        blockerMessage = blockerMessage,
+                        showPackageOnBlocker = showPackageOnBlocker,
+                        reduceMotion = reduceMotion,
                         onGoHome = { navigateHome() },
                         onViewSchedule = { navigateToSchedule(packageName) }
                     )
@@ -382,11 +390,18 @@ fun BlockerScreen(
     isPro: Boolean = false,
     blockerStyle: String = "classic",
     blockerPhotoUri: String = "",
+    blockerMessage: String = "Stay with the plan. This can wait.",
+    showPackageOnBlocker: Boolean = false,
+    reduceMotion: Boolean = false,
     onGoHome: () -> Unit,
     onViewSchedule: () -> Unit
 ) {
     val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
-    val effectiveStyle = if (isPro) blockerStyle else "classic"
+    val effectiveStyle = when {
+        !isPro -> "classic"
+        reduceMotion && blockerStyle != "photo" -> "classic"
+        else -> blockerStyle
+    }
     val transition = rememberInfiniteTransition(label = "blocker_style_motion")
     val pulseScale by transition.animateFloat(
         initialValue = 1f,
@@ -499,7 +514,7 @@ fun BlockerScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "This application is currently outside its scheduled hours.",
+                text = if (isPro) blockerMessage else "This application is currently outside its scheduled hours.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -550,7 +565,7 @@ fun BlockerScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (packageName.isNotEmpty()) {
+                        if (showPackageOnBlocker && packageName.isNotEmpty()) {
                             Text(
                                 text = packageName,
                                 style = MaterialTheme.typography.bodySmall,
