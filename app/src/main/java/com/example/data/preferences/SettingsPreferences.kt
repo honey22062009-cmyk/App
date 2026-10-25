@@ -39,6 +39,11 @@ class SettingsPreferences(private val context: Context) {
         val CUSTOM_DNS_SECONDARY = stringPreferencesKey("custom_dns_secondary")
         val ADULT_BLOCKS_COUNT = intPreferencesKey("adult_blocks_count")
         val APP_GROUPS = stringSetPreferencesKey("app_groups")
+
+        // Pro / premium blocker customization
+        val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
+        val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
+        val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
     }
 
     val themeModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -101,6 +106,18 @@ class SettingsPreferences(private val context: Context) {
 
     val appGroupsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.APP_GROUPS] ?: emptySet()
+    }
+
+    val isProEntitledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.PRO_ENTITLED] ?: false
+    }
+
+    val blockerStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BLOCKER_STYLE] ?: "classic"
+    }
+
+    val blockerPhotoUriFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.BLOCKER_PHOTO_URI] ?: ""
     }
 
     suspend fun setProtectionEnabled(enabled: Boolean) {
@@ -211,6 +228,33 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setAppGroups(groups: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_GROUPS] = groups
+        }
+    }
+
+    suspend fun setProEntitled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PRO_ENTITLED] = enabled
+            if (!enabled) {
+                preferences[PreferencesKeys.BLOCKER_STYLE] = "classic"
+                preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
+            }
+        }
+    }
+
+    suspend fun setBlockerStyle(style: String) {
+        val normalized = style.lowercase().trim()
+        val allowed = setOf("classic", "pulse", "focus", "photo")
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BLOCKER_STYLE] =
+                if (normalized in allowed) normalized else "classic"
+        }
+    }
+
+    suspend fun setBlockerPhotoUri(uri: String?) {
+        context.dataStore.edit { preferences ->
+            val value = uri?.trim().orEmpty()
+            if (value.isBlank()) preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
+            else preferences[PreferencesKeys.BLOCKER_PHOTO_URI] = value
         }
     }
 
