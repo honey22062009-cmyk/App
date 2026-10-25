@@ -400,7 +400,8 @@ fun ScreenContent(
         Screen.Apps -> {
             AppsScreen(
                 repository = repository,
-                onConfigureScheduleForApp = onConfigureScheduleForApp
+                onConfigureScheduleForApp = onConfigureScheduleForApp,
+                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) }
             )
         }
         Screen.Schedules -> {
