@@ -94,7 +94,13 @@ private fun PaywallDialogContent(
 
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            // Billing availability is reflected inline below. Do not throw a large
+            // snackbar over the purchase dialog for normal unavailable states.
+            if (!it.contains("unavailable", ignoreCase = true) &&
+                !it.contains("not available", ignoreCase = true)
+            ) {
+                snackbar.showSnackbar(it)
+            }
             billingManager.clearMessage()
         }
     }
@@ -177,20 +183,15 @@ private fun PaywallDialogContent(
                                     color = Color(0xFF1A1F29),
                                     contentColor = Color(0xFFF4F6FC)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.width(24.dp))
-                                        Spacer(Modifier.width(12.dp))
-                                        Column {
-                                            Text("Connecting to Google Play", fontWeight = FontWeight.SemiBold)
-                                            Text(
-                                                "Prices appear when Billing is available.",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color(0xFFB8C0D4)
-                                            )
-                                        }
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF91A7FF))
+                                        Spacer(Modifier.height(6.dp))
+                                        Text("Google Play checkout isn't ready", fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "Install this app through a configured Google Play test/release track to load live prices and checkout.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFFB8C0D4)
+                                        )
                                     }
                                 }
                             }
