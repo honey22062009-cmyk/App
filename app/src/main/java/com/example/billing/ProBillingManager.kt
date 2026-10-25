@@ -26,7 +26,8 @@ data class ProPlan(
     val productId: String,
     val title: String,
     val price: String,
-    val offerToken: String,
+    val productType: String,
+    val offerToken: String?,
     val productDetails: ProductDetails
 )
 
@@ -38,6 +39,7 @@ class ProBillingManager(
     companion object {
         const val MONTHLY_PRODUCT_ID = "strict_blocker_pro_monthly"
         const val YEARLY_PRODUCT_ID = "strict_blocker_pro_yearly"
+        const val LIFETIME_PRODUCT_ID = "strict_blocker_pro_lifetime"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -96,12 +98,20 @@ class ProBillingManager(
     fun refreshProducts() {
         if (!billingClient.isReady) return
 
-        val products = listOf(MONTHLY_PRODUCT_ID, YEARLY_PRODUCT_ID).map { id ->
+        val products = listOf(
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(id)
+                .setProductId(MONTHLY_PRODUCT_ID)
                 .setProductType(BillingClient.ProductType.SUBS)
+                .build(),
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(YEARLY_PRODUCT_ID)
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build(),
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(LIFETIME_PRODUCT_ID)
+                .setProductType(BillingClient.ProductType.INAPP)
                 .build()
-        }
+        )
 
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(products)
@@ -114,29 +124,54 @@ class ProBillingManager(
             }
 
             _plans.value = detailsResult.productDetailsList.mapNotNull { details ->
-                val offer = details.subscriptionOfferDetails?.firstOrNull() ?: return@mapNotNull null
-                val pricingPhase = offer.pricingPhases.pricingPhaseList.lastOrNull()
-                    ?: return@mapNotNull null
+                val productType = details.productType
+                val subscriptionOffer = details.subscriptionOfferDetails?.firstOrNull()
+                val oneTimeOffer =
+                    details.oneTimePurchaseOfferDetailsList?.firstOrNull()
+                        ?: details.oneTimePurchaseOfferDetails
+
+                val price = when (productType) {
+                    BillingClient.ProductType.SUBS ->
+                        subscriptionOffer?.pricingPhases?.pricingPhaseList?.lastOrNull()?.formattedPrice
+                    BillingClient.ProductType.INAPP -> oneTimeOffer?.formattedPrice
+                    else -> null
+                } ?: return@mapNotNull null
+
+                val offerToken = when (productType) {
+                    BillingClient.ProductType.SUBS -> subscriptionOffer?.offerToken
+                    BillingClient.ProductType.INAPP -> oneTimeOffer?.offerToken
+                    else -> null
+                }
 
                 ProPlan(
                     productId = details.productId,
                     title = when (details.productId) {
                         YEARLY_PRODUCT_ID -> "Yearly"
+                        LIFETIME_PRODUCT_ID -> "Lifetime"
                         else -> "Monthly"
                     },
-                    price = pricingPhase.formattedPrice,
-                    offerToken = offer.offerToken,
+                    price = price,
+                    productType = productType,
+                    offerToken = offerToken,
                     productDetails = details
                 )
-            }.sortedBy { it.productId != YEARLY_PRODUCT_ID }
+            }.sortedBy { plan ->
+                when (plan.productId) {
+                    YEARLY_PRODUCT_ID -> 0
+                    LIFETIME_PRODUCT_ID -> 1
+                    else -> 2
+                }
+            }
         }
     }
 
     fun launchPurchase(activity: Activity, plan: ProPlan) {
-        val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+        val productBuilder = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(plan.productDetails)
-            .setOfferToken(plan.offerToken)
-            .build()
+        if (!plan.offerToken.isNullOrBlank()) {
+            productBuilder.setOfferToken(plan.offerToken)
+        }
+        val productParams = productBuilder.build()
 
         val params = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productParams))
@@ -153,16 +188,34 @@ class ProBillingManager(
     fun restorePurchases() {
         if (!billingClient.isReady) return
 
-        val params = QueryPurchasesParams.newBuilder()
+        val subscriptionParams = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.SUBS)
             .build()
 
-        billingClient.queryPurchasesAsync(params) { result, purchases ->
-            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
-                _message.value = result.debugMessage
-                return@queryPurchasesAsync
+        billingClient.queryPurchasesAsync(subscriptionParams) { subscriptionResult, subscriptions ->
+            if (subscriptionResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                _message.value = subscriptionResult.debugMessage
             }
-            processPurchases(purchases)
+
+            val inAppParams = QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+
+            billingClient.queryPurchasesAsync(inAppParams) { inAppResult, oneTimePurchases ->
+                if (inAppResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                    _message.value = inAppResult.debugMessage
+                }
+
+                val active = buildList {
+                    if (subscriptionResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                        addAll(subscriptions)
+                    }
+                    if (inAppResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                        addAll(oneTimePurchases)
+                    }
+                }
+                processPurchases(active)
+            }
         }
     }
 
@@ -182,7 +235,7 @@ class ProBillingManager(
     }
 
     private fun processPurchases(purchases: List<Purchase>) {
-        val validProducts = setOf(MONTHLY_PRODUCT_ID, YEARLY_PRODUCT_ID)
+        val validProducts = setOf(MONTHLY_PRODUCT_ID, YEARLY_PRODUCT_ID, LIFETIME_PRODUCT_ID)
         val activePurchases = purchases.filter { purchase ->
             purchase.purchaseState == Purchase.PurchaseState.PURCHASED &&
                 purchase.products.any { it in validProducts }
