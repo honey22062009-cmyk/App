@@ -373,8 +373,13 @@ fun DashboardScreen(
                                             .height((72f * barFraction).dp)
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(
-                                                if (count == 0) {
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                                                brush = if (count == 0) {
+                                                    Brush.linearGradient(
+                                                        listOf(
+                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                                                        )
+                                                    )
                                                 } else {
                                                     Brush.verticalGradient(
                                                         listOf(
