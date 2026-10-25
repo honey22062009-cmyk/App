@@ -186,26 +186,6 @@ fun AdultBlockerScreen(
     }
 
     val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
-    val effectiveStyle = if (isPro) blockerStyle else "classic"
-    val transition = rememberInfiniteTransition(label = "blocker_style_motion")
-    val pulseScale by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (effectiveStyle == "pulse") 1.08f else if (effectiveStyle == "focus") 1.035f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "blocker_pulse_scale"
-    )
-    val pulseAlpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = if (effectiveStyle == "pulse") 0.78f else 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "blocker_pulse_alpha"
-    )
     val backgroundBrush = remember(isDark) {
         if (isDark) {
             Brush.verticalGradient(
@@ -232,25 +212,6 @@ fun AdultBlockerScreen(
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        if (isPro && effectiveStyle == "photo" && blockerPhotoUri.isNotBlank()) {
-            AsyncImage(
-                model = blockerPhotoUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.48f),
-                contentScale = ContentScale.Crop
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        if (isDark) Color.Black.copy(alpha = 0.58f)
-                        else Color.White.copy(alpha = 0.66f)
-                    )
-            )
-        }
-
         Column(
             modifier = Modifier
                 .padding(24.dp)
@@ -425,6 +386,26 @@ fun BlockerScreen(
     onViewSchedule: () -> Unit
 ) {
     val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
+    val effectiveStyle = if (isPro) blockerStyle else "classic"
+    val transition = rememberInfiniteTransition(label = "blocker_style_motion")
+    val pulseScale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (effectiveStyle == "pulse") 1.08f else if (effectiveStyle == "focus") 1.035f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blocker_pulse_scale"
+    )
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = if (effectiveStyle == "pulse") 0.78f else 0.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blocker_pulse_alpha"
+    )
     val backgroundBrush = remember(isDark) {
         if (isDark) {
             Brush.verticalGradient(
@@ -448,12 +429,31 @@ fun BlockerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
+        if (isPro && effectiveStyle == "photo" && blockerPhotoUri.isNotBlank()) {
+            AsyncImage(
+                model = blockerPhotoUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.48f),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isDark) Color.Black.copy(alpha = 0.58f)
+                        else Color.White.copy(alpha = 0.66f)
+                    )
+            )
+        }
+
         Column(
             modifier = Modifier
+                .padding(24.dp)
                 .widthIn(max = 480.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
