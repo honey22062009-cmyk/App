@@ -45,8 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,7 +101,6 @@ private fun ManualPaywallContent(
     val savedRequestId by settings.lastPaymentRequestIdFlow.collectAsState(initial = "")
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboard.current
 
     var selectedPlan by remember { mutableStateOf<ManualPlan?>(null) }
     var requestId by remember { mutableStateOf("") }
@@ -307,10 +304,11 @@ private fun ManualPaywallContent(
 
                                                 OutlinedButton(
                                                     onClick = {
+                                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                        clipboard.setPrimaryClip(
+                                                            android.content.ClipData.newPlainText("UPI ID", ManualPaymentManager.UPI_ID)
+                                                        )
                                                         scope.launch {
-                                                            clipboard.setClipEntry(
-                                                                ClipEntry(android.content.ClipData.newPlainText("UPI ID", ManualPaymentManager.UPI_ID))
-                                                            )
                                                             snackbar.showSnackbar("UPI ID copied.")
                                                         }
                                                     }
