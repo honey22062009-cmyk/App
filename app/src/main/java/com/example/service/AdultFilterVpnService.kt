@@ -69,10 +69,14 @@ class AdultFilterVpnService : VpnService(), Runnable {
             val intent = Intent(context, AdultFilterVpnService::class.java).apply {
                 action = ACTION_START
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (t: Throwable) {
+                Log.w("AdultFilterVpn", "Could not start VPN foreground service", t)
             }
         }
 
@@ -80,7 +84,11 @@ class AdultFilterVpnService : VpnService(), Runnable {
             val intent = Intent(context, AdultFilterVpnService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (t: Throwable) {
+                Log.w("AdultFilterVpn", "Could not stop VPN service cleanly", t)
+            }
         }
     }
 
