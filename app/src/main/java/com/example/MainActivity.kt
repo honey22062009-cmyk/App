@@ -155,14 +155,6 @@ fun MainAppScaffold(
     initialTargetPackage: String?,
     reduceMotion: Boolean
 ) {
-    val context = LocalContext.current
-    val billingManager = remember(context, repository) {
-        ProBillingManager(context.applicationContext, repository.settings)
-    }
-    DisposableEffect(billingManager) {
-        onDispose { billingManager.close() }
-    }
-
     var currentScreen by remember {
         mutableStateOf<Screen>(
             if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
@@ -288,7 +280,6 @@ fun MainAppScaffold(
                         ScreenContent(
                             currentScreen = targetScreen,
                             repository = repository,
-                            billingManager = billingManager,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
                             onConfigureScheduleForApp = { pkg ->
@@ -361,7 +352,6 @@ fun MainAppScaffold(
                         ScreenContent(
                             currentScreen = targetScreen,
                             repository = repository,
-                            billingManager = billingManager,
                             selectedSchedulePackage = selectedSchedulePackage,
                             onNavigateToScreen = { screen -> currentScreen = screen },
                             onConfigureScheduleForApp = { pkg ->
@@ -381,12 +371,12 @@ fun MainAppScaffold(
 fun ScreenContent(
     currentScreen: Screen,
     repository: AppBlockerRepository,
-    billingManager: ProBillingManager,
     selectedSchedulePackage: String?,
     onNavigateToScreen: (Screen) -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     when (currentScreen) {
         Screen.Dashboard -> {
             DashboardScreen(
@@ -455,7 +445,6 @@ fun ScreenContent(
         }
         Screen.Paywall -> {
             PaywallScreen(
-                billingManager = billingManager,
                 settings = repository.settings,
                 onBack = { onNavigateToScreen(Screen.Settings) },
                 onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
