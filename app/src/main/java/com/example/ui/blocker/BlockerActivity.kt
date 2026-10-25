@@ -3,6 +3,11 @@ package com.example.ui.blocker
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -38,6 +43,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,9 +53,12 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,8 +66,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import coil.compose.AsyncImage
 import com.example.MainActivity
 import com.example.R
+import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.StrictBlockerTheme
 
@@ -96,7 +107,13 @@ class BlockerActivity : ComponentActivity() {
             null
         }
 
+        val settings = SettingsPreferences(applicationContext)
+
         setContent {
+            val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
+            val blockerStyle by settings.blockerStyleFlow.collectAsState(initial = "classic")
+            val blockerPhotoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
+
             StrictBlockerTheme {
                 // During an adult-content cooldown Back is intentionally ignored.
                 BackHandler {
@@ -117,6 +134,9 @@ class BlockerActivity : ComponentActivity() {
                         packageName = packageName,
                         nextAllowed = nextAllowed,
                         appIcon = appIcon,
+                        isPro = isPro,
+                        blockerStyle = blockerStyle,
+                        blockerPhotoUri = blockerPhotoUri,
                         onGoHome = { navigateHome() },
                         onViewSchedule = { navigateToSchedule(packageName) }
                     )
@@ -166,6 +186,26 @@ fun AdultBlockerScreen(
     }
 
     val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
+    val effectiveStyle = if (isPro) blockerStyle else "classic"
+    val transition = rememberInfiniteTransition(label = "blocker_style_motion")
+    val pulseScale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (effectiveStyle == "pulse") 1.08f else if (effectiveStyle == "focus") 1.035f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blocker_pulse_scale"
+    )
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = if (effectiveStyle == "pulse") 0.78f else 0.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (effectiveStyle == "pulse") 900 else 1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blocker_pulse_alpha"
+    )
     val backgroundBrush = remember(isDark) {
         if (isDark) {
             Brush.verticalGradient(
@@ -189,12 +229,31 @@ fun AdultBlockerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
+        if (isPro && effectiveStyle == "photo" && blockerPhotoUri.isNotBlank()) {
+            AsyncImage(
+                model = blockerPhotoUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.48f),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isDark) Color.Black.copy(alpha = 0.58f)
+                        else Color.White.copy(alpha = 0.66f)
+                    )
+            )
+        }
+
         Column(
             modifier = Modifier
+                .padding(24.dp)
                 .widthIn(max = 480.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -359,6 +418,9 @@ fun BlockerScreen(
     packageName: String,
     nextAllowed: String,
     appIcon: Drawable?,
+    isPro: Boolean = false,
+    blockerStyle: String = "classic",
+    blockerPhotoUri: String = "",
     onGoHome: () -> Unit,
     onViewSchedule: () -> Unit
 ) {
@@ -401,9 +463,17 @@ fun BlockerScreen(
             Box(
                 modifier = Modifier
                     .size(88.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                    }
                     .clip(CircleShape)
                     .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE0F2FE))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), CircleShape),
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha),
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
