@@ -92,6 +92,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
     @Volatile
     private var isRunning = false
     private var udpSocket: DatagramSocket? = null
+    private var restartAttempt = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -137,6 +138,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
         if (isRunning) return
         isRunning = true
         _isVpnActive.value = true
+        restartAttempt = 0
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -300,8 +302,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
             val unexpectedExit = isRunning
             cleanup()
             if (unexpectedExit) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                scheduleTunnelRestart()
             }
         }
     }
@@ -395,7 +396,39 @@ class AdultFilterVpnService : VpnService(), Runnable {
         return sum.inv().toShort()
     }
 
+    private fun scheduleTunnelRestart() {
+        serviceScope.launch {
+            restartAttempt = (restartAttempt + 1).coerceAtMost(6)
+            val delayMs = (1_000L shl (restartAttempt - 1)).coerceAtMost(30_000L)
+            kotlinx.coroutines.delay(delayMs)
+
+            try {
+                val stillEnabled =
+                    repository.settings.isAdultProtectionEnabledFlow.first() &&
+                        repository.settings.isDnsFilterEnabledFlow.first()
+
+                if (
+                    stillEnabled &&
+                    !isRunning &&
+                    isVpnConfigured(applicationContext)
+                ) {
+                    Log.i("AdultFilterVpn", "Retrying DNS tunnel after unexpected exit")
+                    startVpn()
+                } else if (!stillEnabled) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+            } catch (t: Throwable) {
+                Log.w("AdultFilterVpn", "VPN restart attempt failed", t)
+                if (restartAttempt < 6) {
+                    scheduleTunnelRestart()
+                }
+            }
+        }
+    }
+
     private fun stopVpn() {
+        restartAttempt = 0
         isRunning = false
         _isVpnActive.value = false
         vpnThread?.interrupt()
