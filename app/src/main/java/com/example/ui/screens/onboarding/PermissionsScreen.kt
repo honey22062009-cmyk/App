@@ -80,7 +80,6 @@ fun PermissionsScreen(
     // Live permission states
     var isAccessibilityGranted by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
     var isUsageGranted by remember { mutableStateOf(PermissionHelper.isUsageAccessGranted(context)) }
-    var isOverlayGranted by remember { mutableStateOf(PermissionHelper.canDrawOverlays(context)) }
     var isBatteryOptIgnored by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
     var isNotificationGranted by remember { mutableStateOf(PermissionHelper.isNotificationPermissionGranted(context)) }
     var isExactAlarmGranted by remember { mutableStateOf(PermissionHelper.canScheduleExactAlarms(context)) }
@@ -91,7 +90,6 @@ fun PermissionsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAccessibilityGranted = PermissionHelper.isAccessibilityServiceEnabled(context)
                 isUsageGranted = PermissionHelper.isUsageAccessGranted(context)
-                isOverlayGranted = PermissionHelper.canDrawOverlays(context)
                 isBatteryOptIgnored = PermissionHelper.isIgnoringBatteryOptimizations(context)
                 isNotificationGranted = PermissionHelper.isNotificationPermissionGranted(context)
                 isExactAlarmGranted = PermissionHelper.canScheduleExactAlarms(context)
@@ -101,8 +99,8 @@ fun PermissionsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val criticalGrantedCount = listOf(isAccessibilityGranted, isUsageGranted, isOverlayGranted).count { it }
-    val totalCritical = 3
+    val criticalGrantedCount = listOf(isAccessibilityGranted, isUsageGranted).count { it }
+    val totalCritical = 2
     val allCriticalGranted = criticalGrantedCount == totalCritical
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -219,7 +217,7 @@ fun PermissionsScreen(
             // Section 1: Core Protection
             item {
                 Text(
-                    text = "Required",
+                    text = "Core access",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -255,22 +253,6 @@ fun PermissionsScreen(
                     whatStops = stringResource(R.string.perm_usage_what),
                     howToEnable = stringResource(R.string.perm_usage_how),
                     onGrantClick = { PermissionHelper.openUsageAccessSettings(context) }
-                )
-            }
-
-            // 3. Display Over Other Apps (Overlay)
-            item {
-                PermissionSetupCard(
-                    title = "Display Over Other Apps",
-                    technicalName = "Overlay Shield Window",
-                    icon = Icons.Default.PictureInPicture,
-                    isGranted = isOverlayGranted,
-                    isRequired = true,
-                    summary = "Allows the blocking screen to appear over a restricted app when needed.",
-                    why = stringResource(R.string.perm_overlay_why),
-                    whatStops = stringResource(R.string.perm_overlay_what),
-                    howToEnable = stringResource(R.string.perm_overlay_how),
-                    onGrantClick = { PermissionHelper.openOverlaySettings(context) }
                 )
             }
 
