@@ -62,7 +62,7 @@ fun OwnerConsoleScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var email by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf(ManualPaymentManager.OWNER_EMAIL) }
     var password by remember { mutableStateOf("") }
     var signedIn by remember { mutableStateOf(false) }
     var signingIn by remember { mutableStateOf(false) }
