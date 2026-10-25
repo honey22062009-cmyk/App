@@ -209,60 +209,73 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection.entries.forEach { section ->
-                    item {
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = 0.dp
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = section.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                SettingsSectionContent(
+                item {
+                    GlassCard(modifier = Modifier.fillMaxWidth(), elevation = 0.dp) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            SettingsSection.entries.forEach { section ->
+                                SettingsSidebarItem(
                                     section = section,
-                                    themeMode = themeMode,
-                                    delayMinutes = delayMinutes,
-                                    isProtectionEnabled = isProtectionEnabled,
-                                    reduceMotion = reduceMotion,
-                                    showPackageOnBlocker = showPackageOnBlocker,
-                                    accountSignedIn = accountSignedIn,
-                                    accountEmail = accountEmail,
-                                    historyRetentionDays = historyRetentionDays,
-                                    onThemeChange = { mode ->
-                                        scope.launch { repository.settings.setThemeMode(mode) }
-                                    },
-                                    onDelayChange = { minutes ->
-                                        scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
-                                    },
-                                    onProtectionChange = { enabled ->
-                                        scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                                    },
-                                    onNavigateToPermissions = onNavigateToPermissions,
-                                    onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
-                                    onNavigateToLegal = onNavigateToLegal,
-                                    onNavigateToAdultProtection = onNavigateToAdultProtection,
-                                    onNavigateToPaywall = onNavigateToPaywall,
-                                    onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
-                                    onNavigateToAccount = onNavigateToAccount,
-                                    onNavigateToInsights = onNavigateToInsights,
-                                    onReduceMotionChange = { enabled ->
-                                        scope.launch { repository.settings.setReduceMotion(enabled) }
-                                    },
-                                    onShowPackageOnBlockerChange = { enabled ->
-                                        scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
-                                    },
-                                    onHistoryRetentionChange = { days ->
-                                        scope.launch {
-                                            repository.settings.setBlockHistoryRetentionDays(days)
-                                            repository.pruneBlockHistoryNow()
-                                        }
-                                    }
+                                    selected = selectedSection == section,
+                                    onClick = { selectedSection = section }
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
                             }
+                        }
+                    }
+                }
+
+                item {
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = 0.dp
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = selectedSection.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            SettingsSectionContent(
+                                section = selectedSection,
+                                themeMode = themeMode,
+                                delayMinutes = delayMinutes,
+                                isProtectionEnabled = isProtectionEnabled,
+                                reduceMotion = reduceMotion,
+                                showPackageOnBlocker = showPackageOnBlocker,
+                                accountSignedIn = accountSignedIn,
+                                accountEmail = accountEmail,
+                                historyRetentionDays = historyRetentionDays,
+                                onThemeChange = { mode ->
+                                    scope.launch { repository.settings.setThemeMode(mode) }
+                                },
+                                onDelayChange = { minutes ->
+                                    scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
+                                },
+                                onProtectionChange = { enabled ->
+                                    scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                },
+                                onNavigateToPermissions = onNavigateToPermissions,
+                                onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
+                                onNavigateToLegal = onNavigateToLegal,
+                                onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                onNavigateToPaywall = onNavigateToPaywall,
+                                onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
+                                onNavigateToAccount = onNavigateToAccount,
+                                onNavigateToInsights = onNavigateToInsights,
+                                onReduceMotionChange = { enabled ->
+                                    scope.launch { repository.settings.setReduceMotion(enabled) }
+                                },
+                                onShowPackageOnBlockerChange = { enabled ->
+                                    scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                },
+                                onHistoryRetentionChange = { days ->
+                                    scope.launch {
+                                        repository.settings.setBlockHistoryRetentionDays(days)
+                                        repository.pruneBlockHistoryNow()
+                                    }
+                                }
+                            )
                         }
                     }
                 }
