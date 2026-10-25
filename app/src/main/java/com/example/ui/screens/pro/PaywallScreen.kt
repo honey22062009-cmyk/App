@@ -106,6 +106,8 @@ fun PaywallScreen(
                         PremiumFeature("Custom blocker photos")
                         PremiumFeature("Animated blocker styles")
                         PremiumFeature("Premium focus themes")
+                        PremiumFeature("Focus insights and trends")
+                        PremiumFeature("Up to 8 app groups")
                         PremiumFeature("More personalization options")
                     }
                 }
@@ -282,7 +284,13 @@ private fun PlanCard(
                 )
             }
             Button(onClick = onBuy) {
-                Text("Subscribe")
+                Text(
+                    if (plan.productId == ProBillingManager.LIFETIME_PRODUCT_ID) {
+                        "Buy once"
+                    } else {
+                        "Subscribe"
+                    }
+                )
             }
         }
     }
