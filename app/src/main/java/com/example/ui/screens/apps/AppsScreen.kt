@@ -517,6 +517,9 @@ fun AppGroupDialog(
     val chosen = remember { mutableStateListOf<String>() }
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(28.dp),
         onDismissRequest = onDismiss,
         title = { Text("Create app group") },
         text = {
