@@ -138,7 +138,6 @@ class AdultFilterVpnService : VpnService(), Runnable {
         if (isRunning) return
         isRunning = true
         _isVpnActive.value = true
-        restartAttempt = 0
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -182,6 +181,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
             builder.setConfigureIntent(pendingIntent)
 
             vpnInterface = builder.establish() ?: return
+            restartAttempt = 0
             inStream = FileInputStream(vpnInterface!!.fileDescriptor)
             outStream = FileOutputStream(vpnInterface!!.fileDescriptor)
 
