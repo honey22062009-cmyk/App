@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
                     ?: AppBlockerRepository(context)
             }
             val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+            val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
             val systemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
                 "light" -> false
@@ -108,7 +109,8 @@ class MainActivity : ComponentActivity() {
             StrictBlockerTheme(darkTheme = isDark) {
                 MainAppContent(
                     repository = repository,
-                    initialTargetPackage = targetPackage
+                    initialTargetPackage = targetPackage,
+                    reduceMotion = reduceMotion
                 )
             }
         }
@@ -128,18 +130,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppContent(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?
+    initialTargetPackage: String?,
+    reduceMotion: Boolean
 ) {
     var isSplashVisible by remember { mutableStateOf(true) }
 
     if (isSplashVisible) {
         SplashScreen(
+            reduceMotion = reduceMotion,
             onSplashComplete = { isSplashVisible = false }
         )
     } else {
         MainAppScaffold(
             repository = repository,
-            initialTargetPackage = initialTargetPackage
+            initialTargetPackage = initialTargetPackage,
+            reduceMotion = reduceMotion
         )
     }
 }
@@ -147,7 +152,8 @@ fun MainAppContent(
 @Composable
 fun MainAppScaffold(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?
+    initialTargetPackage: String?,
+    reduceMotion: Boolean
 ) {
     val context = LocalContext.current
     val billingManager = remember(context, repository) {
@@ -270,8 +276,12 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            if (reduceMotion) {
+                                fadeIn(tween(80)) togetherWith fadeOut(tween(80))
+                            } else {
+                                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
+                                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            }
                         },
                         label = "tablet_screen_transition"
                     ) { targetScreen ->
@@ -339,8 +349,12 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            if (reduceMotion) {
+                                fadeIn(tween(80)) togetherWith fadeOut(tween(80))
+                            } else {
+                                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
+                                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            }
                         },
                         label = "phone_screen_transition"
                     ) { targetScreen ->
