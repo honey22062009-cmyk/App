@@ -211,7 +211,9 @@ fun SettingsScreen(
                                     onNavigateToPermissions = onNavigateToPermissions,
                                     onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                     onNavigateToLegal = onNavigateToLegal,
-                                    onNavigateToAdultProtection = onNavigateToAdultProtection
+                                    onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                    onNavigateToPaywall = onNavigateToPaywall,
+                                    onNavigateToBlockerCustomization = onNavigateToBlockerCustomization
                                 )
                             }
                         }
