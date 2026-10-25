@@ -2,6 +2,10 @@ package com.example.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Security
@@ -82,6 +86,20 @@ sealed class Screen(
         title = "Strict Blocker Pro",
         selectedIcon = Icons.Filled.Shield,
         unselectedIcon = Icons.Outlined.Shield
+    )
+
+    data object Account : Screen(
+        route = "account",
+        title = "Account",
+        selectedIcon = Icons.Filled.AccountCircle,
+        unselectedIcon = Icons.Outlined.AccountCircle
+    )
+
+    data object Insights : Screen(
+        route = "insights",
+        title = "Insights",
+        selectedIcon = Icons.Filled.BarChart,
+        unselectedIcon = Icons.Outlined.BarChart
     )
 
     data object BlockerCustomization : Screen(
