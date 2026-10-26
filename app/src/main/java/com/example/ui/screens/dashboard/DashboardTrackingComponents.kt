@@ -849,8 +849,15 @@ internal fun CalendarHeatmapCard(
     }
     val checkMap = remember(checkIns) { checkIns.associateBy { it.localDate } }
 
-    GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
-        Column(Modifier.padding(16.dp)) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = WarmMagenta)
                 Spacer(Modifier.width(8.dp))
@@ -889,7 +896,7 @@ internal fun CalendarHeatmapCard(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f)
-                                    .padding(3.dp)
+                                    .padding(2.dp)
                                     .border(
                                         width = if (date == today) 1.5.dp else 0.dp,
                                         color = if (date == today) WarmPlum else Color.Transparent,
@@ -923,12 +930,22 @@ internal fun CalendarHeatmapCard(
                                             .background(WarmCoral, CircleShape)
                                     )
                                 }
+                                if (checkIn != null) {
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 4.dp, end = 4.dp)
+                                            .size(5.dp)
+                                            .background(WarmMint, CircleShape)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
     }
 }
 

@@ -69,6 +69,29 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private fun buildTabletDashboardRows(cards: List<String>): List<List<String>> {
+    val fullWidthCards = setOf("hero", "checkin", "graph", "stats", "protection")
+    val rows = mutableListOf<List<String>>()
+    var index = 0
+    while (index < cards.size) {
+        val current = cards[index]
+        if (current in fullWidthCards) {
+            rows += listOf(current)
+            index++
+        } else {
+            val next = cards.getOrNull(index + 1)
+            if (next != null && next !in fullWidthCards) {
+                rows += listOf(current, next)
+                index += 2
+            } else {
+                rows += listOf(current)
+                index++
+            }
+        }
+    }
+    return rows
+}
+
 @Composable
 fun DashboardScreen(
     repository: AppBlockerRepository,
@@ -191,6 +214,87 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val tablet = maxWidth >= 720.dp
+        val visibleCardOrder = remember(cardOrder, hiddenCards) {
+            cardOrder.filterNot { it in hiddenCards }
+        }
+        val tabletRows = remember(visibleCardOrder) {
+            buildTabletDashboardRows(visibleCardOrder)
+        }
+        val renderDashboardCard: @Composable (String) -> Unit = { key ->
+                    when (key) {
+                        "hero" -> StreakHeroCard(
+                            stats = stats,
+                            characterId = selectedCharacterId,
+                            lastResetLabel = lastResetLabel,
+                            goalDays = goalDays,
+                            reduceMotion = reduceMotion,
+                            tablet = tablet,
+                            onRecordReset = {
+                                editingReset = null
+                                showResetEditor = true
+                            },
+                            onEditGoal = { showGoal = true }
+                        )
+    
+                        "stats" -> StatsStrip(stats, tablet)
+    
+                        "graph" -> StreakGraphCard(
+                            trackerStartedAt = trackerStartedAt,
+                            resets = resetRecords,
+                            zone = zone,
+                            tablet = tablet
+                        )
+    
+                        "milestones" -> MilestoneCard(
+                            stats = stats,
+                            onViewAll = { showMilestones = true }
+                        )
+    
+                        "checkin" -> DailyCheckInCard(
+                            currentDays = stats.currentDays,
+                            todayCheckIn = todayCheckIn,
+                            todaySleep = todaySleep,
+                            onSelect = { rating ->
+                                scope.launch {
+                                    repository.settings.saveDailyCheckIn(today.toString(), rating)
+                                }
+                            },
+                            onRecordReset = {
+                                editingReset = null
+                                showResetEditor = true
+                            },
+                            onAddSleep = { showSleepEditor = true }
+                        )
+    
+                        "calendar" -> CalendarHeatmapCard(
+                            trackerStartedAt = trackerStartedAt,
+                            resets = resetRecords,
+                            checkIns = checkIns,
+                            zone = zone,
+                            onDateSelected = { selectedCalendarDate = it }
+                        )
+    
+                        "insights" -> InsightCard(insight)
+    
+                        "timeline" -> JourneyPreviewCard(
+                            items = journeyItems,
+                            onOpen = { showTimeline = true }
+                        )
+    
+                        "protection" -> ProtectionStatusCard(
+                            enabled = isProtectionEnabled,
+                            health = health,
+                            activeManagedApps = managedApps.count { it.isManaged },
+                            totalBlocks = totalBlocks,
+                            onToggle = { enabled ->
+                                scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                            },
+                            onOpenSetup = onNavigateToPermissions
+                        )
+                    }
+        }
+
+
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -214,80 +318,36 @@ fun DashboardScreen(
                 )
             }
 
-            items(
-                items = cardOrder.filterNot { it in hiddenCards },
-                key = { it }
-            ) { key ->
-                when (key) {
-                    "hero" -> StreakHeroCard(
-                        stats = stats,
-                        characterId = selectedCharacterId,
-                        lastResetLabel = lastResetLabel,
-                        goalDays = goalDays,
-                        reduceMotion = reduceMotion,
-                        tablet = tablet,
-                        onRecordReset = {
-                            editingReset = null
-                            showResetEditor = true
-                        },
-                        onEditGoal = { showGoal = true }
-                    )
-
-                    "stats" -> StatsStrip(stats, tablet)
-
-                    "graph" -> StreakGraphCard(
-                        trackerStartedAt = trackerStartedAt,
-                        resets = resetRecords,
-                        zone = zone,
-                        tablet = tablet
-                    )
-
-                    "milestones" -> MilestoneCard(
-                        stats = stats,
-                        onViewAll = { showMilestones = true }
-                    )
-
-                    "checkin" -> DailyCheckInCard(
-                        currentDays = stats.currentDays,
-                        todayCheckIn = todayCheckIn,
-                        todaySleep = todaySleep,
-                        onSelect = { rating ->
-                            scope.launch {
-                                repository.settings.saveDailyCheckIn(today.toString(), rating)
+            if (tablet) {
+                items(
+                    items = tabletRows,
+                    key = { row -> row.joinToString("+") }
+                ) { row ->
+                    if (row.size == 1) {
+                        renderDashboardCard(row.single())
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            row.forEach { key ->
+                                val cardWeight = if ("calendar" in row) {
+                                    if (key == "calendar") 1.25f else 0.75f
+                                } else 1f
+                                Box(modifier = Modifier.weight(cardWeight)) {
+                                    renderDashboardCard(key)
+                                }
                             }
-                        },
-                        onRecordReset = {
-                            editingReset = null
-                            showResetEditor = true
-                        },
-                        onAddSleep = { showSleepEditor = true }
-                    )
-
-                    "calendar" -> CalendarHeatmapCard(
-                        trackerStartedAt = trackerStartedAt,
-                        resets = resetRecords,
-                        checkIns = checkIns,
-                        zone = zone,
-                        onDateSelected = { selectedCalendarDate = it }
-                    )
-
-                    "insights" -> InsightCard(insight)
-
-                    "timeline" -> JourneyPreviewCard(
-                        items = journeyItems,
-                        onOpen = { showTimeline = true }
-                    )
-
-                    "protection" -> ProtectionStatusCard(
-                        enabled = isProtectionEnabled,
-                        health = health,
-                        activeManagedApps = managedApps.count { it.isManaged },
-                        totalBlocks = totalBlocks,
-                        onToggle = { enabled ->
-                            scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                        },
-                        onOpenSetup = onNavigateToPermissions
-                    )
+                        }
+                    }
+                }
+            } else {
+                items(
+                    items = visibleCardOrder,
+                    key = { it }
+                ) { key ->
+                    renderDashboardCard(key)
                 }
             }
         }

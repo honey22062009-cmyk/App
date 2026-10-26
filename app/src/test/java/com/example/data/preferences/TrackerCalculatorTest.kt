@@ -125,4 +125,76 @@ class TrackerCalculatorTest {
         assertEquals(17, stats.bestDays)
         assertEquals(2, stats.previousDays)
     }
+
+    @Test
+    fun sameTimestampEventsRemainDistinctWithoutNegativeIntervals() {
+        val start = ms(2026, 1, 1, 12)
+        val sameTime = ms(2026, 1, 5, 12)
+        val stats = TrackerCalculator.stats(
+            start,
+            listOf(
+                TrackerResetRecord("a", sameTime),
+                TrackerResetRecord("b", sameTime)
+            ),
+            ms(2026, 1, 7, 12),
+            zone
+        )
+        assertEquals(2, stats.totalResets)
+        assertEquals(2, stats.currentDays)
+        assertEquals(4, stats.bestDays)
+    }
+
+    @Test
+    fun editingLatestResetRecalculatesTheCurrentStreak() {
+        val start = ms(2026, 1, 1)
+        val editedEvents = listOf(
+            TrackerResetRecord("first", ms(2026, 1, 4)),
+            TrackerResetRecord("latest", ms(2026, 1, 6))
+        )
+        val stats = TrackerCalculator.stats(start, editedEvents, ms(2026, 1, 10), zone)
+        assertEquals(4, stats.currentDays)
+        assertEquals(2, stats.previousDays)
+        assertEquals(4, stats.bestDays)
+    }
+
+    @Test
+    fun deletingLatestResetRecalculatesHistoryFromTheRemainingEvents() {
+        val start = ms(2026, 1, 1)
+        val remainingEvents = listOf(TrackerResetRecord("first", ms(2026, 1, 4)))
+        val stats = TrackerCalculator.stats(start, remainingEvents, ms(2026, 1, 10), zone)
+        assertEquals(6, stats.currentDays)
+        assertEquals(3, stats.previousDays)
+        assertEquals(6, stats.bestDays)
+        assertEquals(1, stats.totalResets)
+    }
+
+    @Test
+    fun monthAndYearBoundariesUseLocalCalendarDates() {
+        val start = ms(2025, 12, 29, 12)
+        val events = listOf(
+            TrackerResetRecord("december", ms(2025, 12, 31, 12)),
+            TrackerResetRecord("january", ms(2026, 1, 1, 12))
+        )
+        val stats = TrackerCalculator.stats(start, events, ms(2026, 1, 2, 12), zone)
+        assertEquals(1, stats.currentDays)
+        assertEquals(1, stats.previousDays)
+        assertEquals(1, stats.resetsThisMonth)
+        assertEquals(2, stats.totalResets)
+    }
+
+    @Test
+    fun elapsedStreakIsStableAcrossTimezoneChangesWhileMonthUsesLocalDate() {
+        val start = java.time.Instant.parse("2025-12-31T23:00:00Z").toEpochMilli()
+        val resetAt = java.time.Instant.parse("2026-01-01T01:00:00Z").toEpochMilli()
+        val now = java.time.Instant.parse("2026-01-01T22:00:00Z").toEpochMilli()
+        val events = listOf(TrackerResetRecord("reset", resetAt))
+
+        val utcStats = TrackerCalculator.stats(start, events, now, ZoneId.of("UTC"))
+        val pacificStats = TrackerCalculator.stats(start, events, now, ZoneId.of("America/Los_Angeles"))
+
+        assertEquals(utcStats.currentDays, pacificStats.currentDays)
+        assertEquals(1, utcStats.resetsThisMonth)
+        assertEquals(0, pacificStats.resetsThisMonth)
+    }
+
 }
