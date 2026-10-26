@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.core.system.AlarmScheduler
+import com.example.core.system.TrackerReminderScheduler
 
 /**
  * Recalculates future schedule boundaries and transition alarms when:
@@ -19,6 +20,7 @@ class TimeChangeReceiver : BroadcastReceiver() {
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_DATE_CHANGED -> {
                 AlarmScheduler.scheduleNextTransition(context)
+        TrackerReminderScheduler.refresh(context)
             }
         }
     }
