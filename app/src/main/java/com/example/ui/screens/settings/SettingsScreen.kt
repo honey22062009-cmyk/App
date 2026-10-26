@@ -1,5 +1,6 @@
 package com.example.ui.screens.settings
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
@@ -47,17 +49,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
 import kotlinx.coroutines.launch
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
-    Account("Account", Icons.Default.AccountCircle),
     Appearance("Appearance", Icons.Default.Palette),
     Blocking("Blocking", Icons.Default.HourglassBottom),
+    Progress("Progress reminders", Icons.Default.Notifications),
     Protection("Protection", Icons.Default.Shield),
     Permissions("Permissions", Icons.Default.Security),
     Privacy("Privacy & legal", Icons.Default.PrivacyTip),
@@ -78,6 +82,7 @@ fun SettingsScreen(
     onNavigateToOwnerConsole: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val delayMinutes by repository.settings.strictChangeDelayMinutesFlow.collectAsState(initial = 0)
     val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
@@ -86,6 +91,12 @@ fun SettingsScreen(
     val accountSignedIn by repository.settings.isAccountSignedInFlow.collectAsState(initial = false)
     val accountEmail by repository.settings.accountEmailFlow.collectAsState(initial = "")
     val historyRetentionDays by repository.settings.blockHistoryRetentionDaysFlow.collectAsState(initial = 30)
+    val dailyReminderEnabled by repository.settings.dailyReminderEnabledFlow.collectAsState(initial = false)
+    val dailyReminderHour by repository.settings.dailyReminderHourFlow.collectAsState(initial = 20)
+    val dailyReminderMinute by repository.settings.dailyReminderMinuteFlow.collectAsState(initial = 0)
+    val sleepReminderEnabled by repository.settings.sleepReminderEnabledFlow.collectAsState(initial = false)
+    val sleepReminderHour by repository.settings.sleepReminderHourFlow.collectAsState(initial = 6)
+    val sleepReminderMinute by repository.settings.sleepReminderMinuteFlow.collectAsState(initial = 0)
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
 
     BoxWithConstraints(
@@ -156,6 +167,12 @@ fun SettingsScreen(
                                 accountSignedIn = accountSignedIn,
                                 accountEmail = accountEmail,
                                 historyRetentionDays = historyRetentionDays,
+                                dailyReminderEnabled = dailyReminderEnabled,
+                                dailyReminderHour = dailyReminderHour,
+                                dailyReminderMinute = dailyReminderMinute,
+                                sleepReminderEnabled = sleepReminderEnabled,
+                                sleepReminderHour = sleepReminderHour,
+                                sleepReminderMinute = sleepReminderMinute,
                                 onThemeChange = { mode ->
                                     scope.launch { repository.settings.setThemeMode(mode) }
                                 },
@@ -179,6 +196,18 @@ fun SettingsScreen(
                                 },
                                 onShowPackageOnBlockerChange = { enabled ->
                                     scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                },
+                                onDailyReminderChange = { enabled, hour, minute ->
+                                    scope.launch {
+                                        repository.settings.setDailyReminder(enabled, hour, minute)
+                                        TrackerReminderScheduler.refresh(context)
+                                    }
+                                },
+                                onSleepReminderChange = { enabled, hour, minute ->
+                                    scope.launch {
+                                        repository.settings.setSleepReminder(enabled, hour, minute)
+                                        TrackerReminderScheduler.refresh(context)
+                                    }
                                 },
                                 onHistoryRetentionChange = { days ->
                                     scope.launch {
@@ -248,6 +277,12 @@ fun SettingsScreen(
                                 accountSignedIn = accountSignedIn,
                                 accountEmail = accountEmail,
                                 historyRetentionDays = historyRetentionDays,
+                                dailyReminderEnabled = dailyReminderEnabled,
+                                dailyReminderHour = dailyReminderHour,
+                                dailyReminderMinute = dailyReminderMinute,
+                                sleepReminderEnabled = sleepReminderEnabled,
+                                sleepReminderHour = sleepReminderHour,
+                                sleepReminderMinute = sleepReminderMinute,
                                 onThemeChange = { mode ->
                                     scope.launch { repository.settings.setThemeMode(mode) }
                                 },
@@ -271,6 +306,18 @@ fun SettingsScreen(
                                 },
                                 onShowPackageOnBlockerChange = { enabled ->
                                     scope.launch { repository.settings.setShowPackageOnBlocker(enabled) }
+                                },
+                                onDailyReminderChange = { enabled, hour, minute ->
+                                    scope.launch {
+                                        repository.settings.setDailyReminder(enabled, hour, minute)
+                                        TrackerReminderScheduler.refresh(context)
+                                    }
+                                },
+                                onSleepReminderChange = { enabled, hour, minute ->
+                                    scope.launch {
+                                        repository.settings.setSleepReminder(enabled, hour, minute)
+                                        TrackerReminderScheduler.refresh(context)
+                                    }
                                 },
                                 onHistoryRetentionChange = { days ->
                                     scope.launch {
@@ -334,6 +381,12 @@ private fun SettingsSectionContent(
     accountSignedIn: Boolean,
     accountEmail: String,
     historyRetentionDays: Int,
+    dailyReminderEnabled: Boolean,
+    dailyReminderHour: Int,
+    dailyReminderMinute: Int,
+    sleepReminderEnabled: Boolean,
+    sleepReminderHour: Int,
+    sleepReminderMinute: Int,
     onThemeChange: (String) -> Unit,
     onDelayChange: (Int) -> Unit,
     onProtectionChange: (Boolean) -> Unit,
@@ -348,23 +401,11 @@ private fun SettingsSectionContent(
     onNavigateToOwnerConsole: () -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onShowPackageOnBlockerChange: (Boolean) -> Unit,
-    onHistoryRetentionChange: (Int) -> Unit
+    onHistoryRetentionChange: (Int) -> Unit,
+    onDailyReminderChange: (Boolean, Int, Int) -> Unit,
+    onSleepReminderChange: (Boolean, Int, Int) -> Unit
 ) {
     when (section) {
-        SettingsSection.Account -> {
-            SettingsDescription(
-                if (accountSignedIn) "Signed in as " + accountEmail
-                else if (accountEmail.isNotBlank()) "Signed out • remembered account: " + accountEmail
-                else "Connect a Google account for identity and future sync features."
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            SettingsLinkRow(
-                title = if (accountSignedIn) "Manage account" else "Sign in with Google",
-                subtitle = "Account identity, sign-out and remembered account controls",
-                onClick = onNavigateToAccount
-            )
-        }
-
         SettingsSection.Appearance -> {
             SettingsDescription("Choose how the app follows your device theme.")
             Spacer(modifier = Modifier.height(12.dp))
@@ -424,6 +465,30 @@ private fun SettingsSectionContent(
                     )
                 }
             }
+        }
+
+        SettingsSection.Progress -> {
+            SettingsDescription(
+                "Reminders are optional. They are scheduled once per day and can be turned off at any time."
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ReminderSettingRow(
+                title = "Daily progress reminder",
+                subtitle = "Opens the daily check-in directly.",
+                enabled = dailyReminderEnabled,
+                hour = dailyReminderHour,
+                minute = dailyReminderMinute,
+                onChange = onDailyReminderChange
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            ReminderSettingRow(
+                title = "Sleep reminder",
+                subtitle = "Reminds you to manually log last night's sleep.",
+                enabled = sleepReminderEnabled,
+                hour = sleepReminderHour,
+                minute = sleepReminderMinute,
+                onChange = onSleepReminderChange
+            )
         }
 
         SettingsSection.Protection -> {
@@ -558,5 +623,51 @@ private fun SettingsLinkRow(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+
+@Composable
+private fun ReminderSettingRow(
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    hour: Int,
+    minute: Int,
+    onChange: (Boolean, Int, Int) -> Unit
+) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsToggleRow(
+            title = title,
+            subtitle = subtitle,
+            checked = enabled,
+            onCheckedChange = { onChange(it, hour, minute) }
+        )
+        Button(
+            onClick = {
+                TimePickerDialog(
+                    context,
+                    { _, selectedHour, selectedMinute ->
+                        onChange(enabled, selectedHour, selectedMinute)
+                    },
+                    hour,
+                    minute,
+                    false
+                ).show()
+            },
+            enabled = enabled
+        ) {
+            val displayHour = when {
+                hour == 0 -> 12
+                hour > 12 -> hour - 12
+                else -> hour
+            }
+            val suffix = if (hour < 12) "AM" else "PM"
+            Text(
+                displayHour.toString() + ":" +
+                    minute.toString().padStart(2, '0') + " " + suffix
+            )
+        }
     }
 }
