@@ -137,14 +137,18 @@ internal fun StreakHeroCard(
         animationSpec = if (reduceMotion) tween(0) else tween(700),
         label = "hero_progress"
     )
-    val infinite = rememberInfiniteTransition(label = "hero_glass")
-    val drift by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(10_000, easing = LinearEasing)),
-        label = "hero_highlight"
-    )
-    val highlight = if (reduceMotion) 0.15f else drift
+    val highlight = if (reduceMotion) {
+        0.15f
+    } else {
+        val infinite = rememberInfiniteTransition(label = "hero_glass")
+        val drift by infinite.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(10_000, easing = LinearEasing)),
+            label = "hero_highlight"
+        )
+        drift
+    }
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -445,7 +449,7 @@ internal fun StreakGraphCard(
     zone: ZoneId,
     tablet: Boolean
 ) {
-    var range by rememberSaveable { mutableStateOf(GraphRange.Seven) }
+    var range by remember { mutableStateOf(GraphRange.Seven) }
     val today = LocalDate.now(zone)
     val earliest = remember(trackerStartedAt, resets, today) {
         val trackerDate = trackerStartedAt.takeIf { it > 0L }
@@ -466,7 +470,10 @@ internal fun StreakGraphCard(
                     Text("Streak history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Tap or drag across the line for a day", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     GraphRange.entries.forEach { item ->
                         FilterChip(
                             selected = range == item,
