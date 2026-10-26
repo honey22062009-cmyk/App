@@ -167,14 +167,23 @@ class SettingsPreferences(private val context: Context) {
     val trackerResetRecordsFlow: Flow<List<TrackerResetRecord>> = context.dataStore.data.map { preferences ->
         val structured = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
             .mapNotNull(TrackerResetRecord::decode)
-            .associateBy { it.timestamp }
-            .toMutableMap()
+            .toMutableList()
+        val structuredTimestamps = structured.mapTo(mutableSetOf()) { it.timestamp }
+
+        // Legacy timestamp-only history is merged without collapsing distinct structured
+        // records that happen to share the same exact timestamp.
         (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
             .mapNotNull { it.toLongOrNull() }
             .forEach { timestamp ->
-                structured.putIfAbsent(timestamp, TrackerResetRecord.legacy(timestamp))
+                if (timestamp !in structuredTimestamps) {
+                    structured += TrackerResetRecord.legacy(timestamp)
+                }
             }
-        structured.values.sortedByDescending { it.timestamp }
+
+        structured.sortedWith(
+            compareByDescending<TrackerResetRecord> { it.timestamp }
+                .thenBy { it.id }
+        )
     }
 
     val dailyCheckInsFlow: Flow<List<DailyCheckIn>> = context.dataStore.data.map { preferences ->
