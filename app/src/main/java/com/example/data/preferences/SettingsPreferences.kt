@@ -57,6 +57,7 @@ class SettingsPreferences(private val context: Context) {
         val FAP_EVENT_TIMESTAMPS = stringSetPreferencesKey("fap_event_timestamps")
         val TRACKER_RESET_RECORDS = stringSetPreferencesKey("tracker_reset_records_v2")
         val DAILY_CHECK_INS = stringSetPreferencesKey("daily_check_ins")
+        val SLEEP_ENTRIES = stringSetPreferencesKey("sleep_entries")
         val TRACKER_GOAL_DAYS = intPreferencesKey("tracker_goal_days")
         val DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
@@ -216,6 +217,12 @@ class SettingsPreferences(private val context: Context) {
     val dailyCheckInsFlow: Flow<List<DailyCheckIn>> = context.dataStore.data.map { preferences ->
         (preferences[PreferencesKeys.DAILY_CHECK_INS] ?: emptySet())
             .mapNotNull(DailyCheckIn::decode)
+            .sortedByDescending { it.localDate }
+    }
+
+    val sleepEntriesFlow: Flow<List<SleepEntry>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.SLEEP_ENTRIES] ?: emptySet())
+            .mapNotNull(SleepEntry::decode)
             .sortedByDescending { it.localDate }
     }
 
@@ -566,6 +573,31 @@ class SettingsPreferences(private val context: Context) {
         }
     }
 
+    suspend fun saveSleepEntry(
+        localDate: String,
+        durationMinutes: Int,
+        note: String? = null
+    ) {
+        val date = runCatching { java.time.LocalDate.parse(localDate) }.getOrNull() ?: return
+        val entry = SleepEntry(
+            localDate = date,
+            durationMinutes = durationMinutes.coerceIn(0, 24 * 60),
+            note = note?.trim()?.take(500)?.takeIf { it.isNotBlank() }
+        )
+        context.dataStore.edit { preferences ->
+            val items = (preferences[PreferencesKeys.SLEEP_ENTRIES] ?: emptySet())
+                .mapNotNull(SleepEntry::decode)
+                .filterNot { it.localDate == date }
+                .toMutableList()
+            items += entry
+            preferences[PreferencesKeys.SLEEP_ENTRIES] = items
+                .sortedByDescending { it.localDate }
+                .take(730)
+                .map { it.encode() }
+                .toSet()
+        }
+    }
+
     suspend fun setTrackerGoalDays(days: Int?) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.TRACKER_GOAL_DAYS] = (days ?: 0).coerceIn(0, 3650)
@@ -600,6 +632,7 @@ class SettingsPreferences(private val context: Context) {
             preferences.remove(PreferencesKeys.FAP_EVENT_TIMESTAMPS)
             preferences.remove(PreferencesKeys.TRACKER_RESET_RECORDS)
             preferences.remove(PreferencesKeys.DAILY_CHECK_INS)
+            preferences.remove(PreferencesKeys.SLEEP_ENTRIES)
             preferences.remove(PreferencesKeys.SEEN_MILESTONES)
         }
     }
