@@ -331,6 +331,7 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { deleteCandidate = null },
             shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
             title = { Text("Delete this reset?", fontWeight = FontWeight.Bold) },
             text = { Text("The tracker will recalculate streak history after this entry is removed.") },
             confirmButton = {
