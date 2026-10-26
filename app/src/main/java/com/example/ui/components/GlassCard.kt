@@ -144,7 +144,7 @@ fun AppSurface(
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(22.dp),
+    shape: Shape = RoundedCornerShape(24.dp),
     variant: GlassVariant = GlassVariant.Standard,
     borderWidth: Dp = 1.dp,
     borderColor: Color? = null,
@@ -162,61 +162,92 @@ fun GlassCard(
         customBlur = blurRadius,
         borderWidth = borderWidth
     )
-    val glassModifier = modifier.clip(shape)
-    val border = BorderStroke(
-        spec.borderWidth,
-        if (borderColor != null) Brush.linearGradient(listOf(borderColor, borderColor))
-        else spec.borderBrush
-    )
+    val dark = GlassDefaults.isDarkTheme()
+    val edgeBrush = if (borderColor != null) {
+        Brush.linearGradient(listOf(borderColor.copy(alpha = 0.55f), borderColor.copy(alpha = 0.20f)))
+    } else {
+        Brush.linearGradient(
+            listOf(
+                Color.White.copy(alpha = if (dark) 0.22f else 0.78f),
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+            )
+        )
+    }
 
-    val body: @Composable () -> Unit = {
-        Box(
-            modifier = Modifier
-                .background(
-                    if (specularHighlight && spec.specularBrush != null) {
-                        spec.specularBrush
-                    } else {
-                        Brush.linearGradient(listOf(spec.backgroundColor, spec.backgroundColor))
-                    }
-                )
-        ) {
+    val glassContent: @Composable () -> Unit = {
+        Box {
             Box(
-                modifier = Modifier.background(
-                    Brush.linearGradient(
-                        listOf(
-                            spec.backgroundColor,
-                            spec.backgroundColor.copy(alpha = (spec.backgroundColor.alpha * 0.84f).coerceIn(0f, 1f))
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                spec.backgroundColor.copy(alpha = if (dark) 0.68f else 0.80f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = if (dark) 0.50f else 0.62f),
+                                spec.backgroundColor.copy(alpha = if (dark) 0.56f else 0.72f)
+                            )
                         )
                     )
+            )
+            if (specularHighlight) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = if (dark) 0.16f else 0.42f),
+                                    Color.White.copy(alpha = if (dark) 0.05f else 0.12f),
+                                    Color.Transparent
+                                ),
+                                center = androidx.compose.ui.geometry.Offset(120f, 20f),
+                                radius = 420f
+                            )
+                        )
                 )
-            ) {
-                content()
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.035f),
+                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.04f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
             }
+            content()
         }
     }
 
     if (onClick != null) {
         Surface(
             onClick = onClick,
-            modifier = glassModifier,
+            modifier = modifier.clip(shape),
             shape = shape,
             color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
-            shadowElevation = if (elevation > 0.dp) elevation else 8.dp,
-            border = border,
-            content = body
+            shadowElevation = if (elevation > 0.dp) elevation else 12.dp,
+            border = BorderStroke(borderWidth, edgeBrush),
+            content = glassContent
         )
     } else {
         Surface(
-            modifier = glassModifier,
+            modifier = modifier.clip(shape),
             shape = shape,
             color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
-            shadowElevation = if (elevation > 0.dp) elevation else 8.dp,
-            border = border,
-            content = body
+            shadowElevation = if (elevation > 0.dp) elevation else 12.dp,
+            border = BorderStroke(borderWidth, edgeBrush),
+            content = glassContent
         )
     }
 }
