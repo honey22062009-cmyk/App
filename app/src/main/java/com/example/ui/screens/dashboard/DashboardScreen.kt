@@ -61,6 +61,7 @@ import com.example.data.preferences.TrackerResetRecord
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -112,6 +113,22 @@ fun DashboardScreen(
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
         repository.settings.refreshExpiredProEntitlement()
+    }
+
+    // Refresh day-based tracker values at local midnight without running a per-second timer.
+    LaunchedEffect(zone) {
+        while (true) {
+            val current = System.currentTimeMillis()
+            val nextMidnight = Instant.ofEpochMilli(current)
+                .atZone(zone)
+                .toLocalDate()
+                .plusDays(1)
+                .atStartOfDay(zone)
+                .toInstant()
+                .toEpochMilli()
+            delay((nextMidnight - current + 1_000L).coerceAtLeast(1_000L))
+            nowMillis = System.currentTimeMillis()
+        }
     }
 
     DisposableEffect(context, lifecycleOwner) {
