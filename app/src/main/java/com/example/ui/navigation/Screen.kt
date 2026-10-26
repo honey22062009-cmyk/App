@@ -53,6 +53,13 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.Shield
     )
 
+    data object Onboarding : Screen(
+        route = "onboarding",
+        title = "Welcome",
+        selectedIcon = Icons.Filled.AccountCircle,
+        unselectedIcon = Icons.Outlined.AccountCircle
+    )
+
     data object Permissions : Screen(
         route = "permissions",
         title = "Permissions",
