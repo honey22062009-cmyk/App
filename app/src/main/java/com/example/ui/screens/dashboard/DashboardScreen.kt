@@ -157,7 +157,7 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val tablet = maxWidth >= 720.dp
-        val contentWidth = if (tablet) 980.dp else maxWidth
+        val contentWidth = maxWidth
 
         LazyColumn(
             modifier = Modifier
@@ -165,8 +165,8 @@ fun DashboardScreen(
                 .width(contentWidth)
                 .fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = if (tablet) 32.dp else 16.dp,
-                end = if (tablet) 32.dp else 16.dp,
+                start = if (tablet) 22.dp else 12.dp,
+                end = if (tablet) 22.dp else 12.dp,
                 top = 18.dp,
                 bottom = 128.dp
             ),
@@ -196,18 +196,27 @@ fun DashboardScreen(
                             .shadow(12.dp, CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(Color(0xFF7857FF), Color(0xFFE36DAE))
+                                    listOf(Color(0xFFE45B99), Color(0xFFE36DAE))
                                 ),
                                 CircleShape
                             )
                             .clickable(onClick = onOpenPro),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = "Strict Blocker Pro",
-                            tint = Color.White
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "Strict Blocker Pro",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                "PRO",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
                 }
             }
@@ -253,10 +262,10 @@ fun DashboardScreen(
                                 drawArc(
                                     brush = Brush.sweepGradient(
                                         listOf(
-                                            Color(0xFF7868FF),
-                                            Color(0xFF4CB8F4),
+                                            Color(0xFFE45B99),
+                                            Color(0xFFF4866B),
                                             Color(0xFFE76AAE),
-                                            Color(0xFF7868FF)
+                                            Color(0xFFE45B99)
                                         )
                                     ),
                                     startAngle = 140f,
@@ -318,7 +327,7 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    MetricCard("Previous", "$previousStreak d", Color(0xFF6A8DF5), Modifier.weight(1f))
+                    MetricCard("Previous", "$previousStreak d", Color(0xFFA953C7), Modifier.weight(1f))
                     MetricCard("Best", "$displayedBest d", Color(0xFFE46FAE), Modifier.weight(1f))
                     MetricCard("Resets", "$resetCount", Color(0xFF62B49A), Modifier.weight(1f))
                 }
@@ -383,8 +392,8 @@ fun DashboardScreen(
                                                 } else {
                                                     Brush.verticalGradient(
                                                         listOf(
-                                                            if (index % 2 == 0) Color(0xFF7D6AF7) else Color(0xFFEC7BAA),
-                                                            if (index % 2 == 0) Color(0xFF53B6E8) else Color(0xFFFFA37F)
+                                                            if (index % 2 == 0) Color(0xFFE45B99) else Color(0xFFEC7BAA),
+                                                            if (index % 2 == 0) Color(0xFFF4866B) else Color(0xFFFFA37F)
                                                         )
                                                     )
                                                 }
@@ -489,22 +498,6 @@ fun DashboardScreen(
                 }
             }
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ToolCard("Apps", Icons.Default.Apps, Color(0xFF6D83F2), onNavigateToApps, Modifier.weight(1f))
-                    ToolCard("Schedules", Icons.Default.CalendarMonth, Color(0xFF58B6A0), onNavigateToSchedules, Modifier.weight(1f))
-                    ToolCard(
-                        if (isAdultProtectionEnabled) "18+ On" else "18+ Off",
-                        Icons.Default.Security,
-                        Color(0xFFE46FAE),
-                        onNavigateToAdultProtection,
-                        Modifier.weight(1f)
-                    )
-                }
-            }
         }
     }
 
@@ -546,60 +539,88 @@ fun DashboardScreen(
 
 @Composable
 private fun HumanPairIllustration() {
-    val primary = Color(0xFF627CF0)
-    val secondary = Color(0xFFE16EAA)
-    Canvas(modifier = Modifier.size(width = 92.dp, height = 76.dp)) {
-        fun figure(cx: Float, color: Color, feminine: Boolean) {
-            val headY = size.height * 0.22f
-            val headR = size.minDimension * 0.09f
-            if (feminine) {
-                drawCircle(
-                    color = color.copy(alpha = 0.35f),
-                    radius = headR * 1.48f,
-                    center = Offset(cx, headY + headR * 0.18f)
-                )
-            }
-            drawCircle(color = color, radius = headR, center = Offset(cx, headY))
-            val shoulderY = size.height * 0.39f
-            val hipY = size.height * 0.69f
+    Canvas(modifier = Modifier.size(width = 124.dp, height = 96.dp)) {
+        fun figure(
+            centerX: Float,
+            main: Color,
+            light: Color,
+            bodyWidth: Float
+        ) {
+            val headY = size.height * 0.18f
+            val headR = size.minDimension * 0.11f
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.20f),
+                radius = headR + 2f,
+                center = Offset(centerX + 3f, headY + 3f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(light, main),
+                    center = Offset(centerX - 4f, headY - 4f),
+                    radius = headR * 2.2f
+                ),
+                radius = headR,
+                center = Offset(centerX, headY)
+            )
+
+            val torsoTop = size.height * 0.34f
+            val torsoHeight = size.height * 0.34f
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.18f),
+                topLeft = Offset(centerX - bodyWidth / 2f + 3f, torsoTop + 4f),
+                size = Size(bodyWidth, torsoHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+            )
+            drawRoundRect(
+                brush = Brush.linearGradient(listOf(light, main, main.copy(alpha = 0.9f))),
+                topLeft = Offset(centerX - bodyWidth / 2f, torsoTop),
+                size = Size(bodyWidth, torsoHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+            )
+
+            val limb = size.width * 0.055f
             drawLine(
-                color = color,
-                start = Offset(cx, shoulderY),
-                end = Offset(cx, hipY),
-                strokeWidth = size.width * 0.08f,
+                brush = Brush.linearGradient(listOf(light, main)),
+                start = Offset(centerX - bodyWidth * 0.32f, torsoTop + 8f),
+                end = Offset(centerX - bodyWidth * 0.80f, size.height * 0.58f),
+                strokeWidth = limb,
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = color,
-                start = Offset(cx, shoulderY + 2f),
-                end = Offset(cx - size.width * 0.13f, size.height * 0.58f),
-                strokeWidth = size.width * 0.055f,
+                brush = Brush.linearGradient(listOf(light, main)),
+                start = Offset(centerX + bodyWidth * 0.32f, torsoTop + 8f),
+                end = Offset(centerX + bodyWidth * 0.80f, size.height * 0.58f),
+                strokeWidth = limb,
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = color,
-                start = Offset(cx, shoulderY + 2f),
-                end = Offset(cx + size.width * 0.13f, size.height * 0.58f),
-                strokeWidth = size.width * 0.055f,
+                brush = Brush.linearGradient(listOf(light, main)),
+                start = Offset(centerX - bodyWidth * 0.20f, torsoTop + torsoHeight - 2f),
+                end = Offset(centerX - bodyWidth * 0.34f, size.height * 0.91f),
+                strokeWidth = limb * 1.15f,
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = color,
-                start = Offset(cx, hipY),
-                end = Offset(cx - size.width * 0.08f, size.height * 0.91f),
-                strokeWidth = size.width * 0.06f,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = color,
-                start = Offset(cx, hipY),
-                end = Offset(cx + size.width * 0.08f, size.height * 0.91f),
-                strokeWidth = size.width * 0.06f,
+                brush = Brush.linearGradient(listOf(light, main)),
+                start = Offset(centerX + bodyWidth * 0.20f, torsoTop + torsoHeight - 2f),
+                end = Offset(centerX + bodyWidth * 0.34f, size.height * 0.91f),
+                strokeWidth = limb * 1.15f,
                 cap = StrokeCap.Round
             )
         }
-        figure(size.width * 0.34f, primary, false)
-        figure(size.width * 0.66f, secondary, true)
+
+        figure(
+            centerX = size.width * 0.34f,
+            main = Color(0xFF9A4ABA),
+            light = Color(0xFFE0A4F3),
+            bodyWidth = size.width * 0.24f
+        )
+        figure(
+            centerX = size.width * 0.66f,
+            main = Color(0xFFE85D98),
+            light = Color(0xFFFFB1D0),
+            bodyWidth = size.width * 0.23f
+        )
     }
 }
 
