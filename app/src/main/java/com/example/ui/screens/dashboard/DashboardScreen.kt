@@ -235,11 +235,16 @@ fun DashboardScreen(
                     )
 
                     "checkin" -> DailyCheckInCard(
+                        currentDays = stats.currentDays,
                         todayCheckIn = todayCheckIn,
                         onSelect = { rating ->
                             scope.launch {
                                 repository.settings.saveDailyCheckIn(today.toString(), rating)
                             }
+                        },
+                        onRecordReset = {
+                            editingReset = null
+                            showResetEditor = true
                         }
                     )
 
