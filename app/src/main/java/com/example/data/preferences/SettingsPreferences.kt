@@ -758,11 +758,11 @@ class SettingsPreferences(private val context: Context) {
     companion object {
         fun defaultDashboardCardOrder(): List<String> = listOf(
             "hero",
-            "stats",
-            "graph",
-            "milestones",
             "checkin",
+            "graph",
             "calendar",
+            "milestones",
+            "stats",
             "insights",
             "timeline",
             "protection"
