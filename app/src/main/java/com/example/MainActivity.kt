@@ -63,17 +63,20 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TARGET_PACKAGE = "extra_target_package"
+        const val EXTRA_TRACKER_ACTION = "extra_tracker_action"
     }
 
     // Compose observes this state, so a new intent sent to an existing Activity
     // updates the requested destination instead of being silently ignored.
     private var targetPackage by mutableStateOf<String?>(null)
+    private var trackerAction by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
+        trackerAction = intent?.getStringExtra(EXTRA_TRACKER_ACTION)
 
         setContent {
             val context = LocalContext.current
@@ -94,6 +97,7 @@ class MainActivity : ComponentActivity() {
                 MainAppContent(
                     repository = repository,
                     initialTargetPackage = targetPackage,
+                    initialTrackerAction = trackerAction,
                     reduceMotion = reduceMotion
                 )
             }
@@ -108,6 +112,9 @@ class MainActivity : ComponentActivity() {
         if (intent.hasExtra(EXTRA_TARGET_PACKAGE)) {
             targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
         }
+        if (intent.hasExtra(EXTRA_TRACKER_ACTION)) {
+            trackerAction = intent.getStringExtra(EXTRA_TRACKER_ACTION)
+        }
     }
 }
 
@@ -115,6 +122,7 @@ class MainActivity : ComponentActivity() {
 fun MainAppContent(
     repository: AppBlockerRepository,
     initialTargetPackage: String?,
+    initialTrackerAction: String?,
     reduceMotion: Boolean
 ) {
     var isSplashVisible by remember { mutableStateOf(true) }
@@ -128,6 +136,7 @@ fun MainAppContent(
         MainAppScaffold(
             repository = repository,
             initialTargetPackage = initialTargetPackage,
+            initialTrackerAction = initialTrackerAction,
             reduceMotion = reduceMotion
         )
     }
@@ -137,12 +146,15 @@ fun MainAppContent(
 fun MainAppScaffold(
     repository: AppBlockerRepository,
     initialTargetPackage: String?,
+    initialTrackerAction: String?,
     reduceMotion: Boolean
 ) {
     val context = LocalContext.current
     var currentScreen by remember {
         mutableStateOf<Screen>(
-            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Onboarding
+            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules
+            else if (!initialTrackerAction.isNullOrEmpty()) Screen.Dashboard
+            else Screen.Onboarding
         )
     }
 
@@ -155,7 +167,7 @@ fun MainAppScaffold(
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
-    LaunchedEffect(repository, initialTargetPackage) {
+    LaunchedEffect(repository, initialTargetPackage, initialTrackerAction) {
         repository.settings.refreshExpiredProEntitlement()
         val lastPaymentRequestId = repository.settings.lastPaymentRequestIdFlow.first()
         if (lastPaymentRequestId.isNotBlank()) {
@@ -169,6 +181,8 @@ fun MainAppScaffold(
         if (!initialTargetPackage.isNullOrEmpty()) {
             selectedSchedulePackage = initialTargetPackage
             currentScreen = Screen.Schedules
+        } else if (!initialTrackerAction.isNullOrEmpty() && onboardingCompleted) {
+            currentScreen = Screen.Dashboard
         } else if (onboardingCompleted) {
             currentScreen = Screen.Dashboard
         } else {
@@ -240,6 +254,7 @@ fun MainAppScaffold(
                         currentScreen = targetScreen,
                         repository = repository,
                         selectedSchedulePackage = selectedSchedulePackage,
+                        initialTrackerAction = initialTrackerAction,
                         onNavigateToScreen = { screen -> currentScreen = screen },
                         onOpenAccountDialog = {
                             showAccountDialog = true
@@ -282,6 +297,7 @@ fun ScreenContent(
     currentScreen: Screen,
     repository: AppBlockerRepository,
     selectedSchedulePackage: String?,
+    initialTrackerAction: String?,
     onNavigateToScreen: (Screen) -> Unit,
     onOpenAccountDialog: () -> Unit,
     onOpenPaywallDialog: () -> Unit,
@@ -293,6 +309,7 @@ fun ScreenContent(
         Screen.Dashboard -> {
             DashboardScreen(
                 repository = repository,
+                initialTrackerAction = initialTrackerAction,
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
