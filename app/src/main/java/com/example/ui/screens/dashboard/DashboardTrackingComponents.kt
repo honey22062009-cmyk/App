@@ -234,7 +234,7 @@ private fun HeroRing(
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
     Box(
         modifier = modifier
-            .height(250.dp),
+            .height(210.dp),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(224.dp)) {
@@ -633,14 +633,38 @@ internal fun MilestoneCard(
 
 @Composable
 internal fun DailyCheckInCard(
+    currentDays: Int,
     todayCheckIn: DailyCheckIn?,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    onRecordReset: () -> Unit
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("How was today?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Optional and separate from your streak.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(10.dp))
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Today", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Streak · Day " + currentDays + "   ·   Check-in · " +
+                            (if (todayCheckIn == null) "Pending" else "Done"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                OutlinedButton(
+                    onClick = onRecordReset,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Record reset")
+                }
+            }
+            Text(
+                "Daily check-in confirms your day. It never adds fake time to the streak.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf(
                     Triple("easy", "Easy", "🙂"),
@@ -650,11 +674,20 @@ internal fun DailyCheckInCard(
                     FilterChip(
                         selected = todayCheckIn?.rating == value,
                         onClick = { onSelect(value) },
-                        label = { Text("$icon $label") },
+                        label = { Text(icon + " " + label) },
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
+            Text(
+                if (todayCheckIn == null) {
+                    "You can leave today pending if you do not want to check in."
+                } else {
+                    "Today's check-in can be changed by selecting another option."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
