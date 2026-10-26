@@ -54,6 +54,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.system.ProtectionHealth
+import com.example.core.system.ProtectionHealthSnapshot
 import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
@@ -436,7 +437,7 @@ private fun DashboardHeader(
 @Composable
 private fun ProtectionStatusCard(
     enabled: Boolean,
-    health: ProtectionHealth,
+    health: ProtectionHealthSnapshot,
     activeManagedApps: Int,
     totalBlocks: Int,
     onToggle: (Boolean) -> Unit,
