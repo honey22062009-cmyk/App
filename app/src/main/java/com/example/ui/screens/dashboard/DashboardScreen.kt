@@ -2,6 +2,8 @@ package com.example.ui.screens.dashboard
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,6 +59,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -337,7 +341,7 @@ fun DashboardScreen(
                 GlassCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
-                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -348,7 +352,7 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "Logged resets per day",
+                                    "Logged reset trend",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -359,65 +363,16 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Spacer(Modifier.height(18.dp))
-                        Row(
+                        Spacer(Modifier.height(12.dp))
+                        StreakLineGraph(
+                            values = weekly.map { it.second },
+                            labels = weekly.map { it.first.dayOfWeek.name.take(1) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(116.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            val maxCount = max(1, weekly.maxOfOrNull { it.second } ?: 1)
-                            weekly.forEachIndexed { index, (date, count) ->
-                                val barFraction = if (count == 0) 0.12f
-                                    else (count.toFloat() / maxCount.toFloat()).coerceAtLeast(0.3f)
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Bottom
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height((72f * barFraction).dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(
-                                                brush = if (count == 0) {
-                                                    Brush.linearGradient(
-                                                        listOf(
-                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
-                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
-                                                        )
-                                                    )
-                                                } else {
-                                                    Brush.verticalGradient(
-                                                        listOf(
-                                                            if (index % 2 == 0) Color(0xFFE45B99) else Color(0xFFEC7BAA),
-                                                            if (index % 2 == 0) Color(0xFFF4866B) else Color(0xFFFFA37F)
-                                                        )
-                                                    )
-                                                }
-                                            )
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(
-                                        date.dayOfWeek.name.take(1),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
+                                .height(if (tablet) 176.dp else 145.dp)
+                        )
                     }
                 }
-            }
-
-            item {
-                Text(
-                    "Protection tools",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
             }
 
             item {
@@ -455,7 +410,7 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        LiquidToggle(
                             checked = isProtectionEnabled,
                             onCheckedChange = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
@@ -650,33 +605,135 @@ private fun MetricCard(
 }
 
 @Composable
-private fun ToolCard(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    accent: Color,
-    onClick: () -> Unit,
+private fun StreakLineGraph(
+    values: List<Int>,
+    labels: List<String>,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 15.dp, horizontal = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+    val maxValue = max(1, values.maxOrNull() ?: 1)
+
+    Column(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .background(accent.copy(alpha = 0.14f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = accent)
+            if (values.isEmpty()) return@Canvas
+
+            val left = 10f
+            val right = size.width - 10f
+            val top = 12f
+            val bottom = size.height - 12f
+            val stepX = if (values.size <= 1) 0f else (right - left) / (values.size - 1)
+
+            val points = values.mapIndexed { index, value ->
+                Offset(
+                    x = left + stepX * index,
+                    y = bottom - (value.toFloat() / maxValue.toFloat()) * (bottom - top)
+                )
             }
-            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+
+            val fill = Path().apply {
+                moveTo(points.first().x, bottom)
+                lineTo(points.first().x, points.first().y)
+                points.drop(1).forEach { lineTo(it.x, it.y) }
+                lineTo(points.last().x, bottom)
+                close()
+            }
+            drawPath(
+                path = fill,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFE45B99).copy(alpha = 0.30f),
+                        Color(0xFFF4866B).copy(alpha = 0.08f),
+                        Color.Transparent
+                    )
+                )
+            )
+
+            val line = Path().apply {
+                moveTo(points.first().x, points.first().y)
+                points.drop(1).forEach { lineTo(it.x, it.y) }
+            }
+            drawPath(
+                path = line,
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        Color(0xFFE45B99),
+                        Color(0xFFF4866B),
+                        Color(0xFFA953C7)
+                    )
+                ),
+                style = Stroke(width = 6f, cap = StrokeCap.Round)
+            )
+
+            points.forEach { point ->
+                drawCircle(Color.White.copy(alpha = 0.92f), 7f, point)
+                drawCircle(Color(0xFFE45B99), 4f, point)
+            }
         }
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            labels.forEach { label ->
+                Text(
+                    text = label,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiquidToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) 27.dp else 2.dp,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 520f),
+        label = "liquid_toggle"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(57.dp)
+            .height(32.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(
+                if (checked) {
+                    Brush.linearGradient(
+                        listOf(
+                            Color(0xFFE45B99),
+                            Color(0xFFF4866B),
+                            Color(0xFFA953C7)
+                        )
+                    )
+                } else {
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                }
+            )
+            .clickable { onCheckedChange(!checked) }
+            .padding(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(28.dp)
+                .shadow(7.dp, CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White, Color(0xFFFFEEF5))
+                    ),
+                    CircleShape
+                )
+        )
     }
 }
