@@ -1,6 +1,10 @@
 package com.example.ui.screens.settings
 
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.core.system.PermissionHelper
 import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
@@ -405,6 +410,10 @@ private fun SettingsSectionContent(
     onDailyReminderChange: (Boolean, Int, Int) -> Unit,
     onSleepReminderChange: (Boolean, Int, Int) -> Unit
 ) {
+    val context = LocalContext.current
+    val notificationsAllowed = PermissionHelper.isNotificationPermissionGranted(context)
+    val exactAlarmsAllowed = PermissionHelper.canScheduleExactAlarms(context)
+
     when (section) {
         SettingsSection.Appearance -> {
             SettingsDescription("Choose how the app follows your device theme.")
@@ -489,6 +498,41 @@ private fun SettingsSectionContent(
                 minute = sleepReminderMinute,
                 onChange = onSleepReminderChange
             )
+            Spacer(modifier = Modifier.height(16.dp))
+            if (!notificationsAllowed) {
+                SettingsLinkRow(
+                    title = "Allow notifications",
+                    subtitle = "Android currently blocks notifications for Strict Blocker.",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                    putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName)
+                                }
+                            )
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmsAllowed) {
+                SettingsLinkRow(
+                    title = "Allow exact reminder times",
+                    subtitle = "Without Alarms & reminders access, Android may deliver reminders late.",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                            )
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            SettingsDescription("Delivery also depends on battery policies and notification-channel settings.")
         }
 
         SettingsSection.Protection -> {

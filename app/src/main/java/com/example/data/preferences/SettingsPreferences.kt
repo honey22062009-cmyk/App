@@ -271,7 +271,13 @@ class SettingsPreferences(private val context: Context) {
     }
 
     val dashboardHiddenCardsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.DASHBOARD_HIDDEN_CARDS] ?: emptySet()
+        val hasSavedLayout = preferences.contains(PreferencesKeys.DASHBOARD_CARD_ORDER) ||
+            preferences.contains(PreferencesKeys.DASHBOARD_HIDDEN_CARDS)
+        if (hasSavedLayout) {
+            preferences[PreferencesKeys.DASHBOARD_HIDDEN_CARDS] ?: emptySet()
+        } else {
+            setOf("stats", "insights", "timeline")
+        }
     }
 
     val seenMilestonesFlow: Flow<Set<Int>> = context.dataStore.data.map { preferences ->
@@ -388,6 +394,7 @@ class SettingsPreferences(private val context: Context) {
             preferences[PreferencesKeys.USER_AGE] = safeAge
             preferences[PreferencesKeys.USER_GENDER] = safeGender
             preferences[PreferencesKeys.SELECTED_CHARACTER_ID] = safeCharacter
+            preferences[PreferencesKeys.ONBOARDING_COMPLETED] = true
             if (safeCompanionName.isBlank()) {
                 preferences.remove(PreferencesKeys.CHARACTER_NAME)
             } else {

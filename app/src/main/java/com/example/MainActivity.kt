@@ -223,11 +223,13 @@ fun MainAppScaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                FloatingGlassDock(
-                    currentScreen = currentScreen,
-                    onSelect = { screen -> currentScreen = screen },
-                    reduceMotion = reduceMotion
-                )
+                if (currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions) {
+                    FloatingGlassDock(
+                        currentScreen = currentScreen,
+                        onSelect = { screen -> currentScreen = screen },
+                        reduceMotion = reduceMotion
+                    )
+                }
             }
         ) { innerPadding ->
             Box(
@@ -342,7 +344,12 @@ fun ScreenContent(
                 settings = repository.settings,
                 scope = scope,
                 reduceMotion = repository.settings.reduceMotionFlow.collectAsState(initial = false).value,
-                onFinished = { onNavigateToScreen(Screen.Permissions) }
+                onFinished = {
+                    scope.launch {
+                        repository.settings.setOnboardingCompleted(true)
+                        onNavigateToScreen(Screen.Permissions)
+                    }
+                }
             )
         }
         Screen.Permissions -> {

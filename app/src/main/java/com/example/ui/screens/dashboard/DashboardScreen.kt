@@ -254,18 +254,14 @@ fun DashboardScreen(
                             currentDays = stats.currentDays,
                             todayCheckIn = todayCheckIn,
                             todaySleep = todaySleep,
-                            onSelect = { rating ->
-                                scope.launch {
-                                    repository.settings.saveDailyCheckIn(today.toString(), rating)
-                                }
-                            },
+                            onOpenCheckIn = { showDailyPrompt = true },
                             onRecordReset = {
                                 editingReset = null
                                 showResetEditor = true
                             },
                             onAddSleep = { showSleepEditor = true }
                         )
-    
+
                         "calendar" -> CalendarHeatmapCard(
                             trackerStartedAt = trackerStartedAt,
                             resets = resetRecords,
@@ -510,13 +506,13 @@ private fun DashboardHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                if (userName.isBlank()) "Your progress" else "Good to see you, $userName",
+                if (userName.isBlank()) "Your day" else "Welcome back, ${userName.trim()}",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                "Day $currentDays of your current streak · private, manually controlled tracking.",
+                "Day $currentDays · Your progress, recorded by you.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

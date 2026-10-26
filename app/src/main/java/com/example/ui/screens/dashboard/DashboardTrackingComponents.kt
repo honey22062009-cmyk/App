@@ -304,7 +304,7 @@ private fun HeroActions(
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Your progress",
+            "Current streak",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -637,75 +637,56 @@ internal fun DailyCheckInCard(
     currentDays: Int,
     todayCheckIn: DailyCheckIn?,
     todaySleep: SleepEntry?,
-    onSelect: (String) -> Unit,
+    onOpenCheckIn: () -> Unit,
     onRecordReset: () -> Unit,
     onAddSleep: () -> Unit
 ) {
+    val sleepLabel = todaySleep?.let {
+        (it.durationMinutes / 60).toString() + "h " +
+            (it.durationMinutes % 60).toString().padStart(2, '0') + "m"
+    } ?: "Not logged"
+
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
-        Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("Today", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Streak · Day " + currentDays + "   ·   Check-in · " +
-                            (if (todayCheckIn == null) "Pending" else "Done"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        if (todaySleep == null) "Sleep · Not logged"
-                        else "Sleep · " + (todaySleep.durationMinutes / 60) + "h " +
-                            (todaySleep.durationMinutes % 60).toString().padStart(2, '0') + "m",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Streak · Day $currentDays", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                OutlinedButton(
-                    onClick = onRecordReset,
-                    shape = RoundedCornerShape(16.dp)
+                Surface(
+                    shape = CircleShape,
+                    color = if (todayCheckIn == null) WarmCoral.copy(alpha = .14f) else WarmMint.copy(alpha = .18f)
                 ) {
-                    Text("Record reset")
-                }
-            }
-            Text(
-                "Daily check-in confirms your day. It never adds fake time to the streak.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf(
-                    Triple("easy", "Easy", "🙂"),
-                    Triple("okay", "Okay", "😐"),
-                    Triple("difficult", "Difficult", "😮‍💨")
-                ).forEach { (value, label, icon) ->
-                    FilterChip(
-                        selected = todayCheckIn?.rating == value,
-                        onClick = { onSelect(value) },
-                        label = { Text(icon + " " + label) },
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        if (todayCheckIn == null) "Check-in pending" else "Checked in",
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (todayCheckIn == null) WarmCoral else WarmMint,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onAddSleep) {
+                Button(onClick = onOpenCheckIn, modifier = Modifier.weight(1f), shape = RoundedCornerShape(15.dp)) {
+                    Text(if (todayCheckIn == null) "Check in" else "Edit check-in")
+                }
+                OutlinedButton(onClick = onAddSleep, modifier = Modifier.weight(1f), shape = RoundedCornerShape(15.dp)) {
                     Text(if (todaySleep == null) "Add sleep" else "Edit sleep")
                 }
             }
-            Text(
-                if (todayCheckIn == null) {
-                    "You can leave today pending if you do not want to check in."
-                } else {
-                    "Today's check-in can be changed by selecting another option."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sleep", fontWeight = FontWeight.SemiBold)
+                    Text(sleepLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = onRecordReset) { Text("Record reset") }
+            }
+            Text("Your streak uses elapsed time, not check-in taps. Entries stay on this device.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

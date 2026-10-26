@@ -2,6 +2,7 @@ package com.example.core.system
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.os.Build
 import android.content.Context
 import android.content.Intent
 import com.example.data.preferences.SettingsPreferences
@@ -70,10 +71,17 @@ object TrackerReminderScheduler {
             .withNano(0)
         if (!next.isAfter(now)) next = next.plusDays(1)
 
-        manager.setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            next.toInstant().toEpochMilli(),
-            pendingIntent
-        )
+        val triggerAt = next.toInstant().toEpochMilli()
+        val canUseExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            manager.canScheduleExactAlarms()
+        try {
+            if (canUseExact) {
+                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            } else {
+                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            }
+        } catch (_: SecurityException) {
+            manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        }
     }
 }
