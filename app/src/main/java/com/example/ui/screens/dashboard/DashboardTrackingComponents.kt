@@ -18,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -220,6 +221,7 @@ private fun HeroRing(
     progress: Float,
     modifier: Modifier
 ) {
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
     Box(
         modifier = modifier
             .height(250.dp),
@@ -229,7 +231,7 @@ private fun HeroRing(
             val stroke = size.minDimension * 0.052f
             val inset = stroke
             drawArc(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                color = trackColor,
                 startAngle = 140f,
                 sweepAngle = 260f,
                 useCenter = false,
@@ -493,6 +495,9 @@ private fun InteractiveStreakGraph(points: List<StreakPoint>, modifier: Modifier
         return (normalized * points.lastIndex).roundToInt().coerceIn(0, points.lastIndex)
     }
 
+    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val guideColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+    val surfaceColor = MaterialTheme.colorScheme.surface
     Column {
         Canvas(
             modifier = modifier
@@ -521,7 +526,7 @@ private fun InteractiveStreakGraph(points: List<StreakPoint>, modifier: Modifier
             }
             repeat(3) { line ->
                 val y = top + (bottom - top) * line / 2f
-                drawLine(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f), Offset(left, y), Offset(right, y), 1f)
+                drawLine(gridColor, Offset(left, y), Offset(right, y), 1f)
             }
             val fill = Path().apply {
                 moveTo(offsets.first().x, bottom)
@@ -539,13 +544,13 @@ private fun InteractiveStreakGraph(points: List<StreakPoint>, modifier: Modifier
             offsets.forEachIndexed { index, point ->
                 if (points[index].reset) {
                     drawCircle(WarmCoral, 6f, point)
-                    drawCircle(MaterialTheme.colorScheme.surface, 2.5f, point)
+                    drawCircle(surfaceColor, 2.5f, point)
                 }
             }
             if (selectedIndex in offsets.indices) {
                 val p = offsets[selectedIndex]
-                drawLine(MaterialTheme.colorScheme.onSurface.copy(alpha = .18f), Offset(p.x, top), Offset(p.x, bottom), 2f)
-                drawCircle(MaterialTheme.colorScheme.surface, 9f, p)
+                drawLine(guideColor, Offset(p.x, top), Offset(p.x, bottom), 2f)
+                drawCircle(surfaceColor, 9f, p)
                 drawCircle(WarmMagenta, 6f, p)
             }
         }
@@ -636,7 +641,7 @@ internal fun CalendarHeatmapCard(
     zone: ZoneId,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    var month by rememberSaveable { mutableStateOf(YearMonth.now(zone)) }
+    var month by remember { mutableStateOf(YearMonth.now(zone)) }
     val today = LocalDate.now(zone)
     val first = month.atDay(1)
     val leading = first.dayOfWeek.value - 1
@@ -980,7 +985,7 @@ internal fun CalendarDetailDialog(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Streak day $streakDay")
                 Text(if (resetItems.isEmpty()) "No reset logged." else "${resetItems.size} reset${if (resetItems.size == 1) "" else "s"} logged.")
-                checkIn?.let { Text("Daily check-in: ${it.rating.replaceFirstChar(Char::uppercase)}") }
+                checkIn?.let { Text("Daily check-in: ${it.rating.replaceFirstChar { it.uppercase() }}") }
                 resetItems.firstOrNull()?.category?.let { Text("Category: $it") }
                 resetItems.firstOrNull()?.note?.let { Text("Note: $it") }
             }
@@ -1003,7 +1008,7 @@ internal fun TimelineDialog(
         title = { Text("Journey timeline", fontWeight = FontWeight.Bold) },
         text = {
             Column(
-                modifier = Modifier.height(460.dp).widthIn(max = 560.dp).horizontalScroll(rememberScrollState(horizontal = false)),
+                modifier = Modifier.height(460.dp).widthIn(max = 560.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 items.take(18).forEach { JourneyRow(it) }
