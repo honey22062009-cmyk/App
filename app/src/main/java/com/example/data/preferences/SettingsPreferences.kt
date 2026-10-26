@@ -430,7 +430,14 @@ class SettingsPreferences(private val context: Context) {
             val records = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
                 .mapNotNull(TrackerResetRecord::decode)
                 .toMutableList()
-            val index = records.indexOfFirst { it.id == id }
+            var index = records.indexOfFirst { it.id == id }
+            if (index < 0 && id.startsWith("legacy-")) {
+                val legacyTimestamp = id.removePrefix("legacy-").toLongOrNull()
+                if (legacyTimestamp != null) {
+                    records += TrackerResetRecord.legacy(legacyTimestamp)
+                    index = records.lastIndex
+                }
+            }
             if (index < 0) return@edit
             val oldTimestamp = records[index].timestamp
             records[index] = records[index].copy(
@@ -456,14 +463,18 @@ class SettingsPreferences(private val context: Context) {
             val records = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
                 .mapNotNull(TrackerResetRecord::decode)
                 .toMutableList()
-            val record = records.firstOrNull { it.id == id } ?: return@edit
-            records.removeAll { it.id == id }
+            val structured = records.firstOrNull { it.id == id }
+            val legacyTimestamp = id.takeIf { it.startsWith("legacy-") }
+                ?.removePrefix("legacy-")
+                ?.toLongOrNull()
+            val targetTimestamp = structured?.timestamp ?: legacyTimestamp ?: return@edit
+            records.removeAll { it.id == id || (legacyTimestamp != null && it.timestamp == legacyTimestamp) }
             preferences[PreferencesKeys.TRACKER_RESET_RECORDS] = records.map { it.encode() }.toSet()
 
             val timestamps = (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
                 .mapNotNull { it.toLongOrNull() }
                 .toMutableList()
-            timestamps.remove(record.timestamp)
+            timestamps.remove(targetTimestamp)
             val sorted = timestamps.sorted().takeLast(1500)
             preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = sorted.map(Long::toString).toSet()
             rebuildTrackerCache(preferences, sorted)
