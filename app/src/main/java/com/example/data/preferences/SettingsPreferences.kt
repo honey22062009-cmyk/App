@@ -26,6 +26,13 @@ class SettingsPreferences(private val context: Context) {
         val SHOW_OVERLAY_SHIELD = booleanPreferencesKey("show_overlay_shield")
         val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
 
+        // Local-only onboarding/profile. These fields are intentionally not synced to Firebase.
+        val USER_NAME = stringPreferencesKey("user_name")
+        val USER_AGE = intPreferencesKey("user_age")
+        val USER_GENDER = stringPreferencesKey("user_gender")
+        val SELECTED_CHARACTER_ID = stringPreferencesKey("selected_character_id")
+        val CHARACTER_NAME = stringPreferencesKey("character_name")
+
         // Adult Content Protection Settings
         val ADULT_PROTECTION_ENABLED = booleanPreferencesKey("adult_protection_enabled")
         val STRICT_ADULT_MODE = booleanPreferencesKey("strict_adult_mode")
@@ -98,6 +105,26 @@ class SettingsPreferences(private val context: Context) {
 
     val isOverlayShieldEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.SHOW_OVERLAY_SHIELD] ?: true
+    }
+
+    val userNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.USER_NAME] ?: ""
+    }
+
+    val userAgeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.USER_AGE] ?: 0
+    }
+
+    val userGenderFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.USER_GENDER] ?: "prefer_not_to_say"
+    }
+
+    val selectedCharacterIdFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.SELECTED_CHARACTER_ID] ?: "nova"
+    }
+
+    val characterNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.CHARACTER_NAME] ?: ""
     }
 
     // Adult Content Protection Flows
@@ -295,6 +322,40 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setOnboardingCompleted(completed: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
+        }
+    }
+
+    suspend fun saveLocalProfile(
+        name: String,
+        age: Int,
+        gender: String,
+        characterId: String,
+        companionName: String?
+    ) {
+        val safeName = name.trim().replace(Regex("\\s+"), " ").take(32)
+        val safeAge = age.coerceIn(13, 120)
+        val safeGender = gender.lowercase().trim().takeIf {
+            it in setOf("male", "female", "other", "prefer_not_to_say")
+        } ?: "prefer_not_to_say"
+        val safeCharacter = characterId.lowercase().trim().takeIf {
+            it in setOf("nova", "milo", "aria", "kai", "luna", "sol")
+        } ?: "nova"
+        val safeCompanionName = companionName
+            ?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.take(24)
+            .orEmpty()
+
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USER_NAME] = safeName
+            preferences[PreferencesKeys.USER_AGE] = safeAge
+            preferences[PreferencesKeys.USER_GENDER] = safeGender
+            preferences[PreferencesKeys.SELECTED_CHARACTER_ID] = safeCharacter
+            if (safeCompanionName.isBlank()) {
+                preferences.remove(PreferencesKeys.CHARACTER_NAME)
+            } else {
+                preferences[PreferencesKeys.CHARACTER_NAME] = safeCompanionName
+            }
         }
     }
 
