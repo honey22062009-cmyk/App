@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.SettingsPreferences
+import com.example.data.preferences.SleepEntry
 import com.example.data.preferences.StreakPoint
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
@@ -635,8 +636,10 @@ internal fun MilestoneCard(
 internal fun DailyCheckInCard(
     currentDays: Int,
     todayCheckIn: DailyCheckIn?,
+    todaySleep: SleepEntry?,
     onSelect: (String) -> Unit,
-    onRecordReset: () -> Unit
+    onRecordReset: () -> Unit,
+    onAddSleep: () -> Unit
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
         Column(
@@ -649,6 +652,13 @@ internal fun DailyCheckInCard(
                     Text(
                         "Streak · Day " + currentDays + "   ·   Check-in · " +
                             (if (todayCheckIn == null) "Pending" else "Done"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        if (todaySleep == null) "Sleep · Not logged"
+                        else "Sleep · " + (todaySleep.durationMinutes / 60) + "h " +
+                            (todaySleep.durationMinutes % 60).toString().padStart(2, '0') + "m",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -679,6 +689,14 @@ internal fun DailyCheckInCard(
                     )
                 }
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onAddSleep) {
+                    Text(if (todaySleep == null) "Add sleep" else "Edit sleep")
+                }
+            }
             Text(
                 if (todayCheckIn == null) {
                     "You can leave today pending if you do not want to check in."
@@ -690,6 +708,82 @@ internal fun DailyCheckInCard(
             )
         }
     }
+}
+
+@Composable
+internal fun SleepEntryDialog(
+    current: SleepEntry?,
+    onDismiss: () -> Unit,
+    onSave: (Int, String?) -> Unit
+) {
+    var minutes by remember(current) { mutableIntStateOf(current?.durationMinutes ?: 8 * 60) }
+    var note by remember(current) { mutableStateOf(current?.note.orEmpty()) }
+    val presets = listOf(5, 6, 7, 8, 9)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        title = { Text("Log sleep", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Manual entry only. Strict Blocker does not measure sleep automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presets.forEach { hours ->
+                        FilterChip(
+                            selected = minutes == hours * 60,
+                            onClick = { minutes = hours * 60 },
+                            label = { Text(hours.toString() + "h") }
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { minutes = (minutes - 15).coerceAtLeast(0) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("−15m") }
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f)
+                    ) {
+                        Text(
+                            (minutes / 60).toString() + "h " +
+                                (minutes % 60).toString().padStart(2, '0') + "m",
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { minutes = (minutes + 15).coerceAtMost(24 * 60) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("+15m") }
+                }
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it.take(500) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Optional note") },
+                    supportingText = { Text("Saved only on this device.") },
+                    minLines = 2,
+                    maxLines = 4
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(minutes, note.trim().takeIf { it.isNotBlank() }) }) {
+                Text("Save sleep")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
