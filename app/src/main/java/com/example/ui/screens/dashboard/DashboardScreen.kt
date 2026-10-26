@@ -93,6 +93,8 @@ fun DashboardScreen(
     val hiddenCards by repository.settings.dashboardHiddenCardsFlow.collectAsState(initial = emptySet())
     val seenMilestones by repository.settings.seenMilestonesFlow.collectAsState(initial = emptySet())
     val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
+    val userName by repository.settings.userNameFlow.collectAsState(initial = "")
+    val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
     val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
@@ -189,6 +191,8 @@ fun DashboardScreen(
         ) {
             item(key = "header") {
                 DashboardHeader(
+                    userName = userName,
+                    currentDays = stats.currentDays,
                     isPro = isPro,
                     onOpenPro = onOpenPro,
                     onCustomize = {
@@ -204,6 +208,7 @@ fun DashboardScreen(
                 when (key) {
                     "hero" -> StreakHeroCard(
                         stats = stats,
+                        characterId = selectedCharacterId,
                         lastResetLabel = lastResetLabel,
                         goalDays = goalDays,
                         reduceMotion = reduceMotion,
@@ -382,6 +387,8 @@ fun DashboardScreen(
 
 @Composable
 private fun DashboardHeader(
+    userName: String,
+    currentDays: Int,
     isPro: Boolean,
     onOpenPro: () -> Unit,
     onCustomize: () -> Unit
@@ -392,13 +399,13 @@ private fun DashboardHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Your progress",
+                if (userName.isBlank()) "Your progress" else "Good to see you, $userName",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                "Private tracking, built around what you explicitly log.",
+                "Day $currentDays of your current streak · private, manually controlled tracking.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
