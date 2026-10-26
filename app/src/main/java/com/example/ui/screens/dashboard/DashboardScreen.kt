@@ -86,6 +86,7 @@ fun DashboardScreen(
     val trackerStartedAt by repository.settings.trackerStartedAtFlow.collectAsState(initial = 0L)
     val resetRecords by repository.settings.trackerResetRecordsFlow.collectAsState(initial = emptyList())
     val checkIns by repository.settings.dailyCheckInsFlow.collectAsState(initial = emptyList())
+    val sleepEntries by repository.settings.sleepEntriesFlow.collectAsState(initial = emptyList())
     val goalDays by repository.settings.trackerGoalDaysFlow.collectAsState(initial = 0)
     val cardOrder by repository.settings.dashboardCardOrderFlow.collectAsState(
         initial = com.example.data.preferences.SettingsPreferences.defaultDashboardCardOrder()
@@ -103,6 +104,7 @@ fun DashboardScreen(
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
     var showResetEditor by remember { mutableStateOf(false) }
+    var showSleepEditor by remember { mutableStateOf(false) }
     var editingReset by remember { mutableStateOf<TrackerResetRecord?>(null) }
     var deleteCandidate by remember { mutableStateOf<TrackerResetRecord?>(null) }
     var showGoal by remember { mutableStateOf(false) }
@@ -156,6 +158,7 @@ fun DashboardScreen(
     }
     val today = remember(nowMillis, zone) { Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate() }
     val todayCheckIn = remember(checkIns, today) { checkIns.firstOrNull { it.localDate == today } }
+    val todaySleep = remember(sleepEntries, today) { sleepEntries.firstOrNull { it.localDate == today } }
     val insight = remember(stats, resetRecords, nowMillis, zone) {
         buildInsight(stats, resetRecords, nowMillis, zone)
     }
@@ -237,6 +240,7 @@ fun DashboardScreen(
                     "checkin" -> DailyCheckInCard(
                         currentDays = stats.currentDays,
                         todayCheckIn = todayCheckIn,
+                        todaySleep = todaySleep,
                         onSelect = { rating ->
                             scope.launch {
                                 repository.settings.saveDailyCheckIn(today.toString(), rating)
@@ -245,7 +249,8 @@ fun DashboardScreen(
                         onRecordReset = {
                             editingReset = null
                             showResetEditor = true
-                        }
+                        },
+                        onAddSleep = { showSleepEditor = true }
                     )
 
                     "calendar" -> CalendarHeatmapCard(
@@ -276,6 +281,19 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showSleepEditor) {
+        SleepEntryDialog(
+            current = todaySleep,
+            onDismiss = { showSleepEditor = false },
+            onSave = { minutes, note ->
+                scope.launch {
+                    repository.settings.saveSleepEntry(today.toString(), minutes, note)
+                }
+                showSleepEditor = false
+            }
+        )
     }
 
     if (showResetEditor) {
