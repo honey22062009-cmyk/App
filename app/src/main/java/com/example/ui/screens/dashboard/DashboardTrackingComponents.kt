@@ -91,6 +91,7 @@ import com.example.data.preferences.TrackerResetRecord
 import com.example.data.preferences.TrackerStats
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
+import com.example.ui.screens.onboarding.CompanionAvatar
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -123,6 +124,7 @@ internal data class JourneyItem(
 @Composable
 internal fun StreakHeroCard(
     stats: TrackerStats,
+    characterId: String,
     lastResetLabel: String,
     goalDays: Int,
     reduceMotion: Boolean,
@@ -182,6 +184,7 @@ internal fun StreakHeroCard(
                 ) {
                     HeroRing(
                         stats = stats,
+                        characterId = characterId,
                         progress = animatedProgress,
                         modifier = Modifier.weight(1f)
                     )
@@ -202,6 +205,7 @@ internal fun StreakHeroCard(
                 ) {
                     HeroRing(
                         stats = stats,
+                        characterId = characterId,
                         progress = animatedProgress,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -223,6 +227,7 @@ internal fun StreakHeroCard(
 @Composable
 private fun HeroRing(
     stats: TrackerStats,
+    characterId: String,
     progress: Float,
     modifier: Modifier
 ) {
@@ -255,7 +260,10 @@ private fun HeroRing(
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            HumanPairIllustration()
+            CompanionAvatar(
+                characterId = characterId,
+                modifier = Modifier.size(118.dp)
+            )
             AnimatedContent(
                 targetState = stats.currentDays,
                 transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
