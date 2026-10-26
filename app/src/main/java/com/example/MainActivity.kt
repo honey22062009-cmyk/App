@@ -46,6 +46,7 @@ import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
+import com.example.ui.screens.onboarding.OnboardingExperienceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.owner.OwnerConsoleScreen
 import com.example.ui.screens.pro.BlockerCustomizationScreen
@@ -141,7 +142,7 @@ fun MainAppScaffold(
     val context = LocalContext.current
     var currentScreen by remember {
         mutableStateOf<Screen>(
-            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
+            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Onboarding
         )
     }
 
@@ -151,7 +152,6 @@ fun MainAppScaffold(
     var isInitialRouteResolved by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showPaywallDialog by remember { mutableStateOf(false) }
-    var firstRunAccountPrompt by remember { mutableStateOf(false) }
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
@@ -172,12 +172,7 @@ fun MainAppScaffold(
         } else if (onboardingCompleted) {
             currentScreen = Screen.Dashboard
         } else {
-            currentScreen = Screen.Permissions
-            val signedIn = repository.settings.isAccountSignedInFlow.first()
-            if (!signedIn) {
-                firstRunAccountPrompt = true
-                showAccountDialog = true
-            }
+            currentScreen = Screen.Onboarding
         }
         isInitialRouteResolved = true
     }
@@ -188,6 +183,7 @@ fun MainAppScaffold(
         enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
     ) {
         when (currentScreen) {
+            Screen.Onboarding -> currentScreen = Screen.Onboarding
             Screen.AntiBypassGuide,
             Screen.Legal,
             Screen.Paywall,
@@ -246,7 +242,6 @@ fun MainAppScaffold(
                         selectedSchedulePackage = selectedSchedulePackage,
                         onNavigateToScreen = { screen -> currentScreen = screen },
                         onOpenAccountDialog = {
-                            firstRunAccountPrompt = false
                             showAccountDialog = true
                         },
                         onOpenPaywallDialog = { showPaywallDialog = true },
@@ -263,10 +258,9 @@ fun MainAppScaffold(
     if (showAccountDialog) {
         AccountDialog(
             settings = repository.settings,
-            firstRun = firstRunAccountPrompt,
+            firstRun = false,
             onDismiss = {
                 showAccountDialog = false
-                firstRunAccountPrompt = false
             }
         )
     }
@@ -324,6 +318,14 @@ fun ScreenContent(
             AdultProtectionScreen(
                 repository = repository,
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
+            )
+        }
+        Screen.Onboarding -> {
+            OnboardingExperienceScreen(
+                settings = repository.settings,
+                scope = scope,
+                reduceMotion = repository.settings.reduceMotionFlow.collectAsState(initial = false).value,
+                onFinished = { onNavigateToScreen(Screen.Permissions) }
             )
         }
         Screen.Permissions -> {
