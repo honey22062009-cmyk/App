@@ -48,6 +48,12 @@ class SettingsPreferences(private val context: Context) {
         val BEST_FAP_STREAK_DAYS = intPreferencesKey("best_fap_streak_days")
         val FAP_LOG_COUNT = intPreferencesKey("fap_log_count")
         val FAP_EVENT_TIMESTAMPS = stringSetPreferencesKey("fap_event_timestamps")
+        val TRACKER_RESET_RECORDS = stringSetPreferencesKey("tracker_reset_records_v2")
+        val DAILY_CHECK_INS = stringSetPreferencesKey("daily_check_ins")
+        val TRACKER_GOAL_DAYS = intPreferencesKey("tracker_goal_days")
+        val DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
+        val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
+        val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
 
         // Pro / premium blocker customization
         val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
@@ -155,6 +161,49 @@ class SettingsPreferences(private val context: Context) {
     val fapEventTimestampsFlow: Flow<Set<Long>> = context.dataStore.data.map { preferences ->
         (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
             .mapNotNull { it.toLongOrNull() }
+            .toSet()
+    }
+
+    val trackerResetRecordsFlow: Flow<List<TrackerResetRecord>> = context.dataStore.data.map { preferences ->
+        val structured = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
+            .mapNotNull(TrackerResetRecord::decode)
+            .associateBy { it.timestamp }
+            .toMutableMap()
+        (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
+            .mapNotNull { it.toLongOrNull() }
+            .forEach { timestamp ->
+                structured.putIfAbsent(timestamp, TrackerResetRecord.legacy(timestamp))
+            }
+        structured.values.sortedByDescending { it.timestamp }
+    }
+
+    val dailyCheckInsFlow: Flow<List<DailyCheckIn>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.DAILY_CHECK_INS] ?: emptySet())
+            .mapNotNull(DailyCheckIn::decode)
+            .sortedByDescending { it.localDate }
+    }
+
+    val trackerGoalDaysFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.TRACKER_GOAL_DAYS] ?: 0).coerceIn(0, 3650)
+    }
+
+    val dashboardCardOrderFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        val defaultOrder = defaultDashboardCardOrder()
+        val saved = preferences[PreferencesKeys.DASHBOARD_CARD_ORDER]
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it in defaultOrder }
+            .orEmpty()
+        (saved + defaultOrder).distinct()
+    }
+
+    val dashboardHiddenCardsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DASHBOARD_HIDDEN_CARDS] ?: emptySet()
+    }
+
+    val seenMilestonesFlow: Flow<Set<Int>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.SEEN_MILESTONES] ?: emptySet())
+            .mapNotNull { it.toIntOrNull() }
             .toSet()
     }
 
@@ -336,31 +385,127 @@ class SettingsPreferences(private val context: Context) {
     }
 
     suspend fun recordFapReset(nowMillis: Long = System.currentTimeMillis()) {
+        recordTrackerReset(timestamp = nowMillis)
+    }
+
+    suspend fun recordTrackerReset(
+        timestamp: Long,
+        category: String? = null,
+        note: String? = null
+    ) {
+        val safeTimestamp = timestamp.coerceIn(1L, System.currentTimeMillis())
         context.dataStore.edit { preferences ->
-            val start = preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: nowMillis
-            val previousLast = preferences[PreferencesKeys.LAST_FAP_AT] ?: 0L
-            val baseline = if (previousLast > 0L) previousLast else start
-            val streakDays = ((nowMillis - baseline).coerceAtLeast(0L) / 86_400_000L).toInt()
-            val previousBest = preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] ?: 0
+            val start = (preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: safeTimestamp)
+                .takeIf { it > 0L }
+                ?: safeTimestamp
+            preferences[PreferencesKeys.TRACKER_STARTED_AT] = minOf(start, safeTimestamp)
 
-            preferences[PreferencesKeys.TRACKER_STARTED_AT] = start
-            preferences[PreferencesKeys.LAST_FAP_AT] = nowMillis
-            preferences[PreferencesKeys.PREVIOUS_FAP_STREAK_DAYS] = streakDays
-            preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] = maxOf(previousBest, streakDays)
-            preferences[PreferencesKeys.FAP_LOG_COUNT] =
-                (preferences[PreferencesKeys.FAP_LOG_COUNT] ?: 0) + 1
-
-            val currentEvents = preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS]
-                ?.mapNotNull { it.toLongOrNull() }
-                ?.toMutableList()
-                ?: mutableListOf()
-            currentEvents.add(nowMillis)
-            val retained = currentEvents
-                .sortedDescending()
-                .take(120)
-                .map { it.toString() }
+            val structured = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
+                .mapNotNull(TrackerResetRecord::decode)
+                .toMutableList()
+            structured += TrackerResetRecord.create(safeTimestamp, category, note)
+            preferences[PreferencesKeys.TRACKER_RESET_RECORDS] = structured
+                .sortedByDescending { it.timestamp }
+                .take(1500)
+                .map { it.encode() }
                 .toSet()
-            preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = retained
+
+            val timestamps = ((preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
+                .mapNotNull { it.toLongOrNull() } + safeTimestamp)
+                .sorted()
+                .takeLast(1500)
+            preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = timestamps.map(Long::toString).toSet()
+            rebuildTrackerCache(preferences, timestamps)
+        }
+    }
+
+    suspend fun updateTrackerReset(
+        id: String,
+        timestamp: Long,
+        category: String? = null,
+        note: String? = null
+    ) {
+        val safeTimestamp = timestamp.coerceIn(1L, System.currentTimeMillis())
+        context.dataStore.edit { preferences ->
+            val records = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
+                .mapNotNull(TrackerResetRecord::decode)
+                .toMutableList()
+            val index = records.indexOfFirst { it.id == id }
+            if (index < 0) return@edit
+            val oldTimestamp = records[index].timestamp
+            records[index] = records[index].copy(
+                timestamp = safeTimestamp,
+                category = category?.trim()?.takeIf { it.isNotEmpty() },
+                note = note?.trim()?.take(500)?.takeIf { it.isNotEmpty() }
+            )
+            preferences[PreferencesKeys.TRACKER_RESET_RECORDS] = records.map { it.encode() }.toSet()
+
+            val timestamps = (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
+                .mapNotNull { it.toLongOrNull() }
+                .toMutableList()
+            timestamps.remove(oldTimestamp)
+            timestamps += safeTimestamp
+            val sorted = timestamps.sorted().takeLast(1500)
+            preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = sorted.map(Long::toString).toSet()
+            rebuildTrackerCache(preferences, sorted)
+        }
+    }
+
+    suspend fun deleteTrackerReset(id: String) {
+        context.dataStore.edit { preferences ->
+            val records = (preferences[PreferencesKeys.TRACKER_RESET_RECORDS] ?: emptySet())
+                .mapNotNull(TrackerResetRecord::decode)
+                .toMutableList()
+            val record = records.firstOrNull { it.id == id } ?: return@edit
+            records.removeAll { it.id == id }
+            preferences[PreferencesKeys.TRACKER_RESET_RECORDS] = records.map { it.encode() }.toSet()
+
+            val timestamps = (preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] ?: emptySet())
+                .mapNotNull { it.toLongOrNull() }
+                .toMutableList()
+            timestamps.remove(record.timestamp)
+            val sorted = timestamps.sorted().takeLast(1500)
+            preferences[PreferencesKeys.FAP_EVENT_TIMESTAMPS] = sorted.map(Long::toString).toSet()
+            rebuildTrackerCache(preferences, sorted)
+        }
+    }
+
+    suspend fun saveDailyCheckIn(localDate: String, rating: String) {
+        val checkIn = runCatching {
+            DailyCheckIn(java.time.LocalDate.parse(localDate), rating.lowercase())
+        }.getOrNull() ?: return
+        if (checkIn.rating !in DailyCheckIn.allowedRatings) return
+        context.dataStore.edit { preferences ->
+            val items = (preferences[PreferencesKeys.DAILY_CHECK_INS] ?: emptySet())
+                .mapNotNull(DailyCheckIn::decode)
+                .filterNot { it.localDate == checkIn.localDate }
+                .toMutableList()
+            items += checkIn
+            preferences[PreferencesKeys.DAILY_CHECK_INS] = items.map { it.encode() }.toSet()
+        }
+    }
+
+    suspend fun setTrackerGoalDays(days: Int?) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TRACKER_GOAL_DAYS] = (days ?: 0).coerceIn(0, 3650)
+        }
+    }
+
+    suspend fun setDashboardLayout(order: List<String>, hidden: Set<String>) {
+        val defaults = defaultDashboardCardOrder()
+        val normalized = (order.filter { it in defaults } + defaults).distinct()
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DASHBOARD_CARD_ORDER] = normalized.joinToString(",")
+            preferences[PreferencesKeys.DASHBOARD_HIDDEN_CARDS] = hidden.filter { it in defaults }.toSet()
+        }
+    }
+
+    suspend fun markMilestoneSeen(days: Int) {
+        if (days <= 0) return
+        context.dataStore.edit { preferences ->
+            val current = (preferences[PreferencesKeys.SEEN_MILESTONES] ?: emptySet()).toMutableSet()
+            current += days.toString()
+            preferences[PreferencesKeys.SEEN_MILESTONES] = current
         }
     }
 
@@ -372,6 +517,9 @@ class SettingsPreferences(private val context: Context) {
             preferences.remove(PreferencesKeys.BEST_FAP_STREAK_DAYS)
             preferences.remove(PreferencesKeys.FAP_LOG_COUNT)
             preferences.remove(PreferencesKeys.FAP_EVENT_TIMESTAMPS)
+            preferences.remove(PreferencesKeys.TRACKER_RESET_RECORDS)
+            preferences.remove(PreferencesKeys.DAILY_CHECK_INS)
+            preferences.remove(PreferencesKeys.SEEN_MILESTONES)
         }
     }
 
@@ -490,6 +638,54 @@ class SettingsPreferences(private val context: Context) {
             val current = preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
             preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] = current + 1
         }
+    }
+
+    private fun rebuildTrackerCache(
+        preferences: androidx.datastore.preferences.core.MutablePreferences,
+        timestamps: List<Long>
+    ) {
+        val sorted = timestamps.filter { it > 0L }.sorted()
+        val now = System.currentTimeMillis()
+        val start = (preferences[PreferencesKeys.TRACKER_STARTED_AT] ?: now)
+            .takeIf { it > 0L }
+            ?: now
+        val last = sorted.lastOrNull() ?: 0L
+        val previousBaseline = if (sorted.size >= 2) sorted[sorted.lastIndex - 1] else start
+        val previous = if (last > 0L) {
+            ((last - previousBaseline).coerceAtLeast(0L) / 86_400_000L)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
+        } else 0
+
+        var baseline = start
+        var best = 0
+        sorted.forEach { event ->
+            val days = ((event - baseline).coerceAtLeast(0L) / 86_400_000L)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
+            best = maxOf(best, days)
+            baseline = maxOf(baseline, event)
+        }
+
+        if (last > 0L) preferences[PreferencesKeys.LAST_FAP_AT] = last
+        else preferences.remove(PreferencesKeys.LAST_FAP_AT)
+        preferences[PreferencesKeys.PREVIOUS_FAP_STREAK_DAYS] = previous
+        preferences[PreferencesKeys.BEST_FAP_STREAK_DAYS] = best
+        preferences[PreferencesKeys.FAP_LOG_COUNT] = sorted.size
+    }
+
+    companion object {
+        fun defaultDashboardCardOrder(): List<String> = listOf(
+            "hero",
+            "stats",
+            "graph",
+            "milestones",
+            "checkin",
+            "calendar",
+            "insights",
+            "timeline",
+            "protection"
+        )
     }
 
     /**
