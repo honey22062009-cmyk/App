@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.core.system.AlarmScheduler
+import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.service.BlockerMonitoringService
 import com.example.service.AdultFilterVpnService
@@ -26,6 +27,7 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 BlockerMonitoringService.start(context)
                 AlarmScheduler.scheduleNextTransition(context)
+                TrackerReminderScheduler.refresh(context)
 
                 val pendingResult = goAsync()
                 val appContext = context.applicationContext
