@@ -72,6 +72,7 @@ import java.util.Locale
 @Composable
 fun DashboardScreen(
     repository: AppBlockerRepository,
+    initialTrackerAction: String? = null,
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
@@ -105,6 +106,7 @@ fun DashboardScreen(
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
     var showResetEditor by remember { mutableStateOf(false) }
     var showSleepEditor by remember { mutableStateOf(false) }
+    var showDailyPrompt by remember { mutableStateOf(false) }
     var editingReset by remember { mutableStateOf<TrackerResetRecord?>(null) }
     var deleteCandidate by remember { mutableStateOf<TrackerResetRecord?>(null) }
     var showGoal by remember { mutableStateOf(false) }
@@ -118,6 +120,14 @@ fun DashboardScreen(
         repository.settings.ensureStreakTrackerStarted()
         repository.settings.refreshExpiredProEntitlement()
     }
+
+    LaunchedEffect(initialTrackerAction) {
+        when (initialTrackerAction) {
+            "sleep" -> showSleepEditor = true
+            "daily" -> showDailyPrompt = true
+        }
+    }
+
 
     // Refresh day-based tracker values at local midnight without running a per-second timer.
     LaunchedEffect(zone) {
@@ -281,6 +291,24 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showDailyPrompt) {
+        DailyCheckInPromptDialog(
+            current = todayCheckIn,
+            onDismiss = { showDailyPrompt = false },
+            onSelect = { rating ->
+                scope.launch {
+                    repository.settings.saveDailyCheckIn(today.toString(), rating)
+                }
+                showDailyPrompt = false
+            },
+            onRecordReset = {
+                showDailyPrompt = false
+                editingReset = null
+                showResetEditor = true
+            }
+        )
     }
 
     if (showSleepEditor) {
