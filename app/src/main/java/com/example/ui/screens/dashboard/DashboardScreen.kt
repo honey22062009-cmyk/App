@@ -1,67 +1,52 @@
 package com.example.ui.screens.dashboard
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -69,6 +54,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.system.ProtectionHealth
+import com.example.data.preferences.DailyCheckIn
+import com.example.data.preferences.TrackerCalculator
+import com.example.data.preferences.TrackerResetRecord
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
@@ -78,7 +66,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.max
 
 @Composable
 fun DashboardScreen(
@@ -90,68 +77,78 @@ fun DashboardScreen(
     onOpenPro: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     val zone = remember { ZoneId.systemDefault() }
 
+    val trackerStartedAt by repository.settings.trackerStartedAtFlow.collectAsState(initial = 0L)
+    val resetRecords by repository.settings.trackerResetRecordsFlow.collectAsState(initial = emptyList())
+    val checkIns by repository.settings.dailyCheckInsFlow.collectAsState(initial = emptyList())
+    val goalDays by repository.settings.trackerGoalDaysFlow.collectAsState(initial = 0)
+    val cardOrder by repository.settings.dashboardCardOrderFlow.collectAsState(
+        initial = com.example.data.preferences.SettingsPreferences.defaultDashboardCardOrder()
+    )
+    val hiddenCards by repository.settings.dashboardHiddenCardsFlow.collectAsState(initial = emptySet())
+    val seenMilestones by repository.settings.seenMilestonesFlow.collectAsState(initial = emptySet())
+    val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
+    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
-    val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
-    val trackerStartedAt by repository.settings.trackerStartedAtFlow.collectAsState(initial = 0L)
-    val lastFapAt by repository.settings.lastFapAtFlow.collectAsState(initial = 0L)
-    val previousStreak by repository.settings.previousFapStreakDaysFlow.collectAsState(initial = 0)
-    val bestStreak by repository.settings.bestFapStreakDaysFlow.collectAsState(initial = 0)
-    val resetCount by repository.settings.fapLogCountFlow.collectAsState(initial = 0)
-    val eventTimestamps by repository.settings.fapEventTimestampsFlow.collectAsState(initial = emptySet())
 
-    val activeManagedApps = managedApps.count { it.isManaged }
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
-    var showResetConfirm by remember { mutableStateOf(false) }
+    var showResetEditor by remember { mutableStateOf(false) }
+    var editingReset by remember { mutableStateOf<TrackerResetRecord?>(null) }
+    var deleteCandidate by remember { mutableStateOf<TrackerResetRecord?>(null) }
+    var showGoal by remember { mutableStateOf(false) }
+    var showMilestones by remember { mutableStateOf(false) }
+    var showTimeline by remember { mutableStateOf(false) }
+    var showCustomization by remember { mutableStateOf(false) }
+    var selectedCalendarDate by remember { mutableStateOf<LocalDate?>(null) }
+    var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
+        repository.settings.refreshExpiredProEntitlement()
     }
 
     DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) health = ProtectionHealth.snapshot(context)
+            if (event == Lifecycle.Event.ON_RESUME) {
+                nowMillis = System.currentTimeMillis()
+                health = ProtectionHealth.snapshot(context)
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val baseline = when {
-        lastFapAt > 0L -> lastFapAt
-        trackerStartedAt > 0L -> trackerStartedAt
-        else -> System.currentTimeMillis()
+    val stats = remember(trackerStartedAt, resetRecords, nowMillis, zone) {
+        TrackerCalculator.stats(trackerStartedAt, resetRecords, nowMillis, zone)
     }
-    val now = System.currentTimeMillis()
-    val currentDays = ((now - baseline).coerceAtLeast(0L) / 86_400_000L).toInt()
-    val displayedBest = max(bestStreak, currentDays)
-    val ringProgressTarget = if (displayedBest <= 0) 0.08f
-        else (currentDays.toFloat() / displayedBest.toFloat()).coerceIn(0.08f, 1f)
-    val ringProgress by animateFloatAsState(
-        targetValue = ringProgressTarget,
-        animationSpec = tween(650),
-        label = "streak_ring"
-    )
-
-    val lastLabel = if (lastFapAt > 0L) {
-        val formatter = DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.getDefault())
-        Instant.ofEpochMilli(lastFapAt).atZone(zone).format(formatter)
-    } else {
-        "No reset logged"
+    val latestReset = resetRecords.maxByOrNull { it.timestamp }
+    val lastResetLabel = remember(latestReset, zone) {
+        latestReset?.let {
+            Instant.ofEpochMilli(it.timestamp).atZone(zone)
+                .format(DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.getDefault()))
+        } ?: "No reset logged"
+    }
+    val today = remember(nowMillis, zone) { Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate() }
+    val todayCheckIn = remember(checkIns, today) { checkIns.firstOrNull { it.localDate == today } }
+    val insight = remember(stats, resetRecords, nowMillis, zone) {
+        buildInsight(stats, resetRecords, nowMillis, zone)
+    }
+    val journeyItems = remember(stats, trackerStartedAt, resetRecords, goalDays, nowMillis, zone) {
+        buildJourneyItems(stats, trackerStartedAt, resetRecords, goalDays, nowMillis, zone)
     }
 
-    val today = LocalDate.now(zone)
-    val weekly = remember(eventTimestamps, today) {
-        (6 downTo 0).map { offset ->
-            val date = today.minusDays(offset.toLong())
-            val count = eventTimestamps.count {
-                Instant.ofEpochMilli(it).atZone(zone).toLocalDate() == date
-            }
-            date to count
+    LaunchedEffect(stats.currentDays, seenMilestones) {
+        val milestone = listOf(1, 3, 7, 14, 30, 60, 90, 180, 365)
+            .lastOrNull { stats.currentDays >= it && it !in seenMilestones }
+        if (milestone != null) {
+            celebrationMilestone = milestone
+            repository.settings.markMilestoneSeen(milestone)
         }
     }
 
@@ -161,14 +158,10 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val tablet = maxWidth >= 720.dp
-        val contentWidth = maxWidth
 
         LazyColumn(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .width(contentWidth)
-                .fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
                 start = if (tablet) 22.dp else 12.dp,
                 end = if (tablet) 22.dp else 12.dp,
                 top = 18.dp,
@@ -176,564 +169,318 @@ fun DashboardScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Your progress",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            "A private, user-logged streak with protection tools underneath.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            item(key = "header") {
+                DashboardHeader(
+                    isPro = isPro,
+                    onOpenPro = onOpenPro,
+                    onCustomize = {
+                        if (isPro) showCustomization = true else onOpenPro()
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .shadow(12.dp, CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFE45B99), Color(0xFFE36DAE))
-                                ),
-                                CircleShape
-                            )
-                            .clickable(onClick = onOpenPro),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = "Strict Blocker Pro",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                "PRO",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-                    }
-                }
+                )
             }
 
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = GlassVariant.Accent,
-                    shape = RoundedCornerShape(28.dp),
-                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f),
-                    backgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "CURRENT STREAK",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(10.dp))
+            items(
+                items = cardOrder.filterNot { it in hiddenCards },
+                key = { it }
+            ) { key ->
+                when (key) {
+                    "hero" -> StreakHeroCard(
+                        stats = stats,
+                        lastResetLabel = lastResetLabel,
+                        goalDays = goalDays,
+                        reduceMotion = reduceMotion,
+                        tablet = tablet,
+                        onRecordReset = {
+                            editingReset = null
+                            showResetEditor = true
+                        },
+                        onEditGoal = { showGoal = true }
+                    )
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(if (tablet) 2.5f else 1.45f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Canvas(modifier = Modifier.size(if (tablet) 260.dp else 220.dp)) {
-                                val stroke = size.minDimension * 0.052f
-                                val inset = stroke
-                                drawArc(
-                                    color = Color.White.copy(alpha = 0.10f),
-                                    startAngle = 140f,
-                                    sweepAngle = 260f,
-                                    useCenter = false,
-                                    topLeft = Offset(inset, inset),
-                                    size = Size(size.width - inset * 2, size.height - inset * 2),
-                                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                                )
-                                drawArc(
-                                    brush = Brush.sweepGradient(
-                                        listOf(
-                                            Color(0xFFE45B99),
-                                            Color(0xFFF4866B),
-                                            Color(0xFFE76AAE),
-                                            Color(0xFFE45B99)
-                                        )
-                                    ),
-                                    startAngle = 140f,
-                                    sweepAngle = 260f * ringProgress,
-                                    useCenter = false,
-                                    topLeft = Offset(inset, inset),
-                                    size = Size(size.width - inset * 2, size.height - inset * 2),
-                                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                                )
-                            }
+                    "stats" -> StatsStrip(stats, tablet)
 
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                HumanPairIllustration()
-                                Spacer(Modifier.height(4.dp))
-                                AnimatedContent(
-                                    targetState = currentDays,
-                                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-                                    label = "streak_days"
-                                ) { days ->
-                                    Text(
-                                        text = "$days",
-                                        style = MaterialTheme.typography.displayLarge,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Text(
-                                    if (currentDays == 1) "day" else "days",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                    "graph" -> StreakGraphCard(
+                        trackerStartedAt = trackerStartedAt,
+                        resets = resetRecords,
+                        zone = zone,
+                        tablet = tablet
+                    )
+
+                    "milestones" -> MilestoneCard(
+                        stats = stats,
+                        onViewAll = { showMilestones = true }
+                    )
+
+                    "checkin" -> DailyCheckInCard(
+                        todayCheckIn = todayCheckIn,
+                        onSelect = { rating ->
+                            scope.launch {
+                                repository.settings.saveDailyCheckIn(today.toString(), rating)
                             }
                         }
+                    )
 
-                        Text(
-                            "Last reset: $lastLabel",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = { showResetConfirm = true },
-                            shape = RoundedCornerShape(18.dp)
-                        ) {
-                            Text("Record reset", fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "This tracker only changes when you log a reset. It does not monitor your body or private activity.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    "calendar" -> CalendarHeatmapCard(
+                        trackerStartedAt = trackerStartedAt,
+                        resets = resetRecords,
+                        checkIns = checkIns,
+                        zone = zone,
+                        onDateSelected = { selectedCalendarDate = it }
+                    )
+
+                    "insights" -> InsightCard(insight)
+
+                    "timeline" -> JourneyPreviewCard(
+                        items = journeyItems,
+                        onOpen = { showTimeline = true }
+                    )
+
+                    "protection" -> ProtectionStatusCard(
+                        enabled = isProtectionEnabled,
+                        health = health,
+                        activeManagedApps = managedApps.count { it.isManaged },
+                        totalBlocks = totalBlocks,
+                        onToggle = { enabled ->
+                            scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                        },
+                        onOpenSetup = onNavigateToPermissions
+                    )
                 }
             }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    MetricCard("Previous", "$previousStreak d", Color(0xFFA953C7), Modifier.weight(1f))
-                    MetricCard("Best", "$displayedBest d", Color(0xFFE46FAE), Modifier.weight(1f))
-                    MetricCard("Resets", "$resetCount", Color(0xFF62B49A), Modifier.weight(1f))
-                }
-            }
-
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Last 7 days",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Logged reset trend",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                "${weekly.sumOf { it.second }} logged",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        StreakLineGraph(
-                            values = weekly.map { it.second },
-                            labels = weekly.map { it.first.dayOfWeek.name.take(1) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(if (tablet) 176.dp else 145.dp)
-                        )
-                    }
-                }
-            }
-
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = if (isProtectionEnabled) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                when {
-                                    !isProtectionEnabled -> "Protection paused"
-                                    !health.coreReady -> "Protection needs setup"
-                                    health.reliabilityScore < 100 -> "Protection active · ${health.reliabilityScore}%"
-                                    else -> "Protection active"
-                                },
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                "$activeManagedApps restricted apps · $totalBlocks blocks",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        LiquidToggle(
-                            checked = isProtectionEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (!health.coreReady || health.reliabilityScore < 100) {
-                item {
-                    GlassCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onNavigateToPermissions),
-                        variant = GlassVariant.Warning,
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Warning, contentDescription = null)
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    if (!health.coreReady) "Finish protection setup"
-                                    else "Improve background reliability",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    health.degradedReasons.firstOrNull()
-                                        ?: "Review Android permissions.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
         }
     }
 
-    if (showResetConfirm) {
+    if (showResetEditor) {
+        ResetEditorDialog(
+            editing = editingReset,
+            currentDays = stats.currentDays,
+            onDismiss = {
+                showResetEditor = false
+                editingReset = null
+            },
+            onSave = { timestamp, category, note ->
+                val existing = editingReset
+                scope.launch {
+                    if (existing == null) {
+                        repository.settings.recordTrackerReset(timestamp, category, note)
+                    } else {
+                        repository.settings.updateTrackerReset(existing.id, timestamp, category, note)
+                    }
+                }
+                showResetEditor = false
+                editingReset = null
+                nowMillis = System.currentTimeMillis()
+            }
+        )
+    }
+
+    if (showGoal) {
+        GoalDialog(
+            currentGoal = goalDays,
+            onDismiss = { showGoal = false },
+            onSave = { days ->
+                scope.launch { repository.settings.setTrackerGoalDays(days) }
+                showGoal = false
+            }
+        )
+    }
+
+    if (showMilestones) {
+        MilestonesDialog(
+            stats = stats,
+            trackerStartedAt = trackerStartedAt,
+            resets = resetRecords,
+            zone = zone,
+            onDismiss = { showMilestones = false }
+        )
+    }
+
+    if (showTimeline) {
+        TimelineDialog(
+            items = journeyItems,
+            resets = resetRecords,
+            onDismiss = { showTimeline = false },
+            onEdit = { record ->
+                showTimeline = false
+                editingReset = record
+                showResetEditor = true
+            },
+            onDelete = { record -> deleteCandidate = record }
+        )
+    }
+
+    deleteCandidate?.let { record ->
         AlertDialog(
-            onDismissRequest = { showResetConfirm = false },
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            tonalElevation = 0.dp,
-            shape = RoundedCornerShape(28.dp),
-            title = {
-                Text(
-                    "Record a reset?",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    "This ends the current streak at $currentDays day${if (currentDays == 1) "" else "s"} and starts a new one now. Only log it if that is what you want recorded."
-                )
-            },
+            onDismissRequest = { deleteCandidate = null },
+            shape = RoundedCornerShape(26.dp),
+            title = { Text("Delete this reset?", fontWeight = FontWeight.Bold) },
+            text = { Text("The tracker will recalculate streak history after this entry is removed.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        scope.launch { repository.settings.recordFapReset() }
-                        showResetConfirm = false
+                        scope.launch { repository.settings.deleteTrackerReset(record.id) }
+                        deleteCandidate = null
+                        nowMillis = System.currentTimeMillis()
                     }
-                ) {
-                    Text("Record")
-                }
+                ) { Text("Delete") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showResetConfirm = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
             }
         )
     }
-}
 
-@Composable
-private fun HumanPairIllustration() {
-    Canvas(modifier = Modifier.size(width = 124.dp, height = 96.dp)) {
-        fun figure(
-            centerX: Float,
-            main: Color,
-            light: Color,
-            bodyWidth: Float
-        ) {
-            val headY = size.height * 0.18f
-            val headR = size.minDimension * 0.11f
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.20f),
-                radius = headR + 2f,
-                center = Offset(centerX + 3f, headY + 3f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(light, main),
-                    center = Offset(centerX - 4f, headY - 4f),
-                    radius = headR * 2.2f
-                ),
-                radius = headR,
-                center = Offset(centerX, headY)
-            )
-
-            val torsoTop = size.height * 0.34f
-            val torsoHeight = size.height * 0.34f
-            drawRoundRect(
-                color = Color.Black.copy(alpha = 0.18f),
-                topLeft = Offset(centerX - bodyWidth / 2f + 3f, torsoTop + 4f),
-                size = Size(bodyWidth, torsoHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-            drawRoundRect(
-                brush = Brush.linearGradient(listOf(light, main, main.copy(alpha = 0.9f))),
-                topLeft = Offset(centerX - bodyWidth / 2f, torsoTop),
-                size = Size(bodyWidth, torsoHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-
-            val limb = size.width * 0.055f
-            drawLine(
-                brush = Brush.linearGradient(listOf(light, main)),
-                start = Offset(centerX - bodyWidth * 0.32f, torsoTop + 8f),
-                end = Offset(centerX - bodyWidth * 0.80f, size.height * 0.58f),
-                strokeWidth = limb,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                brush = Brush.linearGradient(listOf(light, main)),
-                start = Offset(centerX + bodyWidth * 0.32f, torsoTop + 8f),
-                end = Offset(centerX + bodyWidth * 0.80f, size.height * 0.58f),
-                strokeWidth = limb,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                brush = Brush.linearGradient(listOf(light, main)),
-                start = Offset(centerX - bodyWidth * 0.20f, torsoTop + torsoHeight - 2f),
-                end = Offset(centerX - bodyWidth * 0.34f, size.height * 0.91f),
-                strokeWidth = limb * 1.15f,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                brush = Brush.linearGradient(listOf(light, main)),
-                start = Offset(centerX + bodyWidth * 0.20f, torsoTop + torsoHeight - 2f),
-                end = Offset(centerX + bodyWidth * 0.34f, size.height * 0.91f),
-                strokeWidth = limb * 1.15f,
-                cap = StrokeCap.Round
-            )
-        }
-
-        figure(
-            centerX = size.width * 0.34f,
-            main = Color(0xFF9A4ABA),
-            light = Color(0xFFE0A4F3),
-            bodyWidth = size.width * 0.24f
+    selectedCalendarDate?.let { date ->
+        CalendarDetailDialog(
+            date = date,
+            streakDay = TrackerCalculator.streakAt(date, trackerStartedAt, resetRecords, zone),
+            resets = resetRecords,
+            checkIn = checkIns.firstOrNull { it.localDate == date },
+            zone = zone,
+            onDismiss = { selectedCalendarDate = null }
         )
-        figure(
-            centerX = size.width * 0.66f,
-            main = Color(0xFFE85D98),
-            light = Color(0xFFFFB1D0),
-            bodyWidth = size.width * 0.23f
+    }
+
+    if (showCustomization) {
+        DashboardCustomizationDialog(
+            order = cardOrder,
+            hidden = hiddenCards,
+            onDismiss = { showCustomization = false },
+            onSave = { order, hidden ->
+                scope.launch { repository.settings.setDashboardLayout(order, hidden) }
+                showCustomization = false
+            }
+        )
+    }
+
+    celebrationMilestone?.let { days ->
+        MilestoneCelebrationDialog(
+            days = days,
+            onDismiss = { celebrationMilestone = null }
         )
     }
 }
 
 @Composable
-private fun MetricCard(
-    label: String,
-    value: String,
-    accent: Color,
-    modifier: Modifier = Modifier
+private fun DashboardHeader(
+    isPro: Boolean,
+    onOpenPro: () -> Unit,
+    onCustomize: () -> Unit
 ) {
-    GlassCard(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(accent, CircleShape)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Your progress",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(Modifier.height(8.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Private tracking, built around what you explicitly log.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        IconButton(onClick = onCustomize) {
+            Icon(
+                Icons.Default.Tune,
+                contentDescription = "Customize dashboard",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Surface(
+            onClick = onOpenPro,
+            shape = RoundedCornerShape(18.dp),
+            color = Color.Transparent,
+            modifier = Modifier.widthIn(min = 72.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                WarmMagenta.copy(alpha = .95f),
+                                WarmCoral.copy(alpha = .92f),
+                                WarmPlum.copy(alpha = .90f)
+                            )
+                        ),
+                        RoundedCornerShape(18.dp)
+                    )
+                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    if (isPro) Icons.Default.Star else Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(Modifier.size(5.dp))
+                Text(
+                    if (isPro) "PRO" else "PRO",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Black
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun StreakLineGraph(
-    values: List<Int>,
-    labels: List<String>,
-    modifier: Modifier = Modifier
+private fun ProtectionStatusCard(
+    enabled: Boolean,
+    health: ProtectionHealth,
+    activeManagedApps: Int,
+    totalBlocks: Int,
+    onToggle: (Boolean) -> Unit,
+    onOpenSetup: () -> Unit
 ) {
-    val maxValue = max(1, values.maxOrNull() ?: 1)
-
-    Column(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+    val needsAttention = !health.coreReady || health.reliabilityScore < 100
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = needsAttention, onClick = onOpenSetup),
+        variant = if (needsAttention) GlassVariant.Warning else GlassVariant.Subtle,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (values.isEmpty()) return@Canvas
-
-            val left = 10f
-            val right = size.width - 10f
-            val top = 12f
-            val bottom = size.height - 12f
-            val stepX = if (values.size <= 1) 0f else (right - left) / (values.size - 1)
-
-            val points = values.mapIndexed { index, value ->
-                Offset(
-                    x = left + stepX * index,
-                    y = bottom - (value.toFloat() / maxValue.toFloat()) * (bottom - top)
-                )
-            }
-
-            val fill = Path().apply {
-                moveTo(points.first().x, bottom)
-                lineTo(points.first().x, points.first().y)
-                points.drop(1).forEach { lineTo(it.x, it.y) }
-                lineTo(points.last().x, bottom)
-                close()
-            }
-            drawPath(
-                path = fill,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color(0xFFE45B99).copy(alpha = 0.30f),
-                        Color(0xFFF4866B).copy(alpha = 0.08f),
-                        Color.Transparent
-                    )
-                )
+            Icon(
+                if (needsAttention) Icons.Default.Warning else Icons.Default.Shield,
+                contentDescription = null,
+                tint = if (needsAttention) MaterialTheme.colorScheme.secondary else WarmMint
             )
-
-            val line = Path().apply {
-                moveTo(points.first().x, points.first().y)
-                points.drop(1).forEach { lineTo(it.x, it.y) }
-            }
-            drawPath(
-                path = line,
-                brush = Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFFE45B99),
-                        Color(0xFFF4866B),
-                        Color(0xFFA953C7)
-                    )
-                ),
-                style = Stroke(width = 6f, cap = StrokeCap.Round)
-            )
-
-            points.forEach { point ->
-                drawCircle(Color.White.copy(alpha = 0.92f), 7f, point)
-                drawCircle(Color(0xFFE45B99), 4f, point)
-            }
-        }
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            labels.forEach { label ->
+            Spacer(Modifier.size(11.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    text = label,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelSmall,
+                    when {
+                        !enabled -> "Protection paused"
+                        !health.coreReady -> "Protection needs setup"
+                        health.reliabilityScore < 100 -> "Protection active · ${health.reliabilityScore}%"
+                        else -> "Protection healthy"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (needsAttention) {
+                        health.degradedReasons.firstOrNull() ?: "Review Android permissions."
+                    } else {
+                        "$activeManagedApps restricted apps · $totalBlocks blocks"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
-    }
-}
-
-@Composable
-private fun LiquidToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    val thumbOffset by animateDpAsState(
-        targetValue = if (checked) 27.dp else 2.dp,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = 520f),
-        label = "liquid_toggle"
-    )
-
-    Box(
-        modifier = Modifier
-            .width(57.dp)
-            .height(32.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                if (checked) {
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFFE45B99),
-                            Color(0xFFF4866B),
-                            Color(0xFFA953C7)
-                        )
-                    )
-                } else {
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                }
-            )
-            .clickable { onCheckedChange(!checked) }
-            .padding(2.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset)
-                .size(28.dp)
-                .shadow(7.dp, CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(Color.White, Color(0xFFFFEEF5))
-                    ),
-                    CircleShape
-                )
-        )
     }
 }
