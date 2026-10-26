@@ -711,6 +711,50 @@ internal fun DailyCheckInCard(
 }
 
 @Composable
+internal fun DailyCheckInPromptDialog(
+    current: DailyCheckIn?,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onRecordReset: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        title = { Text("Daily check-in", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "This records today's check-in only. Your streak still comes from elapsed time since the last reset.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                listOf(
+                    Triple("easy", "Easy", "🙂"),
+                    Triple("okay", "Okay", "😐"),
+                    Triple("difficult", "Difficult", "😮‍💨")
+                ).forEach { (value, label, icon) ->
+                    FilterChip(
+                        selected = current?.rating == value,
+                        onClick = { onSelect(value) },
+                        label = { Text(icon + " " + label) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                OutlinedButton(
+                    onClick = onRecordReset,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Record reset instead")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Skip for today") }
+        }
+    )
+}
+
+@Composable
 internal fun SleepEntryDialog(
     current: SleepEntry?,
     onDismiss: () -> Unit,
