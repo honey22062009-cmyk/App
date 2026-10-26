@@ -72,4 +72,57 @@ class TrackerCalculatorTest {
         assertTrue(stats.currentDays >= 3650)
         assertEquals(stats.currentDays, stats.bestDays)
     }
+
+
+    @Test
+    fun outOfOrderEventsAreSortedBeforeCalculating() {
+        val start = ms(2026, 1, 1)
+        val events = listOf(
+            TrackerResetRecord("later", ms(2026, 1, 8)),
+            TrackerResetRecord("earlier", ms(2026, 1, 4))
+        )
+        val stats = TrackerCalculator.stats(start, events, ms(2026, 1, 10), zone)
+        assertEquals(2, stats.currentDays)
+        assertEquals(4, stats.previousDays)
+        assertEquals(4, stats.bestDays)
+        assertEquals(2, stats.totalResets)
+    }
+
+    @Test
+    fun futureEventsAreIgnored() {
+        val start = ms(2026, 1, 1)
+        val now = ms(2026, 1, 10)
+        val events = listOf(
+            TrackerResetRecord("valid", ms(2026, 1, 4)),
+            TrackerResetRecord("future", ms(2026, 1, 12))
+        )
+        val stats = TrackerCalculator.stats(start, events, now, zone)
+        assertEquals(6, stats.currentDays)
+        assertEquals(3, stats.previousDays)
+        assertEquals(1, stats.totalResets)
+    }
+
+    @Test
+    fun graphSupportsSingleDayWithoutNaNStyleInputs() {
+        val date = java.time.LocalDate.of(2026, 1, 1)
+        val points = TrackerCalculator.graphPoints(
+            trackerStartedAt = ms(2026, 1, 1),
+            resets = emptyList(),
+            startDate = date,
+            endDate = date,
+            zone = zone
+        )
+        assertEquals(1, points.size)
+        assertEquals(0, points.single().streakDays)
+    }
+
+    @Test
+    fun currentStreakCanBecomePersonalBest() {
+        val start = ms(2026, 1, 1)
+        val events = listOf(TrackerResetRecord("one", ms(2026, 1, 3)))
+        val stats = TrackerCalculator.stats(start, events, ms(2026, 1, 20), zone)
+        assertEquals(17, stats.currentDays)
+        assertEquals(17, stats.bestDays)
+        assertEquals(2, stats.previousDays)
+    }
 }
