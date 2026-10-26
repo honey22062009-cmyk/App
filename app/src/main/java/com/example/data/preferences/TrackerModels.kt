@@ -75,6 +75,33 @@ data class DailyCheckIn(
     }
 }
 
+data class SleepEntry(
+    val localDate: LocalDate,
+    val durationMinutes: Int,
+    val note: String? = null
+) {
+    fun encode(): String = listOf(
+        localDate.toString(),
+        durationMinutes.coerceIn(0, 24 * 60).toString(),
+        java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(note.orEmpty().toByteArray(StandardCharsets.UTF_8))
+    ).joinToString("|")
+
+    companion object {
+        fun decode(raw: String): SleepEntry? {
+            val parts = raw.split("|", limit = 3)
+            val date = parts.getOrNull(0)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+            val minutes = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 24 * 60) ?: return null
+            val note = parts.getOrNull(2)?.let {
+                runCatching {
+                    String(java.util.Base64.getUrlDecoder().decode(it), StandardCharsets.UTF_8)
+                }.getOrDefault("")
+            }?.trim()?.take(500)?.takeIf { it.isNotBlank() }
+            return SleepEntry(date, minutes, note)
+        }
+    }
+}
+
 data class TrackerStats(
     val currentDays: Int,
     val previousDays: Int,
