@@ -412,6 +412,14 @@ private fun ManualPaywallContent(
                                                 }
                                             }
 
+                                            Text(
+                                                "If your UPI app or bank rejects the payment or shows an account/payment limit, " +
+                                                    "that message comes from the payment provider. Strict Blocker does not count or cap UPI attempts. " +
+                                                    "You can return here and retry without creating a fake success state.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
                                             OutlinedTextField(
                                                 value = transactionId,
                                                 onValueChange = { transactionId = it.take(64) },
