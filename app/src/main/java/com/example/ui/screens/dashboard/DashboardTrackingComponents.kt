@@ -84,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.preferences.DailyCheckIn
+import com.example.data.preferences.SettingsPreferences
 import com.example.data.preferences.StreakPoint
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
@@ -508,6 +509,16 @@ private fun InteractiveStreakGraph(points: List<StreakPoint>, modifier: Modifier
     Column {
         Canvas(
             modifier = modifier
+                .semantics {
+                    contentDescription = if (selectedIndex in points.indices) {
+                        val point = points[selectedIndex]
+                        "Streak history, " + point.date.format(formatter) +
+                            ", day " + point.streakDays +
+                            if (point.reset) ", reset logged" else ""
+                    } else {
+                        "Streak history, no tracker history yet"
+                    }
+                }
                 .pointerInput(points, widthPx) {
                     detectTapGestures { selectedIndex = indexForX(it.x) }
                 }
@@ -836,7 +847,7 @@ internal fun ResetEditorDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(30.dp),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .96f),
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .88f),
         title = { Text(if (editing == null) "Record reset" else "Edit reset", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1105,6 +1116,15 @@ internal fun DashboardCustomizationDialog(
                         ) { Icon(Icons.Default.ArrowDownward, contentDescription = "Move down") }
                     }
                 }
+                TextButton(
+                    onClick = {
+                        localOrder = SettingsPreferences.defaultDashboardCardOrder()
+                        localHidden = emptySet()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Reset dashboard layout")
+                }
             }
         },
         confirmButton = { Button(onClick = { onSave(localOrder, localHidden) }) { Text("Save") } },
@@ -1117,7 +1137,7 @@ internal fun MilestoneCelebrationDialog(days: Int, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .96f),
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .88f),
         icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = WarmPlum, modifier = Modifier.size(42.dp)) },
         title = { Text("$days-day milestone", fontWeight = FontWeight.Black) },
         text = { Text("Milestone recorded. Your tracker history stays exactly as logged.") },
