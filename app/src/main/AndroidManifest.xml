@@ -112,6 +112,11 @@
             android:name=".receiver.ScheduleAlarmReceiver"
             android:exported="false" />
 
+        <!-- Optional daily tracker reminders -->
+        <receiver
+            android:name=".receiver.TrackerReminderReceiver"
+            android:exported="false" />
+
         <!-- Time, Timezone & Date Change Receiver -->
         <receiver
             android:name=".receiver.TimeChangeReceiver"
