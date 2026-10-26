@@ -32,6 +32,12 @@ class SettingsPreferences(private val context: Context) {
         val USER_GENDER = stringPreferencesKey("user_gender")
         val SELECTED_CHARACTER_ID = stringPreferencesKey("selected_character_id")
         val CHARACTER_NAME = stringPreferencesKey("character_name")
+        val DAILY_REMINDER_ENABLED = booleanPreferencesKey("daily_reminder_enabled")
+        val DAILY_REMINDER_HOUR = intPreferencesKey("daily_reminder_hour")
+        val DAILY_REMINDER_MINUTE = intPreferencesKey("daily_reminder_minute")
+        val SLEEP_REMINDER_ENABLED = booleanPreferencesKey("sleep_reminder_enabled")
+        val SLEEP_REMINDER_HOUR = intPreferencesKey("sleep_reminder_hour")
+        val SLEEP_REMINDER_MINUTE = intPreferencesKey("sleep_reminder_minute")
 
         // Adult Content Protection Settings
         val ADULT_PROTECTION_ENABLED = booleanPreferencesKey("adult_protection_enabled")
@@ -126,6 +132,30 @@ class SettingsPreferences(private val context: Context) {
 
     val characterNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.CHARACTER_NAME] ?: ""
+    }
+
+    val dailyReminderEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DAILY_REMINDER_ENABLED] ?: false
+    }
+
+    val dailyReminderHourFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.DAILY_REMINDER_HOUR] ?: 20).coerceIn(0, 23)
+    }
+
+    val dailyReminderMinuteFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.DAILY_REMINDER_MINUTE] ?: 0).coerceIn(0, 59)
+    }
+
+    val sleepReminderEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.SLEEP_REMINDER_ENABLED] ?: false
+    }
+
+    val sleepReminderHourFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.SLEEP_REMINDER_HOUR] ?: 6).coerceIn(0, 23)
+    }
+
+    val sleepReminderMinuteFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.SLEEP_REMINDER_MINUTE] ?: 0).coerceIn(0, 59)
     }
 
     // Adult Content Protection Flows
@@ -363,6 +393,22 @@ class SettingsPreferences(private val context: Context) {
             } else {
                 preferences[PreferencesKeys.CHARACTER_NAME] = safeCompanionName
             }
+        }
+    }
+
+    suspend fun setDailyReminder(enabled: Boolean, hour: Int, minute: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_REMINDER_ENABLED] = enabled
+            preferences[PreferencesKeys.DAILY_REMINDER_HOUR] = hour.coerceIn(0, 23)
+            preferences[PreferencesKeys.DAILY_REMINDER_MINUTE] = minute.coerceIn(0, 59)
+        }
+    }
+
+    suspend fun setSleepReminder(enabled: Boolean, hour: Int, minute: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SLEEP_REMINDER_ENABLED] = enabled
+            preferences[PreferencesKeys.SLEEP_REMINDER_HOUR] = hour.coerceIn(0, 23)
+            preferences[PreferencesKeys.SLEEP_REMINDER_MINUTE] = minute.coerceIn(0, 59)
         }
     }
 
