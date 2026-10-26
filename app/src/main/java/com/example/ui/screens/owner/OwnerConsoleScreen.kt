@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -67,6 +68,7 @@ fun OwnerConsoleScreen(
     var signedIn by remember { mutableStateOf(false) }
     var signingIn by remember { mutableStateOf(false) }
     var requests by remember { mutableStateOf<List<PaymentRequest>>(emptyList()) }
+    var pendingApproval by remember { mutableStateOf<PaymentRequest?>(null) }
 
     Column(
         modifier = Modifier
@@ -184,17 +186,7 @@ fun OwnerConsoleScreen(
                     PaymentRequestCard(
                         request = request,
                         onApprove = {
-                            manager.approve(request) { result ->
-                                result.onSuccess {
-                                    scope.launch {
-                                        snackbar.showSnackbar("Approved. The user's app can unlock Pro now.")
-                                    }
-                                }.onFailure { error ->
-                                    scope.launch {
-                                        snackbar.showSnackbar(error.message ?: "Approval failed.")
-                                    }
-                                }
-                            }
+                            pendingApproval = request
                         },
                         onReject = {
                             manager.reject(request) { result ->
@@ -211,6 +203,42 @@ fun OwnerConsoleScreen(
         }
 
         SnackbarHost(snackbar)
+    }
+
+    pendingApproval?.let { request ->
+        AlertDialog(
+            onDismissRequest = { pendingApproval = null },
+            title = { Text("Approve this payment?") },
+            text = {
+                Text(
+                    "Approve only after you have independently verified UTR ${request.transactionId} " +
+                        "for ₹${request.amountRupees}. This immediately grants the matching device its plan."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingApproval = null
+                        manager.approve(request) { result ->
+                            result.onSuccess {
+                                scope.launch {
+                                    snackbar.showSnackbar("Approved. The matching user's app can unlock Pro now.")
+                                }
+                            }.onFailure { error ->
+                                scope.launch {
+                                    snackbar.showSnackbar(error.message ?: "Approval failed.")
+                                }
+                            }
+                        }
+                    }
+                ) { Text("Approve verified payment") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingApproval = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -239,6 +267,11 @@ private fun PaymentRequestCard(
             }
 
             Text("Request: ${request.id}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Device: ${request.deviceHash.take(12)}…${request.deviceHash.takeLast(8)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 "UPI transaction ID / UTR: ${request.transactionId}",
                 style = MaterialTheme.typography.bodyMedium,
