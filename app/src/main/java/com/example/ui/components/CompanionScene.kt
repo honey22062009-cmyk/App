@@ -126,6 +126,7 @@ private class CompanionSurface(context: Context) : GLSurfaceView(context) {
         lastReactionKey = key
         scene.reaction = action
         scene.reactionAt = SystemClock.uptimeMillis()
+        if (scene.reducedMotion && action == "spin") scene.yaw += 90f
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -240,7 +241,8 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
         val time = SystemClock.uptimeMillis() / 1000f
         val elapsed = ((SystemClock.uptimeMillis() - reactionAt) / 1000f).coerceAtLeast(0f)
         val acting = !reducedMotion && elapsed < 1.8f
-        val bounce = if (acting && reaction == "jump") abs(sin(elapsed * PI.toFloat() * 2f)) * .46f
+        val bounce = if (reducedMotion && reaction == "jump") .20f
+            else if (acting && reaction == "jump") abs(sin(elapsed * PI.toFloat() * 2f)) * .46f
             else if (reducedMotion) 0f else sin(time * 2f) * .025f
         val spin = if (acting && reaction == "spin") 360f * (elapsed / 1.8f).let { it * it * (3f - 2f * it) } else 0f
         Matrix.setIdentityM(base, 0)
@@ -262,7 +264,8 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
         ball(.27f, -.78f, .16f, .23f, .16f, .31f, dark)
         ball(.48f, -.48f, -.32f, .22f, .43f, .20f, coat, -40f)
         ball(.64f, -.20f, -.34f, .15f, .19f, .17f, cream)
-        val wave = if (acting && reaction == "wave") sin(elapsed * 17f) * 25f + 125f else 20f
+        val wave = if (reducedMotion && reaction == "wave") 125f
+            else if (acting && reaction == "wave") sin(elapsed * 17f) * 25f + 125f else 20f
         ball(-.53f, -.24f, .02f, .17f, .34f, .20f, coat, -20f)
         ball(.53f, if (wave > 50f) .03f else -.24f, .02f, .17f, .34f, .20f, coat, wave)
         ball(0f, .57f, .03f, .63f, .56f, .47f, coat)
@@ -283,7 +286,7 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
         }
         ball(-.23f, .40f, .41f, .26f, .23f, .10f, cream)
         ball(.23f, .40f, .41f, .26f, .23f, .10f, cream)
-        val blink = (!reducedMotion && time % 4.7f > 4.52f) || (acting && reaction == "pet")
+        val blink = (!reducedMotion && time % 4.7f > 4.52f) || ((acting || reducedMotion) && reaction == "pet")
         if (character == "kai" || character == "sol") {
             ball(-.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
             ball(.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)

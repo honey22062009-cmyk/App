@@ -34,7 +34,7 @@ A selected time two minutes ahead schedules for today. A time already passed sch
 
 ## Verification
 
-The workflow runs Android lint, builds the APK, executes JVM/Robolectric tests, and runs the six-step setup and recording UI regressions on an Android 15 tablet emulator. The tablet job captures setup, companion, Home, recording, Progress and Settings screenshots as `tablet-ui-evidence`.
+The workflow runs Android lint, builds the APK, executes JVM/Robolectric tests, and runs the six-step setup, recording and background notification UI regressions on an Android 15 tablet emulator. The tablet job captures setup, companion, Home, recording, Progress Settings and the delivered reminder screenshots as `tablet-ui-evidence`.
 
 Regression tests cover profile reopening/sign-out, completion recovery, atomic daily recording with sleep-note preservation, the 22:15 → 22:17 reminder case, actual alarm registration/cancellation, malformed DNS packets, A/AAAA/CNAME response construction, lookalike domain exclusions, Opera variants and private-mode signals.
 

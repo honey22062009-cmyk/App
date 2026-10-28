@@ -554,10 +554,10 @@ private fun ProtectionStatusCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     when {
-                        !enabled -> "Protection paused"
-                        !health.coreReady -> "Protection needs setup"
-                        health.reliabilityScore < 100 -> "Protection active · ${health.reliabilityScore}%"
-                        else -> "Protection healthy"
+                        !enabled -> "App blocking paused"
+                        !health.coreReady -> "Finish app blocking setup"
+                        health.reliabilityScore < 100 -> "App blocking · review reliability"
+                        else -> "App blocking ready"
                     },
                     fontWeight = FontWeight.SemiBold
                 )

@@ -78,6 +78,8 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare instrumentation APKs
+        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --no-daemon
       - name: Run Android 15 tablet UI regressions
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -89,7 +91,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             gradle :app:connectedDebugAndroidTest --stacktrace --no-daemon
-            adb pull /sdcard/Android/data/com.aistudio.strictblocker.kzvwpq/files/qa/ tablet-ui-screenshots/
+            adb pull /sdcard/Pictures/StrictBlockerQA/ tablet-ui-screenshots/
       - name: Upload tablet UI evidence
         if: always()
         uses: actions/upload-artifact@v4

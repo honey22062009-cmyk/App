@@ -145,6 +145,12 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                     runCatching { startActivity(intent) }
                 }
             }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // Browser UI nodes can disappear during navigation. A stale node must
+                // not crash the protection process. Never log inspected page text.
+                android.util.Log.w("StrictBlocker", "Window inspection could not complete", error)
             } finally {
                 @Suppress("DEPRECATION")
                 ownedEvent.recycle()

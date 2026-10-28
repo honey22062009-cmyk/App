@@ -1,6 +1,12 @@
 package com.example
 
 import android.graphics.Bitmap
+import android.app.NotificationManager
+import android.content.Context
+import android.content.ContentValues
+import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
+import com.example.core.system.TrackerReminderScheduler
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,11 +32,16 @@ class ReliabilityUiTest {
         compose.waitForIdle()
         Thread.sleep(500) // Allow the separate OpenGL surface to submit its first frame.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "qa").apply { mkdirs() }
-        instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
-            File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            bitmap.recycle()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not produce a screenshot" }
+        val resolver = instrumentation.targetContext.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/StrictBlockerQA")
         }
+        val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+        checkNotNull(resolver.openOutputStream(uri)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
 
     @Test fun sixStepSetupHasNoDockAndDoesNotRepeatAfterRecreation() {
@@ -84,5 +95,26 @@ class ReliabilityUiTest {
         compose.onNodeWithText("Settings").performClick()
         waitFor("Preferences and protection")
         capture("06-settings")
+    }
+
+    @Test fun scheduledReminderArrivesWhileAppIsInBackground() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        fun shell(command: String) {
+            ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+        }
+        shell("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
+        shell("appops set ${context.packageName} SCHEDULE_EXACT_ALARM allow")
+        val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notifications.cancel(6301)
+        assertTrue("The exact test alarm must be registered", TrackerReminderScheduler.scheduleTest(context))
+        compose.activity.runOnUiThread { compose.activity.moveTaskToBack(true) }
+        compose.waitUntil(75_000) {
+            notifications.activeNotifications.any { it.id == 6301 &&
+                it.notification.extras.getCharSequence("android.title")?.toString() == "Reminder test" }
+        }
+        shell("cmd statusbar expand-notifications")
+        capture("07-scheduled-notification")
+        shell("cmd statusbar collapse")
     }
 }
