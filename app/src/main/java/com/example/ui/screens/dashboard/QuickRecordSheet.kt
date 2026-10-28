@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun QuickRecordSheet(
     current: DailyCheckIn?, currentSleep: SleepEntry?, onDismiss: () -> Unit,
-    onReset: () -> Unit, onSave: suspend (String, Int?) -> Unit
+    onReset: () -> Unit, onSave: suspend (String, Int?, Boolean) -> Unit
 ) {
     var rating by rememberSaveable { mutableStateOf(current?.rating ?: "okay") }
     var addSleep by rememberSaveable { mutableStateOf(currentSleep != null) }
@@ -59,7 +59,7 @@ internal fun QuickRecordSheet(
                 error = null
                 saving = true
                 scope.launch {
-                    try { onSave(rating, if (addSleep) minutes else null) }
+                    try { onSave(rating, if (addSleep) minutes else null, currentSleep != null && !addSleep) }
                     catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                     catch (_: Exception) { error = "Could not save. Try again." }
                     finally { saving = false }

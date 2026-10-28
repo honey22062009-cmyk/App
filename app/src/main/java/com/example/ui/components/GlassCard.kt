@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -155,7 +156,7 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val color = backgroundColor ?: when (variant) {
+    val requested = backgroundColor ?: when (variant) {
         GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer
         GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer
         GlassVariant.Warning -> MaterialTheme.colorScheme.secondaryContainer
@@ -163,6 +164,7 @@ fun GlassCard(
         GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceContainerLow
         else -> MaterialTheme.colorScheme.surface
     }
+    val color = requested.compositeOver(MaterialTheme.colorScheme.surface)
     val border = BorderStroke(borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
     if (onClick != null) {
         Surface(onClick = onClick, modifier = modifier, shape = shape, color = color,

@@ -59,6 +59,13 @@ class ReliabilityRegressionTest {
         assertEquals(started, settings.trackerStartedAtFlow.first())
     }
 
+    @Test fun removingOptionalSleepKeepsTheDailyRating() = runBlocking {
+        settings.saveDailyEntry("2026-10-28", "easy", 480)
+        settings.saveDailyEntry("2026-10-28", "okay", null, removeSleep = true)
+        assertTrue(settings.sleepEntriesFlow.first().isEmpty())
+        assertEquals("okay", settings.dailyCheckInsFlow.first().single().rating)
+    }
+
     @Test fun reminderTwoMinutesAwayStaysTodayAndPassedTimeMovesToTomorrow() {
         val now = ZonedDateTime.parse("2026-10-28T22:15:30+05:30[Asia/Kolkata]")
         assertEquals("2026-10-28T22:17+05:30[Asia/Kolkata]", TrackerReminderScheduler.nextOccurrence(22, 17, now).toString())

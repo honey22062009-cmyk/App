@@ -123,7 +123,7 @@ fun LegalComplianceScreen(
                             "• Local blocking data: Managed apps, schedules, preferences, and block history stay on the device through Room/DataStore.\n" +
                             "• Manual payment records: When a user requests Pro activation, Firebase Authentication and Cloud Firestore store the payment request ID, selected plan, amount, UPI transaction reference, a one-way device hash, request status, and timestamps needed for approval.\n" +
                             "• No analytics or advertising: Firebase Analytics and advertising SDKs are not used by this payment flow.\n" +
-                            "• Accessibility boundaries: Browser protection may inspect visible accessibility text in supported browser contexts. Password fields and unrelated editable values are excluded, and page text is not uploaded to Firebase."
+                            "• Accessibility boundaries: With consent, Browser Guard checks visible address/search fields in browser windows. Passwords, unrelated editable values and page paragraphs are excluded; inspected values are not saved or uploaded."
                 )
             }
 

@@ -227,9 +227,10 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val tablet = maxWidth >= 720.dp
+        val wideHome = maxWidth >= 1000.dp && !progressOnly
         val progressKeys = setOf("stats", "graph", "calendar", "timeline", "milestones", "insights")
         val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
-            else listOf("protection", "hero")
+            else if (wideHome) listOf("protection") else listOf("protection", "hero")
         val tabletRows = remember(visibleCardOrder) {
             buildTabletDashboardRows(visibleCardOrder)
         }
@@ -337,7 +338,7 @@ fun DashboardScreen(
                 QuickTourCard(reduceMotion = reduceMotion,
                     onDone = { scope.launch { repository.settings.setQuickTourSeen(true) } })
             }
-            if (!progressOnly) item(key = "today") {
+            if (!progressOnly && !wideHome) item(key = "today") {
                 TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today,
                     reduceMotion, onRecord = { showQuickEntry = true })
             }
@@ -347,6 +348,15 @@ fun DashboardScreen(
                     TextButton(onClick = onNavigateToApps, modifier = Modifier.weight(1f)) { Text("Block apps") }
                     TextButton(onClick = onNavigateToSchedules, modifier = Modifier.weight(1f)) { Text("Schedules") }
                     TextButton(onClick = onNavigateToAdultProtection, modifier = Modifier.weight(1f)) { Text("18+ protection") }
+                }
+            }
+
+            if (wideHome) item(key = "home_focus_row") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                    Box(Modifier.weight(.85f)) {
+                        TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today, reduceMotion, onRecord = { showQuickEntry = true })
+                    }
+                    Box(Modifier.weight(1.65f)) { renderDashboardCard("hero") }
                 }
             }
 
@@ -391,8 +401,8 @@ fun DashboardScreen(
             currentSleep = todaySleep,
             onDismiss = { showQuickEntry = false },
             onReset = { showQuickEntry = false; editingReset = null; showResetEditor = true },
-            onSave = { rating, sleep ->
-                repository.settings.saveDailyEntry(LocalDate.now(zone).toString(), rating, sleep)
+            onSave = { rating, sleep, removeSleep ->
+                repository.settings.saveDailyEntry(LocalDate.now(zone).toString(), rating, sleep, removeSleep)
                 showQuickEntry = false
             }
         )

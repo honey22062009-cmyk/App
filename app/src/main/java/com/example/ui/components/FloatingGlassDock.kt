@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -15,6 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -31,10 +36,20 @@ fun FloatingGlassDock(currentScreen: Screen, onSelect: (Screen) -> Unit, reduceM
     val selectedIndex = items.indexOf(currentScreen).takeIf { it >= 0 }
     Box(modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center) {
-        Surface(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().testTag("glass_dock"),
-            shape = RoundedCornerShape(30.dp), color = colors.surface.copy(alpha = .58f),
-            shadowElevation = 10.dp, border = BorderStroke(1.dp,
-                Brush.verticalGradient(listOf(Color.White.copy(alpha = .85f), colors.primary.copy(alpha = .17f), Color.White.copy(alpha = .46f))))) {
+        val shape = RoundedCornerShape(30.dp)
+        Box(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().testTag("glass_dock")
+            .drawBehind {
+                // A painted halo avoids Android elevation shadows bleeding through transparent children.
+                for (spread in 8 downTo 1) {
+                    val radius = spread.dp.toPx()
+                    drawRoundRect(Color.Black.copy(alpha = .006f), Offset(-radius, -radius / 2),
+                        Size(size.width + radius * 2, size.height + radius), CornerRadius(30.dp.toPx() + radius))
+                }
+            }
+            .clip(shape)
+            .background(colors.surface.copy(alpha = .58f))
+            .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .85f),
+                colors.primary.copy(alpha = .17f), Color.White.copy(alpha = .46f)))), shape)) {
             BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
                 .background(Brush.linearGradient(listOf(Color.White.copy(alpha = .12f), colors.primaryContainer.copy(alpha = .12f), Color.Transparent)))
                 .padding(6.dp)) {

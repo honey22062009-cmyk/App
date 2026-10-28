@@ -81,10 +81,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             if (adultProtectionEnabled && repository.settings.browserInspectionConsentFlow.first()) {
                 if (now - lastAdultTriggerTimestamp > 1200L) {
                     val isAdultBlocked = inspectForAdultContent(packageName)
-                    if (isAdultBlocked) {
-                        lastAdultTriggerTimestamp = now
-                        return@launch
-                    }
+                    if (isAdultBlocked) return@launch
                 }
             }
 
@@ -145,7 +142,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val root = runCatching { rootInActiveWindow }.getOrNull() ?: return false
         if (root.packageName?.toString() != packageName) return false
         BrowserGuardStatus.inspected()
-        val result = BrowserContentInspector.inspect(root, packageName)
+        val result = try { BrowserContentInspector.inspect(root, packageName) }
+            finally { @Suppress("DEPRECATION") root.recycle() }
         if (result is AdultContentEvaluator.EvaluationResult.Blocked) {
             // Reserve this trigger before a database write can suspend; coalesce follow-up events.
             lastAdultTriggerTimestamp = android.os.SystemClock.elapsedRealtime()

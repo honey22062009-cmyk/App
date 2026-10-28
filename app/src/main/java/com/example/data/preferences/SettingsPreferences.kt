@@ -405,7 +405,7 @@ class SettingsPreferences(private val context: Context) {
         }
     }
 
-    suspend fun saveDailyEntry(date: String, rating: String, sleepMinutes: Int?) {
+    suspend fun saveDailyEntry(date: String, rating: String, sleepMinutes: Int?, removeSleep: Boolean = false) {
         val day = java.time.LocalDate.parse(date)
         require(rating in DailyCheckIn.allowedRatings)
         context.dataStore.edit { p ->
@@ -413,7 +413,10 @@ class SettingsPreferences(private val context: Context) {
             checkIns.removeAll { DailyCheckIn.decode(it)?.localDate == day }
             checkIns.add(DailyCheckIn(day, rating).encode())
             p[PreferencesKeys.DAILY_CHECK_INS] = checkIns
-            if (sleepMinutes != null) {
+            if (removeSleep) {
+                p[PreferencesKeys.SLEEP_ENTRIES] = (p[PreferencesKeys.SLEEP_ENTRIES] ?: emptySet())
+                    .filterNot { SleepEntry.decode(it)?.localDate == day }.toSet()
+            } else if (sleepMinutes != null) {
                 val sleep = (p[PreferencesKeys.SLEEP_ENTRIES] ?: emptySet()).toMutableSet()
                 val previous = sleep.mapNotNull(SleepEntry::decode).firstOrNull { it.localDate == day }
                 sleep.removeAll { SleepEntry.decode(it)?.localDate == day }

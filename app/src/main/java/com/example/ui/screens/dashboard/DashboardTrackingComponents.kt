@@ -151,7 +151,7 @@ internal fun StreakHeroCard(
                 }
             }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                if (maxWidth >= 600.dp) {
+                if (maxWidth >= 500.dp) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                         Box(Modifier.weight(.7f)) { streakContent() }
                         com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion, Modifier.weight(1.3f),

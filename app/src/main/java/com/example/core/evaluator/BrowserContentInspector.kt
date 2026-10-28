@@ -23,17 +23,25 @@ internal object BrowserContentInspector {
         val pending = ArrayDeque<AccessibilityNodeInfo>()
         pending.add(root)
         var remaining = 200
-        while (pending.isNotEmpty() && remaining-- > 0) {
-            val node = pending.removeFirst()
-            if (node.isPassword || !node.isVisibleToUser) continue
-            if (node.packageName?.toString()?.let { it != browserPackage } == true) continue
-            if (isAddressOrSearchField(node)) {
-                val result = AdultContentEvaluator.evaluateText(node.text?.toString().orEmpty())
-                if (result is AdultContentEvaluator.EvaluationResult.Blocked) return result
+        try {
+            while (pending.isNotEmpty() && remaining-- > 0) {
+                val node = pending.removeFirst()
+                try {
+                    if (node.isPassword || !node.isVisibleToUser) continue
+                    if (node.packageName?.toString()?.let { it != browserPackage } == true) continue
+                    if (isAddressOrSearchField(node)) {
+                        val result = AdultContentEvaluator.evaluateText(node.text?.toString().orEmpty())
+                        if (result is AdultContentEvaluator.EvaluationResult.Blocked) return result
+                    }
+                    for (i in 0 until node.childCount.coerceAtMost(80)) {
+                        runCatching { node.getChild(i) }.getOrNull()?.let(pending::addLast)
+                    }
+                } finally {
+                    if (node !== root) { @Suppress("DEPRECATION") node.recycle() }
+                }
             }
-            for (i in 0 until node.childCount.coerceAtMost(80)) {
-                runCatching { node.getChild(i) }.getOrNull()?.let(pending::addLast)
-            }
+        } finally {
+            pending.forEach { if (it !== root) { @Suppress("DEPRECATION") it.recycle() } }
         }
         return AdultContentEvaluator.EvaluationResult.Clean
     }

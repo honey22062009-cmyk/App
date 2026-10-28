@@ -11,14 +11,13 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -149,11 +148,17 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
                 reaction, key, backgroundColor ?: Color.Transparent, onPet = { act("pet") })
         }
         Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin", "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe").forEach { (id, label) ->
-                FilledTonalButton(onClick = { act(id) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp)) { Text(label, maxLines = 1) }
+        listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin", "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe")
+            .chunked(3).forEach { actions ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    actions.forEach { (id, label) ->
+                        FilledTonalButton(onClick = { act(id) }, modifier = Modifier.weight(1f),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 8.dp)) {
+                            Text(label, maxLines = 1)
+                        }
+                    }
+                }
             }
-        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextButton(onClick = { act("talk"); if (!soundEnabled) audioStatus = "Turn on sounds to hear the offline voice." }) { Text("Say something") }
             TextButton(onClick = { onSoundChange(!soundEnabled); audioStatus = "" }) { Text(if (soundEnabled) "Sound on" else "Sound off") }

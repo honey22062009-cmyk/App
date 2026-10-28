@@ -1,14 +1,9 @@
 package com.example
 
-import android.app.Activity
 import android.app.UiAutomation
 import android.content.ComponentName
 import android.content.Intent
-import android.os.Bundle
 import android.os.ParcelFileDescriptor
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.preferences.SettingsPreferences
@@ -18,24 +13,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-
-/** A real separate test-APK window that exposes browser-style accessibility fields. Never ships. */
-class BrowserFixtureActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 32, 32, 32) }
-        layout.addView(EditText(this).apply {
-            id = com.example.test.R.id.qa_browser_url_bar
-            contentDescription = "Web address"
-            setText(intent.getStringExtra("address") ?: "https://example.com")
-        })
-        layout.addView(TextView(this).apply { text = "New private tab · You've gone incognito"; textSize = 24f })
-        layout.addView(TextView(this).apply { text = "Ordinary page copy can mention porn or sex without closing this browser." })
-        setContentView(layout)
-        layout.isFocusableInTouchMode = true
-        layout.requestFocus()
-    }
-}
 
 @RunWith(AndroidJUnit4::class)
 class BrowserGuardNativeTest {
