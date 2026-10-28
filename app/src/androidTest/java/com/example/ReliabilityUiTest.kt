@@ -94,11 +94,15 @@ class ReliabilityUiTest {
     @Test fun quickRecordingHidesDockSavesAndSurvivesReopening() {
         runBlocking {
             settings.clearAllUserPreferences()
-            settings.saveLocalProfile("Honey", 18, "male", "nova", "Nova")
+            settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
+            settings.setQuickTourSeen(true)
         }
         compose.activityRule.scenario.recreate()
         waitFor("Hi, Honey")
-        compose.onNodeWithText("Wave").performClick()
+        compose.onNodeWithText("Wave").performScrollTo().performClick()
+        compose.onNodeWithText("Feed").performScrollTo().performClick()
+        compose.onNodeWithText("Crunch, crunch. Thank you!").assertIsDisplayed()
+        capture("08-bunny")
         compose.onNodeWithText("Record today").performScrollTo().performClick()
         waitFor("How was today?")
         compose.onNodeWithText("Home").assertDoesNotExist()
@@ -106,15 +110,75 @@ class ReliabilityUiTest {
         compose.onNodeWithText("Good").performClick()
         compose.onNodeWithText("Save today's entry").performClick()
         compose.waitUntil(10_000) { runBlocking { settings.dailyCheckInsFlow.first().isNotEmpty() } }
+        waitFor("Saved today")
+        compose.onNodeWithText("Saved today").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("1 day recorded · 1 of 7 this week").assertIsDisplayed()
+        capture("09-saved-entry")
+        compose.onNodeWithText("Edit today's entry").performClick()
+        waitFor("How was today?")
+        compose.onNodeWithText("Tough").performClick()
+        compose.onNodeWithText("Save today's entry").performClick()
+        compose.waitUntil(10_000) { runBlocking { settings.dailyCheckInsFlow.first().single().rating == "difficult" } }
         compose.activityRule.scenario.recreate()
         waitFor("Hi, Honey")
-        assertEquals("easy", runBlocking { settings.dailyCheckInsFlow.first().single().rating })
+        assertEquals("difficult", runBlocking { settings.dailyCheckInsFlow.first().single().rating })
+        compose.onNodeWithText("Saved today").assertIsDisplayed()
+        assertEquals(1, runBlocking { settings.dailyCheckInsFlow.first().size })
         compose.onNodeWithText("Progress").performClick()
         waitFor("Your progress")
         capture("05-progress")
         compose.onNodeWithText("Settings").performClick()
         waitFor("Preferences and protection")
         capture("06-settings")
+    }
+
+    @Test fun proIsInTheDockAndPastelAppearanceChoicesPersist() {
+        runBlocking {
+            settings.clearAllUserPreferences()
+            settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
+            settings.setQuickTourSeen(true)
+        }
+        compose.activityRule.scenario.recreate()
+        waitFor("Hi, Honey")
+        compose.onNodeWithText("Pro").performClick()
+        waitFor("Meet Strict Blocker Pro")
+        compose.onNodeWithTag("glass_dock").assertIsDisplayed()
+        capture("10-pro")
+        compose.onNodeWithText("Settings").performClick()
+        waitFor("Rose")
+        compose.onNodeWithText("Lilac").performClick()
+        compose.waitUntil(5000) { runBlocking { settings.accentStyleFlow.first() == "lilac" } }
+        compose.onNodeWithText("Dark").performClick()
+        compose.waitUntil(5000) { runBlocking { settings.themeModeFlow.first() == "dark" } }
+        capture("11-lilac-dark")
+        compose.onNodeWithText("Light").performClick()
+        capture("12-lilac-light")
+        compose.activityRule.scenario.recreate()
+        waitFor("Hi, Honey")
+        assertEquals("lilac", runBlocking { settings.accentStyleFlow.first() })
+        assertEquals("light", runBlocking { settings.themeModeFlow.first() })
+        assertNull("The retired VPN must not be declared", compose.activity.packageManager.getPackageInfo(
+            compose.activity.packageName, android.content.pm.PackageManager.GET_SERVICES).services
+            ?.firstOrNull { it.permission == "android.permission.BIND_VPN_SERVICE" })
+    }
+
+    @Test fun firstUseTourExplainsThreeSectionsAndStaysDismissed() {
+        runBlocking {
+            settings.clearAllUserPreferences()
+            settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
+        }
+        compose.activityRule.scenario.recreate()
+        waitFor("Welcome to your day")
+        compose.onNodeWithText("Next tip").performClick()
+        waitFor("Set your boundaries")
+        compose.onNodeWithText("Next tip").performClick()
+        waitFor("Make it yours")
+        capture("13-quick-tour")
+        compose.onNodeWithText("Let's begin").performClick()
+        compose.waitUntil(5000) { runBlocking { settings.quickTourSeenFlow.first() } }
+        compose.activityRule.scenario.recreate()
+        waitFor("Hi, Honey")
+        compose.onNodeWithText("Welcome to your day").assertDoesNotExist()
     }
 
     @Test fun scheduledReminderArrivesWhileAppIsInBackground() {

@@ -65,6 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.data.preferences.SettingsPreferences
+import com.example.ui.components.AccessibilityDisclosure
 import com.example.R
 import com.example.core.system.PermissionHelper
 import com.example.ui.components.GlassCard
@@ -72,10 +76,20 @@ import com.example.ui.components.StatusBadge
 
 @Composable
 fun PermissionsScreen(
+    settings: SettingsPreferences,
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    var showDisclosure by remember { mutableStateOf(false) }
+    if (showDisclosure) AccessibilityDisclosure(onAgree = {
+        scope.launch {
+            settings.setBrowserInspectionConsent(true)
+            showDisclosure = false
+            PermissionHelper.openAccessibilitySettings(context)
+        }
+    }, onDismiss = { showDisclosure = false })
 
     // Live permission states
     var isAccessibilityGranted by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
@@ -232,11 +246,11 @@ fun PermissionsScreen(
                     icon = Icons.Default.AccessibilityNew,
                     isGranted = isAccessibilityGranted,
                     isRequired = true,
-                    summary = "Lets Strict Blocker detect when a restricted app opens and show the block screen.",
+                    summary = "Detects scheduled apps and, with consent, visible browser searches. Review the disclosure before enabling.",
                     why = stringResource(R.string.perm_accessibility_why),
                     whatStops = stringResource(R.string.perm_accessibility_what),
                     howToEnable = stringResource(R.string.perm_accessibility_how),
-                    onGrantClick = { PermissionHelper.openAccessibilitySettings(context) }
+                    onGrantClick = { showDisclosure = true }
                 )
             }
 

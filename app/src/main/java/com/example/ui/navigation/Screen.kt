@@ -1,6 +1,8 @@
 package com.example.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -90,9 +92,9 @@ sealed class Screen(
 
     data object Paywall : Screen(
         route = "paywall",
-        title = "Strict Blocker Pro",
-        selectedIcon = Icons.Filled.Shield,
-        unselectedIcon = Icons.Outlined.Shield
+        title = "Pro",
+        selectedIcon = Icons.Filled.AutoAwesome,
+        unselectedIcon = Icons.Outlined.AutoAwesome
     )
 
     data object Account : Screen(
@@ -132,6 +134,6 @@ sealed class Screen(
 
     companion object {
         val navItems: List<Screen>
-            get() = listOf(Dashboard, Apps, Progress, Settings)
+            get() = listOf(Dashboard, Apps, Progress, Paywall, Settings)
     }
 }

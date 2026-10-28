@@ -2,41 +2,41 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Quiet evergreen, warm cream and terracotta.
-val BrandPrimary = Color(0xFF246B59)
-val BrandPrimaryDark = Color(0xFF96D7BD)
-val BrandPink = Color(0xFF398773)
-val BrandPinkDark = Color(0xFFA6DDC7)
-val BrandCoral = Color(0xFF94532D)
-val BrandCoralDark = Color(0xFFF1BA95)
-val BrandPlum = Color(0xFF617B6F)
-val BrandPlumDark = Color(0xFFB8CEC3)
+// Rose, lilac and peach. Saturated ink keeps pastel surfaces readable.
+val BrandPrimary = Color(0xFF93466F)
+val BrandPrimaryDark = Color(0xFFF4B6D5)
+val BrandPink = Color(0xFFC85C92)
+val BrandPinkDark = Color(0xFFF2B3D1)
+val BrandCoral = Color(0xFF9B5144)
+val BrandCoralDark = Color(0xFFFFB9A9)
+val BrandPlum = Color(0xFF7160A6)
+val BrandPlumDark = Color(0xFFD1BFF5)
 
 // Semantic colors.
-val BrandEmerald = Color(0xFF187A67)
-val BrandEmeraldDark = Color(0xFF72D3BD)
+val BrandEmerald = Color(0xFF5565A1)
+val BrandEmeraldDark = Color(0xFFBCC9FF)
 val BrandAmber = Color(0xFFB56A00)
 val BrandCrimson = Color(0xFFBA1A1A)
 
-// Deep forest neutrals.
-val DarkBackground = Color(0xFF101815)
-val DarkSurface = Color(0xFF18221D)
-val DarkSurfaceVariant = Color(0xFF222F28)
-val DarkSurfaceBorder = Color(0xFF33423A)
-val DarkOnBackground = Color(0xFFEDF4EE)
-val DarkOnSurface = Color(0xFFEDF4EE)
-val DarkOnSurfaceVariant = Color(0xFFB5C4B9)
-val DarkOutline = Color(0xFF617168)
+// Warm charcoal, without a green cast.
+val DarkBackground = Color(0xFF1B1720)
+val DarkSurface = Color(0xFF25202C)
+val DarkSurfaceVariant = Color(0xFF332C3B)
+val DarkSurfaceBorder = Color(0xFF514555)
+val DarkOnBackground = Color(0xFFF7ECF3)
+val DarkOnSurface = Color(0xFFF7ECF3)
+val DarkOnSurfaceVariant = Color(0xFFD3C1D0)
+val DarkOutline = Color(0xFF9C879A)
 
-// Warm cream surfaces.
-val LightBackground = Color(0xFFF5F5EF)
-val LightSurface = Color(0xFFFFFEF8)
-val LightSurfaceVariant = Color(0xFFEBEEE4)
-val LightSurfaceBorder = Color(0xFFDCE3D7)
-val LightOnBackground = Color(0xFF1D2D24)
-val LightOnSurface = Color(0xFF1D2D24)
-val LightOnSurfaceVariant = Color(0xFF526259)
-val LightOutline = Color(0xFFB8C5B8)
+// Almost-white rose surfaces keep the colour restrained.
+val LightBackground = Color(0xFFFFF7FB)
+val LightSurface = Color(0xFFFFFBFE)
+val LightSurfaceVariant = Color(0xFFF5E6F0)
+val LightSurfaceBorder = Color(0xFFE6D3E1)
+val LightOnBackground = Color(0xFF302432)
+val LightOnSurface = Color(0xFF302432)
+val LightOnSurfaceVariant = Color(0xFF705C6E)
+val LightOutline = Color(0xFF998295)
 
 // Compatibility aliases retained for older screens while the UI migrates.
 val CyberCyan = BrandPrimary

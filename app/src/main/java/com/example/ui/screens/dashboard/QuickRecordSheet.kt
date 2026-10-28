@@ -27,7 +27,7 @@ internal fun QuickRecordSheet(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("How was today?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -55,16 +55,19 @@ internal fun QuickRecordSheet(
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Button(onClick = {
+                if (saving) return@Button
+                error = null
                 saving = true
                 scope.launch {
                     try { onSave(rating, if (addSleep) minutes else null) }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                     catch (_: Exception) { error = "Could not save. Try again." }
                     finally { saving = false }
                 }
             }, enabled = !saving,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if (saving) "Saving…" else "Save today's entry") }
-            TextButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("I need to reset my streak") }
-            Text("Saved on this device. You can edit your entry later.", style = MaterialTheme.typography.bodySmall,
+            TextButton(onClick = onReset, enabled = !saving, modifier = Modifier.fillMaxWidth()) { Text("I need to reset my streak") }
+            Text("One entry per day. Saving again updates today’s entry. Your elapsed streak counts time separately.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
         }

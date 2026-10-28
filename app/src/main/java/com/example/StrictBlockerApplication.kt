@@ -13,7 +13,6 @@ import com.example.core.di.DefaultAppContainer
 import com.example.core.system.AlarmScheduler
 import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
-import com.example.service.AdultFilterVpnService
 import com.example.service.BlockerMonitoringService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,15 +74,7 @@ class StrictBlockerApplication : Application() {
                     BlockerMonitoringService.start(applicationContext)
                 }
 
-                val adultEnabled = repository.settings.isAdultProtectionEnabledFlow.first()
-                val dnsEnabled = repository.settings.isDnsFilterEnabledFlow.first()
-                if (
-                    adultEnabled &&
-                    dnsEnabled &&
-                    AdultFilterVpnService.isVpnConfigured(applicationContext)
-                ) {
-                    AdultFilterVpnService.start(applicationContext)
-                }
+
             } catch (t: Throwable) {
                 Log.w("StrictBlockerApp", "Protection repair pass failed", t)
             }

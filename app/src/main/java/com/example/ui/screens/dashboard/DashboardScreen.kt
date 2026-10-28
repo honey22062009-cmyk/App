@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -122,6 +123,8 @@ fun DashboardScreen(
     val seenMilestones by repository.settings.seenMilestonesFlow.collectAsState(initial = emptySet())
     val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
     val userName by repository.settings.userNameFlow.collectAsState(initial = "")
+    val tourSeen by repository.settings.quickTourSeenFlow.collectAsState(initial = true)
+    val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
     val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
     val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
     val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
@@ -131,7 +134,7 @@ fun DashboardScreen(
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
-    var showQuickEntry by remember { mutableStateOf(false) }
+    var showQuickEntry by rememberSaveable { mutableStateOf(false) }
     var showResetEditor by remember { mutableStateOf(false) }
     var showSleepEditor by remember { mutableStateOf(false) }
     var showDailyPrompt by remember { mutableStateOf(false) }
@@ -156,7 +159,7 @@ fun DashboardScreen(
     LaunchedEffect(initialTrackerAction) {
         when (initialTrackerAction) {
             "sleep" -> showSleepEditor = true
-            "daily" -> showDailyPrompt = true
+            "daily" -> showQuickEntry = true
         }
         if (initialTrackerAction != null) onTrackerActionConsumed()
     }
@@ -241,6 +244,8 @@ fun DashboardScreen(
                             goalDays = goalDays,
                             reduceMotion = reduceMotion,
                             tablet = tablet,
+                            soundEnabled = companionSound,
+                            onSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
                             onRecordReset = {
                                 editingReset = null
                                 showResetEditor = true
@@ -305,7 +310,7 @@ fun DashboardScreen(
 
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter),
             contentPadding = PaddingValues(
                 start = if (tablet) 22.dp else 12.dp,
                 end = if (tablet) 22.dp else 12.dp,
@@ -315,16 +320,28 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item(key = "header") {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(if (progressOnly) "Your progress" else if (userName.isBlank()) "Your day" else "Hi, ${userName.trim()}",
-                        style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                    Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A better day.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (progressOnly) TextButton(onClick = {
-                        if (isPro) showCustomization = true else onOpenPro()
-                    }) { Text("Customize progress") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(if (progressOnly) "Your progress" else if (userName.isBlank()) "Your day" else "Hi, ${userName.trim()}",
+                            style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                        Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A softer landing.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(if (isPro) " Pro active" else " Explore Pro") }
                 }
+                if (progressOnly) TextButton(onClick = {
+                    if (isPro) showCustomization = true else onOpenPro()
+                }) { Text("Customize progress") }
             }
+            if (!progressOnly && !tourSeen) item(key = "quick_tour") {
+                QuickTourCard(reduceMotion = reduceMotion,
+                    onDone = { scope.launch { repository.settings.setQuickTourSeen(true) } })
+            }
+            if (!progressOnly) item(key = "today") {
+                TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today,
+                    reduceMotion, onRecord = { showQuickEntry = true })
+            }
+
             if (!progressOnly) item(key = "shortcuts") {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onNavigateToApps, modifier = Modifier.weight(1f)) { Text("Block apps") }
@@ -375,7 +392,7 @@ fun DashboardScreen(
             onDismiss = { showQuickEntry = false },
             onReset = { showQuickEntry = false; editingReset = null; showResetEditor = true },
             onSave = { rating, sleep ->
-                repository.settings.saveDailyEntry(today.toString(), rating, sleep)
+                repository.settings.saveDailyEntry(LocalDate.now(zone).toString(), rating, sleep)
                 showQuickEntry = false
             }
         )

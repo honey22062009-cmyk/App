@@ -176,7 +176,7 @@ fun LegalComplianceScreen(
                             "• Analytics SDKs: NONE.\n" +
                             "• Firebase Authentication: used for anonymous payment-request identity and the owner's authenticated approval account.\n" +
                             "• Cloud Firestore: used only for manual payment requests, approval status, and Pro entitlement timing.\n" +
-                            "• Optional DNS filtering: sends DNS queries to the configured resolver when enabled."
+                            "• Browser inspection: with consent, evaluates visible URL and search fields locally. No VPN or DNS proxy is installed. Inspected text is not saved or uploaded."
                 )
             }
 

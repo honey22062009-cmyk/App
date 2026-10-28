@@ -8,15 +8,13 @@ import com.example.core.system.AlarmScheduler
 import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.service.BlockerMonitoringService
-import com.example.service.AdultFilterVpnService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Restores monitoring after reboot/update and restores the optional DNS filter only
- * when the user has left that protection enabled.
+ * Repairs schedules and reminder alarms after reboot or app updates.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -34,17 +32,9 @@ class BootReceiver : BroadcastReceiver() {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         TrackerReminderScheduler.refreshNow(appContext)
-                        val settings = AppBlockerRepository(appContext).settings
-                        val adultProtectionEnabled = settings.isAdultProtectionEnabledFlow.first()
-                        val dnsFilterEnabled = settings.isDnsFilterEnabledFlow.first()
-                        if (adultProtectionEnabled &&
-                            dnsFilterEnabled &&
-                            AdultFilterVpnService.isVpnConfigured(appContext)
-                        ) {
-                            AdultFilterVpnService.start(appContext)
-                        }
+
                     } catch (e: Exception) {
-                        Log.w("BootReceiver", "Could not restore optional DNS filtering", e)
+                        Log.w("BootReceiver", "Could not refresh reminders", e)
                     } finally {
                         pendingResult.finish()
                     }

@@ -129,19 +129,6 @@ object PermissionHelper {
         }
     }
 
-    fun openVpnSettings(context: Context) {
-        try {
-            val intent = Intent(Settings.ACTION_VPN_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(intent)
-        } catch (_: Exception) {
-            val fallback = Intent(Settings.ACTION_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(fallback)
-        }
-    }
 
     fun openAppNotificationSettings(context: Context) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {

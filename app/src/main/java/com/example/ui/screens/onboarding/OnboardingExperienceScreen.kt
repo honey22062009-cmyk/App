@@ -87,7 +87,7 @@ private val characterOptions = listOf(
     CharacterOption("milo", "Milo · Bear", Color(0xFFA953C7), Color(0xFFD7A5EA)),
     CharacterOption("aria", "Aria · Cat", Color(0xFFF4866B), Color(0xFFFFC2A8)),
     CharacterOption("kai", "Kai · Panda", Color(0xFF8C5CC7), Color(0xFFC7A5EF)),
-    CharacterOption("luna", "Luna · Rabbit", Color(0xFF62B49A), Color(0xFFA7DCCB)),
+    CharacterOption("luna", "Luna · Rabbit", Color(0xFFD08BB1), Color(0xFFF4CADD)),
     CharacterOption("sol", "Sol · Owl", Color(0xFFD36A89), Color(0xFFF1A0B5))
 )
 

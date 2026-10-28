@@ -1,50 +1,67 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.navigation.Screen
 
+/** A translucent, layered dock. Content really remains visible through its surface. */
 @Composable
 fun FloatingGlassDock(currentScreen: Screen, onSelect: (Screen) -> Unit, reduceMotion: Boolean, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
+    val colors = MaterialTheme.colorScheme
+    val items = Screen.navItems
+    val selectedIndex = items.indexOf(currentScreen).takeIf { it >= 0 }
+    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center) {
-        Surface(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(), shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow, shadowElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Screen.navItems.forEach { screen ->
-                    val selected = currentScreen == screen
-                    val scale by animateFloatAsState(if (selected && !reduceMotion) 1.04f else 1f,
-                        animationSpec = spring(dampingRatio = .72f, stiffness = 520f), label = "navigation_selection")
-                    Column(Modifier.weight(1f).scale(scale).clip(RoundedCornerShape(20.dp))
-                        .selectable(selected, role = Role.Tab) { onSelect(screen) }.padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(36.dp).background(
-                            if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-                            CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(if (selected) screen.selectedIcon else screen.unselectedIcon, null,
-                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(21.dp))
+        Surface(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().testTag("glass_dock"),
+            shape = RoundedCornerShape(30.dp), color = colors.surface.copy(alpha = .58f),
+            shadowElevation = 10.dp, border = BorderStroke(1.dp,
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = .85f), colors.primary.copy(alpha = .17f), Color.White.copy(alpha = .46f))))) {
+            BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
+                .background(Brush.linearGradient(listOf(Color.White.copy(alpha = .12f), colors.primaryContainer.copy(alpha = .12f), Color.Transparent)))
+                .padding(6.dp)) {
+                val cellWidth = maxWidth / items.size
+                val offset by animateDpAsState(cellWidth * (selectedIndex ?: 0),
+                    animationSpec = if (reduceMotion) snap() else spring(dampingRatio = .78f, stiffness = 430f), label = "dock_slide")
+                if (selectedIndex != null) Box(
+                    Modifier.offset(x = offset).width(cellWidth).height(62.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Brush.linearGradient(listOf(colors.primaryContainer.copy(alpha = .90f), colors.secondaryContainer.copy(alpha = .78f))))
+                        .drawWithCache {
+                            val shine = Brush.verticalGradient(listOf(Color.White.copy(alpha = .48f), Color.Transparent))
+                            onDrawBehind { drawRect(shine) }
                         }
-                        Text(screen.title, style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    items.forEach { screen ->
+                        val selected = currentScreen == screen
+                        val tint by animateColorAsState(if (selected) colors.primary else colors.onSurfaceVariant, label = "dock_tint")
+                        Column(Modifier.weight(1f).heightIn(min = 62.dp).clip(RoundedCornerShape(24.dp))
+                            .selectable(selected, role = Role.Tab) { if (!selected) onSelect(screen) }
+                            .padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(if (selected) screen.selectedIcon else screen.unselectedIcon, null, tint = tint, modifier = Modifier.size(22.dp))
+                            Text(screen.title, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = tint)
+                        }
                     }
                 }
             }

@@ -1,3 +1,5 @@
+> Version 1.4.0: pastel themes, translucent sliding dock, visible Pro workspace, daily-entry receipts, a joined 3D bunny with optional sound, a quick tour and browser inspection without a VPN. See [the implementation and release notes](docs/EXPERIENCE-1.4.md).
+
 # Strict Blocker (Android)
 
 Current reliability/UI update: **1.3.1**. See [implementation changes, verification and device limits](docs/RELIABILITY-1.3.1.md).
@@ -13,7 +15,7 @@ Strict Blocker allows device owners to manage installed applications and define 
 - **Strict Enforcement**: Outside an allowed schedule window, managed applications are strictly blocked.
 - **Immediate Interruption**: When an unallowed application is opened, an immediate fullscreen interrupt shield (`BlockerActivity`) intercepts access.
 - **No Compromise UI**: Does not display "Ignore", "Use Anyway", "5 More Minutes", or "Snooze" buttons.
-- **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. If optional DNS filtering is enabled, DNS queries are sent to the configured resolver, which can observe the queried domains.
+- **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. With consent, Browser Guard inspects visible address/search fields locally. Version 1.4 removes the VPN/DNS tunnel.
 
 ---
 
@@ -149,7 +151,7 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 ## Privacy Policy, Terms & Legal Compliance
 
-- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. The manual Pro-payment flow uses Firebase Authentication and Cloud Firestore for payment request IDs, plan/amount, UPI transaction references, one-way device hashes, review status, and entitlement expiry. No Firebase Analytics or advertising SDK is configured. Optional VPN-based DNS filtering forwards DNS queries to the configured resolver; that resolver can observe queried domains.
+- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. The manual Pro-payment flow uses Firebase Authentication and Cloud Firestore for payment request IDs, plan/amount, UPI transaction references, one-way device hashes, review status, and entitlement expiry. No Firebase Analytics or advertising SDK is configured. Browser Guard evaluates visible browser address/search fields on-device after consent; inspected values are not stored or uploaded. There is no VPN service or DNS proxy.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
 - **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
 - **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.

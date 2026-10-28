@@ -1,17 +1,13 @@
 package com.example.ui.screens.adult
 
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.net.VpnService
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,10 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.core.evaluator.AdultContentEvaluator
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
-import com.example.service.AdultFilterVpnService
-import kotlinx.coroutines.delay
+import com.example.service.BrowserGuardStatus
+import com.example.ui.components.AccessibilityDisclosure
 import kotlinx.coroutines.launch
 
 @Composable
@@ -35,175 +32,125 @@ fun AdultProtectionScreen(repository: AppBlockerRepository, onNavigateToPermissi
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val enabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
-    val unlockAt by repository.settings.adultUnlockNotBeforeFlow.collectAsState(initial = 0L)
-    val resolver by repository.settings.customDnsPrimaryFlow.collectAsState(initial = "1.1.1.3")
-    val secondary by repository.settings.customDnsSecondaryFlow.collectAsState(initial = "1.0.0.3")
-    val vpn by AdultFilterVpnService.isVpnActive.collectAsState()
-    val alwaysOn by AdultFilterVpnService.alwaysOn.collectAsState()
-    val queries by AdultFilterVpnService.processedQueries.collectAsState()
+    val consent by repository.settings.browserInspectionConsentFlow.collectAsState(initial = false)
+    val serviceConnected by BrowserGuardStatus.isConnected.collectAsState()
+    val inspections by BrowserGuardStatus.inspections.collectAsState()
+    val totalBlocks by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
     var accessibility by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var advanced by remember { mutableStateOf(false) }
-    var testing by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<String?>(null) }
-    var showDisable by remember { mutableStateOf(false) }
-    var confirmation by remember { mutableStateOf("") }
     var browsers by remember { mutableStateOf<List<String>>(emptyList()) }
-    DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                accessibility = PermissionHelper.isAccessibilityServiceEnabled(context)
-                browsers = runCatching {
-                    context.packageManager.queryIntentActivities(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")).addCategory(Intent.CATEGORY_BROWSABLE),
-                        PackageManager.MATCH_ALL).map { it.loadLabel(context.packageManager).toString() }.distinct().sorted()
-                }.getOrDefault(emptyList())
-                // Refresh the live service's always-on read after returning from system Settings.
-                if (vpn) AdultFilterVpnService.start(context)
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-    LaunchedEffect(Unit) {
+    var showDisclosure by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) }
+    fun refresh() {
+        accessibility = PermissionHelper.isAccessibilityServiceEnabled(context)
         browsers = runCatching {
             context.packageManager.queryIntentActivities(
                 Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")).addCategory(Intent.CATEGORY_BROWSABLE),
                 PackageManager.MATCH_ALL).map { it.loadLabel(context.packageManager).toString() }.distinct().sorted()
         }.getOrDefault(emptyList())
     }
-    LaunchedEffect(unlockAt) {
-        while (unlockAt > 0 && now < unlockAt) { delay(1000); now = System.currentTimeMillis() }
+    DisposableEffect(lifecycle) {
+        refresh()
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refresh() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
-    val requestVpn = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (it.resultCode == Activity.RESULT_OK) AdultFilterVpnService.start(context)
-        else result = "DNS filter is off. Android VPN permission was not granted."
+    fun openWeb(url: String) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)) }
+            .onFailure { result = "No browser is available. Install a browser and try again." }
     }
-    fun connect() {
-        scope.launch {
-            if (!enabled) repository.settings.setAdultProtectionEnabled(true)
-            repository.settings.setDnsFilterEnabled(true)
-            val intent = VpnService.prepare(context)
-            if (intent == null) AdultFilterVpnService.start(context) else requestVpn.launch(intent)
-        }
-    }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 128.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            Text("18+ protection", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("Clear boundaries for your browsing", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        item {
-            Surface(shape = RoundedCornerShape(28.dp), color = if (enabled && vpn && accessibility)
-                MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Default.Shield, null, Modifier.size(38.dp))
-                    Text(when {
-                        !enabled -> "Protection is off"
-                        vpn && accessibility -> "Both protection layers are running"
-                        vpn || accessibility -> "Finish protection setup"
-                        else -> "Protection needs setup"
-                    }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("${if (accessibility) "Browser inspection on" else "Browser inspection off"} · ${if (vpn) "DNS filter connected" else "DNS filter disconnected"}")
-                    if (!vpn) Button(onClick = ::connect) { Text("Connect DNS filter") }
+    val ready = enabled && consent && accessibility && serviceConnected
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(Modifier.widthIn(max = 980.dp).fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 132.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                Text("Browser Guard", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Text("Browse normally. Interrupt explicit searches.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                    Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.Shield, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(when {
+                            !enabled -> "Browser Guard is off"
+                            ready -> "Browser Guard is ready"
+                            !consent -> "Review browser access"
+                            !accessibility -> "Enable Accessibility to begin"
+                            else -> "Waiting for the Android service"
+                        }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text("${totalBlocks} restricted searches or sites interrupted · ${inspections} field checks this session")
+                        Text("No VPN connection. No DNS tunnel. Your normal browser connection stays in use.", style = MaterialTheme.typography.bodyMedium)
+                        if (enabled && !ready) Button(onClick = {
+                            if (!consent) showDisclosure = true else PermissionHelper.openAccessibilitySettings(context)
+                        }) { Text(if (!consent) "Review and enable" else "Open Accessibility settings") }
+                    }
                 }
             }
-        }
-        item { ProtectionStep("1", "Browser inspection", accessibility,
-            "Checks visible URLs and searches, including Opera, Opera GX, Chrome, Firefox and other installed browser handlers.",
-            "Enable browser inspection", { PermissionHelper.openAccessibilitySettings(context) }) }
-        item { ProtectionStep("2", "DNS filtering + SafeSearch", vpn,
-            "Blocks restricted domains through system DNS. Google and Bing searches use their strict DNS endpoints while this filter is connected.",
-            "Connect DNS filter", ::connect) }
-        item { ProtectionStep("3", "Keep the filter running", vpn && alwaysOn,
-            "Android's Always-on VPN setting can restart the filter after interruptions. This app does not change that setting for you.",
-            "Open Android VPN settings", { PermissionHelper.openVpnSettings(context) }) }
-        item {
-            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Check your protection", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("${queries} DNS queries processed in this app session.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = {
-                        testing = true
-                        scope.launch {
-                            val before = AdultFilterVpnService.processedQueries.value
-                            val check = ProtectionProbe.check(resolver)
-                            result = if (AdultFilterVpnService.processedQueries.value <= before)
-                                "The check did not pass through this DNS filter. Reconnect the filter and retry."
-                                else check
-                            testing = false
-                        }
-                    }, enabled = vpn && !testing, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (testing) "Checking DNS…" else "Run a real DNS check")
+            item {
+                GuardCard("What gets interrupted") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Explicit-search guard", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Switch(checked = enabled, onCheckedChange = { on ->
+                            if (on && !consent) showDisclosure = true
+                            else scope.launch { repository.settings.setAdultProtectionEnabled(on) }
+                        })
                     }
+                    Text("Restricted domains and explicit words such as porn, sex and sexual are checked in visible address or search fields. A match returns you to Home and shows a reason.")
+                    Text("Opening Chrome, Opera, Firefox or a private tab is allowed. Ordinary page paragraphs, menus and unrelated form fields cannot trigger Browser Guard.")
+                    Text("An app you added to a blocking schedule still follows that schedule.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                GuardCard("Start a filtered search") {
+                    Text("These shortcuts request the search engine's filter mode. This app cannot lock SafeSearch across every browser without network or managed-device controls.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FilledTonalButton(onClick = { openWeb("https://www.google.com/search?safe=active&q=") }, modifier = Modifier.weight(1f)) { Text("Google · filtered") }
+                        FilledTonalButton(onClick = { openWeb("https://www.bing.com/search?adlt=strict&q=") }, modifier = Modifier.weight(1f)) { Text("Bing · strict") }
+                    }
+                }
+            }
+            item {
+                GuardCard("Try the word check safely") {
+                    OutlinedTextField(value = query, onValueChange = { query = it.take(500); result = null },
+                        label = { Text("A search phrase or website") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedButton(onClick = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW,
-                            Uri.parse("https://example.com/?q=porn&strictblocker=safe-test")).addCategory(Intent.CATEGORY_BROWSABLE)) }
-                            .onFailure { result = "No browser is available for the test." }
-                    }, enabled = accessibility, modifier = Modifier.fillMaxWidth()) { Text("Open safe browser check") }
-                    Text("The browser check uses example.com with a test query. A working browser guard should interrupt it. No adult page is opened.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        result = when (val evaluation = AdultContentEvaluator.evaluateText(query)) {
+                            AdultContentEvaluator.EvaluationResult.Clean -> "Allowed by the word and domain check."
+                            is AdultContentEvaluator.EvaluationResult.Blocked -> "Would interrupt: ${evaluation.category.label}."
+                        }
+                    }, enabled = query.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Check without opening a page") }
                     result?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
-        }
-        item {
-            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.padding(18.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Browser coverage", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(if (browsers.isEmpty()) "Browser detection refreshes when this screen opens." else browsers.joinToString(" · "))
-                    Text("New browsers are detected by their web-opening capability. Private tabs are blocked when their active private-mode controls are visible; private-only Tor and Firefox Focus browsers are restricted.")
-                    Text("Built-in browser VPNs, encrypted DNS, hidden URL bars and cached pages can reduce coverage. Turn off a browser's own VPN or secure DNS for system DNS filtering. Android permissions must stay enabled.",
+            item {
+                GuardCard("Browser compatibility") {
+                    Text(if (browsers.isEmpty()) "No browser handlers detected." else browsers.joinToString(" · "))
+                    Text("Opera variants and installed web-opening apps are detected. The guard needs the browser to expose its address or search field to Android Accessibility. Hidden fields, custom browser interfaces and protected private windows can limit inspection.")
+                    Text("This is a search and domain guard, not an image/video classifier. It cannot guarantee every adult page is blocked.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "Hide details" else "Details and controls") }
-                    if (advanced) {
-                        Text("DNS resolver: $resolver · $secondary")
-                        Text("DNS-only VPN: leave ‘Block connections without VPN’ off. Lockdown requires a full-traffic VPN; enabling it here can stop ordinary internet traffic.")
-                        Text("Domain queries go to the DNS provider. Page text is inspected on this device and is not uploaded.")
-                        TextButton(onClick = onNavigateToPermissions) { Text("Review Android permissions") }
-                        if (enabled) OutlinedButton(onClick = {
-                            scope.launch {
-                                if (unlockAt == 0L) repository.settings.requestAdultProtectionDisable()
-                                showDisable = true
-                            }
-                        }) { Text("Request protection off") }
-                    }
+                    TextButton(onClick = onNavigateToPermissions) { Text("Review permissions") }
                 }
             }
         }
     }
-    if (showDisable) AlertDialog(onDismissRequest = { showDisable = false },
-        title = { Text("Turn protection off") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val remaining = ((unlockAt - now).coerceAtLeast(0) + 59_999) / 60_000
-                Text(if (unlockAt == 0L || remaining > 0) "Protection remains on during the 10-minute waiting period. ${remaining} minute(s) remaining."
-                    else "Waiting period complete. Type TURN OFF to confirm.")
-                if (unlockAt > 0 && now >= unlockAt) OutlinedTextField(value = confirmation, onValueChange = { confirmation = it }, label = { Text("TURN OFF") })
-            }
-        },
-        confirmButton = { TextButton(onClick = {
-            scope.launch {
-                if (repository.settings.completeAdultProtectionDisable(confirmation.trim() == "TURN OFF")) {
-                    AdultFilterVpnService.stop(context); showDisable = false
-                }
-            }
-        }, enabled = unlockAt > 0 && now >= unlockAt && confirmation.trim() == "TURN OFF") { Text("Turn off") } },
-        dismissButton = { TextButton(onClick = { showDisable = false }) { Text("Keep protection on") } })
+    if (showDisclosure) AccessibilityDisclosure(onAgree = {
+        scope.launch {
+            repository.settings.setBrowserInspectionConsent(true)
+            repository.settings.setAdultProtectionEnabled(true)
+            showDisclosure = false
+            if (!accessibility) PermissionHelper.openAccessibilitySettings(context)
+        }
+    }, onDismiss = { showDisclosure = false })
 }
 
 @Composable
-private fun ProtectionStep(number: String, title: String, ready: Boolean, description: String, action: String, onAction: () -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
-        Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                Text(if (ready) "✓" else number, Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!ready) TextButton(onClick = onAction) { Text(action) }
-            }
+private fun GuardCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            content()
         }
     }
 }

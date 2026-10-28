@@ -20,6 +20,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -103,10 +104,10 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-internal val WarmMagenta = Color(0xFF398773)
-internal val WarmCoral = Color(0xFFB16C45)
-internal val WarmPlum = Color(0xFF688375)
-internal val WarmMint = Color(0xFF62B49A)
+internal val WarmMagenta = Color(0xFFC85C92)
+internal val WarmCoral = Color(0xFFCA826B)
+internal val WarmPlum = Color(0xFF9A83C2)
+internal val WarmMint = Color(0xFF7D98CF)
 
 internal enum class GraphRange(val label: String, val days: Long?) {
     Seven("7D", 7),
@@ -127,13 +128,14 @@ internal fun StreakHeroCard(
     stats: TrackerStats, characterId: String, lastResetLabel: String,
     goalDays: Int, reduceMotion: Boolean, tablet: Boolean,
     onRecordReset: () -> Unit, onEditGoal: () -> Unit,
-    companionName: String = "", onRecordToday: () -> Unit = onRecordReset
+    companionName: String = "", onRecordToday: () -> Unit = onRecordReset,
+    soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {}
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp)) {
         Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("YOUR STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            val streakContent: @Composable () -> Unit = {
+                Column {
+                    Text("YOUR ELAPSED STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     AnimatedContent(targetState = stats.currentDays,
                         transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 240)) togetherWith fadeOut(tween(120)) },
                         label = "streak_count") { days ->
@@ -141,19 +143,31 @@ internal fun StreakHeroCard(
                     }
                     Text(if (stats.currentDays == 1) "day of progress" else "days of progress",
                         style = MaterialTheme.typography.titleMedium)
+                    if (stats.currentDays == 0) Text("Your first day is in progress.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Personal best · ${stats.bestDays} days", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TextButton(onClick = onEditGoal) { Text(if (goalDays > 0) "Goal · $goalDays days" else "Set a goal") }
                 }
-                com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion,
-                    Modifier.weight(if (tablet) 1.1f else 1.25f))
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 600.dp) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        Box(Modifier.weight(.7f)) { streakContent() }
+                        com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion, Modifier.weight(1.3f),
+                            soundEnabled = soundEnabled, onSoundChange = onSoundChange)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        streakContent()
+                        com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion, Modifier.fillMaxWidth(),
+                            soundEnabled = soundEnabled, onSoundChange = onSoundChange)
+                    }
+                }
             }
             if (goalDays > 0) LinearProgressIndicator(
                 progress = { (stats.currentDays.toFloat() / goalDays).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(6.dp))
-            Button(onClick = onRecordToday, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                Text("Record today")
-            }
         }
     }
 }

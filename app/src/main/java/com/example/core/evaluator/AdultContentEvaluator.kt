@@ -66,17 +66,7 @@ object AdultContentEvaluator {
         "camgirl live", "fetish porn", "nsfw video", "nude leak", "onlyfans leak",
         "fapello", "sex tape", "adult video", "adult webcam", "live sex cam",
         "nude cam", "erome leak", "naked girls", "naked women", "free porn",
-        "adult tube", "sex video", "hardcore video"
-    )
-
-    // Search Engine hosts
-    private val SEARCH_ENGINES = listOf(
-        "google.", "bing.com", "duckduckgo.com", "yahoo.com", "yandex.", "ecosia.org"
-    )
-
-    // Incognito / Private browsing indicator strings across Android browser UI
-    private val INCOGNITO_INDICATORS = listOf(
-        "incognito", "inprivate", "private browsing", "private tab", "secret mode"
+        "adult tube", "sex video", "hardcore video", "sex", "sexual", "nudes", "nude", "naked", "erotic", "erotica", "nsfw", "sexy", "chudai", "chut", "चुदाई", "पोर्न", "सेक्स"
     )
 
     sealed class EvaluationResult {
@@ -91,27 +81,22 @@ object AdultContentEvaluator {
         INCOGNITO_RESTRICTED("Private/Incognito Browsing")
     }
 
+    private val explicitPatterns = EXPLICIT_KEYWORDS.map { keyword ->
+        Regex("(^|[^\\p{L}\\p{N}])${Regex.escape(keyword)}([^\\p{L}\\p{N}]|$)", RegexOption.IGNORE_CASE)
+    }
+
     /**
-     * Evaluates a URL, address bar text, or browser page title.
+     * Evaluates an actual browser address or search value, never arbitrary page copy.
+     * Private-mode labels and arbitrary page text are not blocking signals.
      */
     fun evaluateText(rawInput: String): EvaluationResult {
         if (rawInput.isBlank()) return EvaluationResult.Clean
 
-        val clean = rawInput.trim().lowercase(Locale.ROOT)
-
-        // 1. Check Incognito / InPrivate browsing titles or tab indicators
-        for (indicator in INCOGNITO_INDICATORS) {
-            if (clean.contains(indicator)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.INCOGNITO_RESTRICTED,
-                    layer = "Incognito Protection Guard"
-                )
-            }
-        }
+        val clean = java.text.Normalizer.normalize(rawInput.take(8192), java.text.Normalizer.Form.NFKC).trim().lowercase(Locale.ROOT)
 
         // 2. Decode URL if encoded
         val decoded = try {
-            URLDecoder.decode(clean, "UTF-8")
+            URLDecoder.decode(URLDecoder.decode(clean, "UTF-8"), "UTF-8")
         } catch (_: Exception) {
             clean
         }
@@ -128,53 +113,14 @@ object AdultContentEvaluator {
             }
         }
 
-        // 4. Check for explicit keywords in search queries or URL paths
-        for (keyword in EXPLICIT_KEYWORDS) {
-            // Word boundary match
-            val regex = Regex("(^|[^a-z0-9])${Regex.escape(keyword)}([^a-z0-9]|$)", RegexOption.IGNORE_CASE)
-            if (regex.containsMatchIn(decoded)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.EXPLICIT_SEARCH,
-                    layer = "Real-Time URL & Search Shield"
-                )
-            }
+        // Token boundaries prevent matches such as Middlesex, Sussex and Essex.
+        // Browser URL separators represent spaces in multiword search terms.
+        val words = decoded.replace(Regex("[+_\\-]"), " ")
+        if (explicitPatterns.any { it.containsMatchIn(words) }) {
+            return EvaluationResult.Blocked(BlockCategory.EXPLICIT_SEARCH, "Browser search guard")
         }
 
         return EvaluationResult.Clean
-    }
-
-    /**
-     * Conservative context scoring for non-browser apps and WebViews.
-     * One ambiguous term is never enough. Inspected text stays in memory only.
-     */
-    fun evaluateVisibleContext(rawInput: String): EvaluationResult {
-        if (rawInput.isBlank()) return EvaluationResult.Clean
-        val clean = rawInput.lowercase(Locale.ROOT).take(12_000)
-
-        val strongTerms = listOf(
-            "porn", "pornography", "xxx", "adult video", "adult webcam",
-            "nsfw video", "explicit video", "nude leak", "sex video"
-        )
-        if (strongTerms.any { clean.contains(it) }) {
-            return EvaluationResult.Blocked(
-                category = BlockCategory.VISIBLE_CONTEXT,
-                layer = "On-Screen Context Shield"
-            )
-        }
-
-        val contextTerms = listOf(
-            "18+", "adult only", "explicit", "nsfw", "uncensored",
-            "nude", "naked", "webcam", "adult content"
-        )
-        val score = contextTerms.count { clean.contains(it) }
-        return if (score >= 3) {
-            EvaluationResult.Blocked(
-                category = BlockCategory.VISIBLE_CONTEXT,
-                layer = "On-Screen Context Shield"
-            )
-        } else {
-            EvaluationResult.Clean
-        }
     }
 
     /**
@@ -234,24 +180,4 @@ object AdultContentEvaluator {
                 lower.contains("searchbox")
     }
 
-    fun isPrivateOnlyBrowser(packageName: String): Boolean = packageName.lowercase(Locale.ROOT).let {
-        it.startsWith("org.torproject.") || it in setOf("org.mozilla.focus", "org.mozilla.klar")
-    }
-
-    fun isActivePrivateIndicator(raw: String, selected: Boolean = false): Boolean {
-        val text = raw.lowercase(Locale.ROOT).trim()
-        if (text.length > 240 || text.startsWith("new ") || text.startsWith("open new ")) return false
-        if (listOf("you've gone incognito", "you’re incognito", "you're incognito", "you are incognito",
-                "you are in private", "you're in private", "private browsing mode", "secret mode is on",
-                "incognito mode is on", "गुप्त मोड चालू").any(text::contains)) return true
-        return selected && listOf("incognito", "private", "inprivate", "secret").any(text::contains)
-    }
-
-    /**
-     * Checks if a domain is a known search engine.
-     */
-    fun isSearchEngine(domain: String): Boolean {
-        val lower = domain.lowercase(Locale.ROOT)
-        return SEARCH_ENGINES.any { lower.contains(it) }
-    }
 }

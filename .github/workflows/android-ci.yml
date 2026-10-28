@@ -52,6 +52,14 @@ jobs:
           retention-days: 14
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+      - name: Build release bundle
+        run: gradle :app:bundleRelease --stacktrace --no-daemon
+      - name: Upload unsigned release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-blocker-unsigned-release-bundle
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,8 +70,19 @@ jobs:
             app/build/reports/lint-results-debug.*
 
   tablet-ui:
+    name: UI · ${{ matrix.device }} · API ${{ matrix.api }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: tablet
+            api: 35
+            profile: pixel_c
+          - device: phone
+            api: 36
+            profile: pixel_6
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -80,13 +99,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Prepare instrumentation APKs
         run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --no-daemon
-      - name: Run Android 15 tablet UI regressions
+      - name: Run Android UI regressions
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
-          profile: pixel_c
+          profile: ${{ matrix.profile }}
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash scripts/run-tablet-ui.sh
@@ -94,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tablet-ui-evidence
+          name: ui-evidence-${{ matrix.device }}
           path: |
             tablet-ui-screenshots/
             app/build/reports/androidTests/

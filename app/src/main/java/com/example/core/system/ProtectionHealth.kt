@@ -1,15 +1,13 @@
 package com.example.core.system
 
 import android.content.Context
-import com.example.service.AdultFilterVpnService
 
 data class ProtectionHealthSnapshot(
     val accessibilityEnabled: Boolean,
     val usageAccessGranted: Boolean,
     val batteryOptimizationIgnored: Boolean,
     val exactAlarmsAllowed: Boolean,
-    val notificationsAllowed: Boolean,
-    val vpnConfigured: Boolean
+    val notificationsAllowed: Boolean
 ) {
     val coreReady: Boolean
         get() = accessibilityEnabled && usageAccessGranted
@@ -44,8 +42,7 @@ object ProtectionHealth {
             usageAccessGranted = PermissionHelper.isUsageAccessGranted(app),
             batteryOptimizationIgnored = PermissionHelper.isIgnoringBatteryOptimizations(app),
             exactAlarmsAllowed = PermissionHelper.canScheduleExactAlarms(app),
-            notificationsAllowed = PermissionHelper.isNotificationPermissionGranted(app),
-            vpnConfigured = AdultFilterVpnService.isVpnConfigured(app)
+            notificationsAllowed = PermissionHelper.isNotificationPermissionGranted(app)
         )
     }
 }

@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 import java.time.ZonedDateTime
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = Application::class)
+@Config(sdk = [26, 35], application = Application::class)
 class ReliabilityRegressionTest {
     private lateinit var context: Context
     private lateinit var settings: SettingsPreferences

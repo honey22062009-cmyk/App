@@ -10,6 +10,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
@@ -91,7 +94,8 @@ class MainActivity : ComponentActivity() {
                 (context.applicationContext as? StrictBlockerApplication)?.container?.repository
                     ?: AppBlockerRepository(context)
             }
-            val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+            val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "light")
+            val accentStyle by repository.settings.accentStyleFlow.collectAsState(initial = "rose")
             val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
             val systemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
@@ -100,7 +104,7 @@ class MainActivity : ComponentActivity() {
                 else -> systemDark
             }
 
-            StrictBlockerTheme(darkTheme = isDark) {
+            StrictBlockerTheme(darkTheme = isDark, accentStyle = accentStyle) {
                 MainAppContent(
                     repository = repository,
                     initialTargetPackage = targetPackage,
@@ -263,8 +267,11 @@ fun MainAppScaffold(
                         if (reduceMotion) {
                             fadeIn(tween(80)) togetherWith fadeOut(tween(80))
                         } else {
-                            (fadeIn(tween(210)) + scaleIn(tween(210), initialScale = 0.988f)) togetherWith
-                                (fadeOut(tween(130)) + scaleOut(tween(130), targetScale = 0.996f))
+                            val order = Screen.navItems
+                            val direction = if (order.indexOf(targetState) >= order.indexOf(initialState)) 1 else -1
+                            ((slideInHorizontally(tween(320)) { it / 5 * direction } + fadeIn(tween(240))) togetherWith
+                                (slideOutHorizontally(tween(260)) { -it / 6 * direction } + fadeOut(tween(180))))
+                                .using(SizeTransform(clip = true))
                         }
                     },
                     label = "screen_transition"
@@ -340,14 +347,14 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onOpenPro = onOpenPaywallDialog
+                onOpenPro = { onNavigateToScreen(Screen.Paywall) }
             )
         }
         Screen.Apps -> {
             AppsScreen(
                 repository = repository,
                 onConfigureScheduleForApp = onConfigureScheduleForApp,
-                onNavigateToPaywall = onOpenPaywallDialog
+                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) }
             )
         }
         Screen.Schedules -> {
@@ -378,6 +385,7 @@ fun ScreenContent(
         }
         Screen.Permissions -> {
             PermissionsScreen(
+                settings = repository.settings,
                 onContinue = {
                     scope.launch {
                         repository.settings.setOnboardingCompleted(true)
@@ -393,10 +401,16 @@ fun ScreenContent(
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onNavigateToPaywall = onOpenPaywallDialog,
+                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) },
                 onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
                 onNavigateToAccount = onOpenAccountDialog,
                 onNavigateToInsights = { onNavigateToScreen(Screen.Insights) },
+                onReplayTour = {
+                    scope.launch {
+                        repository.settings.setQuickTourSeen(false)
+                        onNavigateToScreen(Screen.Dashboard)
+                    }
+                },
                 onNavigateToOwnerConsole = { onNavigateToScreen(Screen.OwnerConsole) }
             )
         }
@@ -409,7 +423,7 @@ fun ScreenContent(
         Screen.Insights -> {
             InsightsScreen(
                 repository = repository,
-                onUpgrade = onOpenPaywallDialog,
+                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
@@ -417,13 +431,15 @@ fun ScreenContent(
             PaywallScreen(
                 settings = repository.settings,
                 onBack = { onNavigateToScreen(Screen.Settings) },
-                onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) }
+                onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
+                onOpenInsights = { onNavigateToScreen(Screen.Insights) },
+                onOpenProgress = { onNavigateToScreen(Screen.Progress) }
             )
         }
         Screen.BlockerCustomization -> {
             BlockerCustomizationScreen(
                 settings = repository.settings,
-                onUpgrade = onOpenPaywallDialog,
+                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }

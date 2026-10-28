@@ -10,6 +10,13 @@ import android.opengl.Matrix
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
@@ -50,7 +61,8 @@ fun CompanionScene(
     reduceMotion: Boolean = false,
     reaction: String = "idle",
     reactionKey: Int = 0,
-    backgroundColor: androidx.compose.ui.graphics.Color? = null
+    backgroundColor: androidx.compose.ui.graphics.Color? = null,
+    onPet: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -85,6 +97,7 @@ fun CompanionScene(
                 else "3D companion preview"
         },
         update = {
+            it.onPet = onPet
             it.interactive = interactive
             it.scene.character = characterId
             it.scene.background = background
@@ -98,19 +111,56 @@ fun CompanionScene(
 
 @Composable
 fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolean, modifier: Modifier = Modifier,
-    backgroundColor: androidx.compose.ui.graphics.Color? = null) {
+    backgroundColor: Color? = null, soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {}) {
     var reaction by remember { mutableStateOf("idle") }
     var key by remember { mutableStateOf(0) }
-    Column(modifier) {
-        CompanionScene(characterId, Modifier.fillMaxWidth().height(230.dp), true, reduceMotion, reaction, key, backgroundColor)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin").forEach { (id, label) ->
-                TextButton(onClick = { reaction = id; key++ }, modifier = Modifier.weight(1f),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)) { Text(label, maxLines = 1) }
+    var caption by remember { mutableStateOf("A little company for your day.") }
+    var audioStatus by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val audio = remember(context) { CompanionAudio(context) { audioStatus = it } }
+    DisposableEffect(audio, lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) audio.stop() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); audio.close() }
+    }
+    LaunchedEffect(soundEnabled) { if (!soundEnabled) audio.stop() }
+    fun act(action: String) {
+        reaction = action; key++
+        caption = when (action) {
+            "wave" -> "Hey, I'm right here."
+            "jump" -> "One little hop at a time!"
+            "spin" -> "A fresh perspective. Wheee!"
+            "dance" -> "Tiny victory dance!"
+            "snack" -> "Crunch, crunch. Thank you!"
+            "rest" -> "Breathe in… and slowly out."
+            "talk" -> "You don't need a perfect day. Just your next small step."
+            else -> "That feels nice. You’ve got this."
+        }
+        if (soundEnabled) {
+            if (action == "talk") audio.say(caption) else audio.effect(action)
+        }
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.fillMaxWidth().background(
+            Brush.radialGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .7f), Color.Transparent)),
+            RoundedCornerShape(28.dp))) {
+            CompanionScene(characterId, Modifier.fillMaxWidth().height(260.dp), true, reduceMotion,
+                reaction, key, backgroundColor ?: Color.Transparent, onPet = { act("pet") })
+        }
+        Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin", "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe").forEach { (id, label) ->
+                FilledTonalButton(onClick = { act(id) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp)) { Text(label, maxLines = 1) }
             }
         }
-        Text("${name.ifBlank { characterId.replaceFirstChar(Char::titlecase) }} · drag to turn, tap to pet",
-            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { act("talk"); if (!soundEnabled) audioStatus = "Turn on sounds to hear the offline voice." }) { Text("Say something") }
+            TextButton(onClick = { onSoundChange(!soundEnabled); audioStatus = "" }) { Text(if (soundEnabled) "Sound on" else "Sound off") }
+        }
+        if (audioStatus.isNotBlank()) Text(audioStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${name.ifBlank { characterId.replaceFirstChar(Char::titlecase) }} · drag, pinch or tap to pet",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -121,6 +171,7 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
     @Volatile var continuous = false
         set(value) { field = value; requestRender() }
     var interactive = false
+    var onPet: (() -> Unit)? = null
     private var previousX = 0f
     private var previousY = 0f
     private var moved = false
@@ -269,6 +320,7 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
 
     override fun performClick(): Boolean {
         super.performClick()
+        onPet?.invoke()
         scene.reaction = "pet"
         scene.reactionAt = SystemClock.uptimeMillis()
         requestRender()
@@ -297,8 +349,10 @@ private class CompanionRenderer(private val state: CompanionState) {
     private val reaction get() = state.reaction
     private val reactionAt get() = state.reactionAt
     private var program = 0
+    private lateinit var uniforms: IntArray
     private lateinit var sphere: Mesh
     private lateinit var cone: Mesh
+    private lateinit var bunnyBody: Mesh
     private val projection = FloatArray(16)
     private val view = FloatArray(16)
     private val base = FloatArray(16)
@@ -335,15 +389,20 @@ private class CompanionRenderer(private val state: CompanionState) {
                 float diffuse = max(dot(n, l), 0.0);
                 float rim = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 3.0);
                 vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
-                float specular = pow(max(dot(n, h), 0.0), 40.0) * 0.20;
+                float specular = pow(max(dot(n, h), 0.0), 28.0) * 0.075;
                 gl_FragColor = vec4(uColor * (0.44 + 0.56 * diffuse) + specular + rim * 0.055, 1.0);
             }
         """.trimIndent())
         GLES20.glAttachShader(program, vertex); GLES20.glAttachShader(program, fragment)
         GLES20.glLinkProgram(program)
+        val linked = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linked, 0)
+        check(linked[0] != 0) { GLES20.glGetProgramInfoLog(program) }
+        uniforms = arrayOf("uMvp", "uModel", "uNormal", "uColor").map { GLES20.glGetUniformLocation(program, it) }.toIntArray()
         GLES20.glDeleteShader(vertex); GLES20.glDeleteShader(fragment)
         sphere = Mesh(CompanionGeometry.sphere())
         cone = Mesh(CompanionGeometry.cone())
+        bunnyBody = Mesh(CompanionGeometry.bunnyBody())
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
     }
 
@@ -355,50 +414,96 @@ private class CompanionRenderer(private val state: CompanionState) {
 
     fun drawFrame() {
         val bg = background
-        GLES20.glClearColor(((bg shr 16) and 255) / 255f, ((bg shr 8) and 255) / 255f, (bg and 255) / 255f, 1f)
+        GLES20.glClearColor(((bg shr 16) and 255) / 255f, ((bg shr 8) and 255) / 255f, (bg and 255) / 255f, ((bg ushr 24) and 255) / 255f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         GLES20.glUseProgram(program)
         Matrix.setLookAtM(view, 0, 0f, .4f, zoom, 0f, .20f, 0f, 0f, 1f, 0f)
         val time = SystemClock.uptimeMillis() / 1000f
         val elapsed = ((SystemClock.uptimeMillis() - reactionAt) / 1000f).coerceAtLeast(0f)
-        val acting = !reducedMotion && elapsed < 1.8f
-        val bounce = if (reducedMotion && reaction == "jump") .20f
-            else if (acting && reaction == "jump") abs(sin(elapsed * PI.toFloat() * 2f)) * .46f
-            else if (reducedMotion) 0f else sin(time * 2f) * .025f
-        val spin = if (acting && reaction == "spin") 360f * (elapsed / 1.8f).let { it * it * (3f - 2f * it) } else 0f
+        val duration = when (reaction) { "rest" -> 8f; "dance" -> 3.6f; "snack", "talk" -> 3f; else -> 2f }
+        val acting = !reducedMotion && elapsed < duration
+        val phase = (elapsed / duration).coerceIn(0f, 1f)
+        val pulse = sin(phase * PI.toFloat()).coerceAtLeast(0f)
+        val bounce = when {
+            reducedMotion -> 0f
+            acting && reaction == "jump" -> abs(sin(phase * PI.toFloat() * 2)) * .52f
+            acting && reaction == "dance" -> abs(sin(elapsed * 10f)) * .10f * pulse
+            else -> sin(time * 2f) * .022f
+        }
+        val spin = if (acting && reaction == "spin") 360f * phase.let { it * it * (3f - 2f * it) } else 0f
         Matrix.setIdentityM(base, 0)
-        Matrix.translateM(base, 0, 0f, bounce - .06f, 0f)
-        Matrix.rotateM(base, 0, pitch, 1f, 0f, 0f)
+        // A soft stage shadow makes the character feel grounded, including mid-jump.
+        draw(sphere, 0f, -.93f, -.06f, .47f - bounce * .18f, .025f, .29f - bounce * .10f, 0xdccbdc)
+        Matrix.translateM(base, 0, if (acting && reaction == "dance") sin(elapsed * 5f) * .14f * pulse else 0f, bounce - .06f, 0f)
+        Matrix.rotateM(base, 0, pitch + if (acting && reaction == "snack") sin(elapsed * 12f) * 3f else 0f, 1f, 0f, 0f)
         Matrix.rotateM(base, 0, yaw + spin, 0f, 1f, 0f)
+        if (acting && reaction in setOf("pet", "dance")) Matrix.rotateM(base, 0, sin(elapsed * 7f) * 7f * pulse, 0f, 0f, 1f)
+        val breathe = if (acting && reaction == "rest") sin(elapsed * PI.toFloat() / 4f) * .045f else 0f
+        Matrix.scaleM(base, 0, 1f + breathe, 1f + breathe * .5f, 1f + breathe)
         val coat = when (character) {
             "milo" -> 0xc4a782; "aria" -> 0xe9c6a4; "kai" -> 0x54666a
-            "luna" -> 0xbbd9cf; "sol" -> 0xf1cb68; else -> 0xdf8d56
+            "luna" -> 0xffeee8; "sol" -> 0xf1cb68; else -> 0xdf8d56
         }
         val cream = 0xffefda
-        val dark = 0x26342f
+        val dark = 0x3b2c3e
         fun ball(x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, color: Int, rz: Float = 0f) =
             draw(sphere, x, y, z, sx, sy, sz, color, rz)
-        // Rounded body, tummy, feet and a visible tail give the figure a full silhouette.
-        ball(0f, -.23f, -.05f, .48f, .61f, .36f, coat)
-        ball(0f, -.25f, .28f, .31f, .39f, .11f, cream)
-        ball(-.27f, -.78f, .16f, .23f, .16f, .31f, dark)
-        ball(.27f, -.78f, .16f, .23f, .16f, .31f, dark)
-        ball(.48f, -.48f, -.32f, .22f, .43f, .20f, coat, -40f)
-        ball(.64f, -.20f, -.34f, .15f, .19f, .17f, cream)
-        val wave = if (reducedMotion && reaction == "wave") 125f
-            else if (acting && reaction == "wave") sin(elapsed * 17f) * 25f + 125f else 20f
-        ball(-.53f, -.24f, .02f, .17f, .34f, .20f, coat, -20f)
-        ball(.53f, if (wave > 50f) .03f else -.24f, .02f, .17f, .34f, .20f, coat, wave)
-        ball(0f, .57f, .03f, .63f, .56f, .47f, coat)
+        if (character == "luna") {
+            // One continuous surface joins torso, neck and head; no floating head or ball joints.
+            draw(bunnyBody, 0f, 0f, 0f, 1f, 1f, 1f, coat)
+            ball(0f, -.30f, .285f, .29f, .32f, .055f, 0xfff9f0)
+            ball(-.25f, -.78f, .14f, .25f, .20f, .34f, coat)
+            ball(.25f, -.78f, .14f, .25f, .20f, .34f, coat)
+            ball(-.25f, -.76f, .43f, .12f, .065f, .024f, 0xe6a0b6)
+            ball(.25f, -.76f, .43f, .12f, .065f, .024f, 0xe6a0b6)
+            ball(0f, -.46f, -.40f, .23f, .23f, .23f, 0xfffaf3)
+        } else {
+            ball(0f, -.23f, -.05f, .48f, .61f, .36f, coat)
+            // Neck overlaps the torso and head all the way around.
+            ball(0f, .18f, .0f, .34f, .27f, .30f, coat)
+            ball(0f, -.25f, .28f, .31f, .39f, .11f, cream)
+            ball(-.27f, -.78f, .16f, .23f, .18f, .31f, coat)
+            ball(.27f, -.78f, .16f, .23f, .18f, .31f, coat)
+            ball(.38f, -.48f, -.32f, .22f, .37f, .20f, coat, -40f)
+            ball(.54f, -.20f, -.34f, .15f, .19f, .17f, cream)
+            ball(0f, .57f, .03f, .63f, .56f, .47f, coat)
+        }
+        // Articulated limbs pivot at the shoulder, with overlapping shoulder sockets.
+        fun arm(side: Float, angle: Float) {
+            val saved = base.copyOf()
+            Matrix.translateM(base, 0, side * .40f, .01f, 0f)
+            Matrix.rotateM(base, 0, angle, 0f, 0f, 1f)
+            ball(0f, -.17f, 0f, .18f, .30f, .20f, coat)
+            ball(0f, -.36f, .015f, .17f, .17f, .18f, coat)
+            System.arraycopy(saved, 0, base, 0, 16)
+        }
+        val wave = when {
+            reducedMotion && reaction == "wave" -> 125f
+            acting && reaction == "wave" -> sin(elapsed * 15f) * 22f * pulse + 125f * pulse
+            acting && reaction == "dance" -> (sin(elapsed * 10f) * 35f + 50f) * pulse
+            acting && reaction == "snack" -> 65f * pulse
+            else -> 12f
+        }
+        arm(-1f, if (acting && reaction == "snack") -65f * pulse else -12f)
+        arm(1f, wave)
+        if (acting && reaction == "snack") {
+            draw(cone, .05f, .20f, .48f, .11f, .30f, .10f, 0xf09a68, 150f)
+            ball(.10f, .40f, .47f, .13f, .08f, .08f, 0xb9a1dd)
+        }
         // Species: fox, bear, cat, panda, rabbit and owl. Each has actual 3D ears/features.
         if (character == "milo" || character == "kai") {
             ball(-.48f, 1.0f, -.04f, .23f, .24f, .16f, if (character == "kai") dark else coat)
             ball(.48f, 1.0f, -.04f, .23f, .24f, .16f, if (character == "kai") dark else coat)
         } else if (character == "luna") {
-            ball(-.29f, 1.15f, -.04f, .15f, .48f, .12f, coat, -12f)
-            ball(.29f, 1.15f, -.04f, .15f, .48f, .12f, coat, 12f)
-            ball(-.29f, 1.17f, .06f, .075f, .32f, .04f, 0xe5a8a3, -12f)
-            ball(.29f, 1.17f, .06f, .075f, .32f, .04f, 0xe5a8a3, 12f)
+            val earMotion = if (acting && reaction in setOf("pet", "jump", "dance")) sin(elapsed * 10f) * 12f * pulse else 0f
+            for (side in listOf(-1f, 1f)) {
+                val saved = base.copyOf()
+                Matrix.translateM(base, 0, side * .28f, .87f, -.02f)
+                Matrix.rotateM(base, 0, side * (10f + earMotion), 0f, 0f, 1f)
+                ball(0f, .35f, 0f, .17f, .54f, .13f, coat)
+                ball(0f, .38f, .105f, .092f, .36f, .035f, 0xf0b4c8)
+                System.arraycopy(saved, 0, base, 0, 16)
+            }
         } else {
             draw(cone, -.43f, .97f, 0f, .25f, .39f, .22f, coat, 15f)
             draw(cone, .43f, .97f, 0f, .25f, .39f, .22f, coat, -15f)
@@ -407,7 +512,7 @@ private class CompanionRenderer(private val state: CompanionState) {
         }
         ball(-.23f, .40f, .41f, .26f, .23f, .10f, cream)
         ball(.23f, .40f, .41f, .26f, .23f, .10f, cream)
-        val blink = (!reducedMotion && time % 4.7f > 4.52f) || ((acting || reducedMotion) && reaction == "pet")
+        val blink = (!reducedMotion && time % 4.7f > 4.52f) || ((acting || reducedMotion) && reaction in setOf("pet", "rest"))
         if (character == "kai" || character == "sol") {
             ball(-.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
             ball(.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
@@ -418,12 +523,13 @@ private class CompanionRenderer(private val state: CompanionState) {
             ball(-.25f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
             ball(.21f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
         }
-        ball(0f, .43f, .535f, .09f, .065f, .055f, dark)
-        ball(0f, .30f, .485f, .085f, .024f, .019f, dark)
+        ball(0f, .43f, .535f, .075f, .055f, .045f, if (character == "luna") 0xc57c99 else dark)
+        ball(0f, .30f, .485f, .075f, if (acting && reaction in setOf("talk", "snack")) .025f + abs(sin(elapsed * 15f)) * .033f else .025f, .019f, dark)
         ball(-.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
         ball(.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
-        // Small green shield medallion ties the companions to the app identity.
-        ball(0f, -.13f, .404f, .12f, .14f, .04f, 0x277c67)
+        // Rose heart charm, embedded in the tummy rather than floating in front.
+        ball(-.04f, -.12f, .364f, .065f, .075f, .023f, 0xd48cb3, 30f)
+        ball(.04f, -.12f, .364f, .065f, .075f, .023f, 0xd48cb3, -30f)
     }
 
     private fun draw(mesh: Mesh, x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, color: Int, rz: Float = 0f) {
@@ -434,10 +540,10 @@ private class CompanionRenderer(private val state: CompanionState) {
         Matrix.multiplyMM(mv, 0, view, 0, model, 0)
         Matrix.multiplyMM(mvp, 0, projection, 0, mv, 0)
         Matrix.invertM(inverse, 0, model, 0); Matrix.transposeM(normal, 0, inverse, 0)
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMvp"), 1, false, mvp, 0)
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uModel"), 1, false, model, 0)
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uNormal"), 1, false, normal, 0)
-        GLES20.glUniform3f(GLES20.glGetUniformLocation(program, "uColor"), ((color shr 16) and 255) / 255f, ((color shr 8) and 255) / 255f, (color and 255) / 255f)
+        GLES20.glUniformMatrix4fv(uniforms[0], 1, false, mvp, 0)
+        GLES20.glUniformMatrix4fv(uniforms[1], 1, false, model, 0)
+        GLES20.glUniformMatrix4fv(uniforms[2], 1, false, normal, 0)
+        GLES20.glUniform3f(uniforms[3], ((color shr 16) and 255) / 255f, ((color shr 8) and 255) / 255f, (color and 255) / 255f)
         mesh.draw(program)
     }
 }
@@ -456,7 +562,7 @@ private class Mesh(vertices: FloatArray) {
 }
 
 internal object CompanionGeometry {
-    fun sphere(rows: Int = 18, columns: Int = 24): FloatArray {
+    fun sphere(rows: Int = 24, columns: Int = 32): FloatArray {
         val result = ArrayList<Float>()
         fun vertex(r: Int, c: Int) {
             val latitude = PI * r / rows
@@ -471,6 +577,47 @@ internal object CompanionGeometry {
             vertex(r, c + 1); vertex(r + 1, c); vertex(r + 1, c + 1)
         }
         return result.toFloatArray()
+    }
+
+    /** Closed, smooth lathed body: torso and head share vertices and normals at the neck. */
+    fun bunnyBody(rows: Int = 64, columns: Int = 48): FloatArray {
+        val profile = listOf(
+            floatArrayOf(-.90f, 0f, 0f), floatArrayOf(-.76f, .30f, .27f),
+            floatArrayOf(-.40f, .46f, .35f), floatArrayOf(-.12f, .43f, .33f),
+            floatArrayOf(.12f, .31f, .29f), floatArrayOf(.27f, .40f, .35f),
+            floatArrayOf(.54f, .61f, .46f), floatArrayOf(.82f, .52f, .40f),
+            floatArrayOf(1.01f, .28f, .23f), floatArrayOf(1.09f, 0f, 0f))
+        fun radius(y: Float, component: Int): Float {
+            val index = (0 until profile.lastIndex).firstOrNull { y <= profile[it + 1][0] } ?: (profile.lastIndex - 1)
+            val a = profile[index]; val b = profile[index + 1]
+            val t = ((y - a[0]) / (b[0] - a[0])).coerceIn(0f, 1f)
+            val prev = profile[(index - 1).coerceAtLeast(0)]
+            val next = profile[(index + 2).coerceAtMost(profile.lastIndex)]
+            val ma = (b[component] - prev[component]) / (b[0] - prev[0]) * (b[0] - a[0])
+            val mb = (next[component] - a[component]) / (next[0] - a[0]) * (b[0] - a[0])
+            return ((2*t*t*t - 3*t*t + 1)*a[component] + (t*t*t - 2*t*t + t)*ma +
+                (-2*t*t*t + 3*t*t)*b[component] + (t*t*t - t*t)*mb).coerceAtLeast(0f)
+        }
+        val out = ArrayList<Float>(rows * columns * 36)
+        fun vertex(row: Int, col: Int) {
+            val y = -.90f + 1.99f * row / rows
+            val angle = 2 * PI.toFloat() * col / columns
+            val c = cos(angle); val sn = sin(angle)
+            val rx = radius(y, 1); val rz = radius(y, 2)
+            val drx = (radius((y + .001f).coerceAtMost(1.09f), 1) - radius((y - .001f).coerceAtLeast(-.90f), 1)) / .002f
+            val drz = (radius((y + .001f).coerceAtMost(1.09f), 2) - radius((y - .001f).coerceAtLeast(-.90f), 2)) / .002f
+            val nx = rz * c; val nz = rx * sn
+            val ny = -(rz * drx * c * c + rx * drz * sn * sn)
+            val length = sqrt(nx*nx + ny*ny + nz*nz)
+            out.addAll(listOf(rx*c, y, rz*sn, if (length > .00001f) nx/length else 0f,
+                if (length > .00001f) ny/length else if (row == 0) -1f else 1f,
+                if (length > .00001f) nz/length else 0f))
+        }
+        for (r in 0 until rows) for (c in 0 until columns) {
+            vertex(r,c); vertex(r+1,c); vertex(r,c+1)
+            vertex(r,c+1); vertex(r+1,c); vertex(r+1,c+1)
+        }
+        return out.toFloatArray()
     }
 
     fun cone(): FloatArray {

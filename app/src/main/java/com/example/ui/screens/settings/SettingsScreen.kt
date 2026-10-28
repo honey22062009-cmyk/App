@@ -86,13 +86,16 @@ fun SettingsScreen(
     onNavigateToBlockerCustomization: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
+    onReplayTour: () -> Unit = {},
     onNavigateToOwnerConsole: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val delayMinutes by repository.settings.strictChangeDelayMinutesFlow.collectAsState(initial = 0)
-    val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
+    val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "light")
+    val accentStyle by repository.settings.accentStyleFlow.collectAsState(initial = "rose")
+    val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
     val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
     val showPackageOnBlocker by repository.settings.showPackageOnBlockerFlow.collectAsState(initial = false)
     val accountSignedIn by repository.settings.isAccountSignedInFlow.collectAsState(initial = false)
@@ -167,6 +170,11 @@ fun SettingsScreen(
                             SettingsSectionContent(
                                 section = selectedSection,
                                 themeMode = themeMode,
+                                accentStyle = accentStyle,
+                                companionSound = companionSound,
+                                onAccentChange = { scope.launch { repository.settings.setAccentStyle(it) } },
+                                onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
+                                onReplayTour = onReplayTour,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -277,6 +285,11 @@ fun SettingsScreen(
                             SettingsSectionContent(
                                 section = selectedSection,
                                 themeMode = themeMode,
+                                accentStyle = accentStyle,
+                                companionSound = companionSound,
+                                onAccentChange = { scope.launch { repository.settings.setAccentStyle(it) } },
+                                onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
+                                onReplayTour = onReplayTour,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -381,6 +394,11 @@ private fun SettingsSidebarItem(
 private fun SettingsSectionContent(
     section: SettingsSection,
     themeMode: String,
+    accentStyle: String,
+    companionSound: Boolean,
+    onAccentChange: (String) -> Unit,
+    onCompanionSoundChange: (Boolean) -> Unit,
+    onReplayTour: () -> Unit,
     delayMinutes: Int,
     isProtectionEnabled: Boolean,
     reduceMotion: Boolean,
@@ -418,7 +436,13 @@ private fun SettingsSectionContent(
 
     when (section) {
         SettingsSection.Appearance -> {
-            SettingsDescription("Choose how the app follows your device theme.")
+            SettingsDescription("Soft colour, clear contrast. Choose the finish that feels like you.")
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("rose" to "Rose", "lilac" to "Lilac", "peach" to "Peach").forEach { (id, name) ->
+                    FilterChip(selected = accentStyle == id, onClick = { onAccentChange(id) }, label = { Text(name) })
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
@@ -437,6 +461,9 @@ private fun SettingsSectionContent(
                 }
             }
             Spacer(modifier = Modifier.height(18.dp))
+            SettingsToggleRow(title = "Companion sounds", subtitle = "Soft effects and optional offline speech. Silent until you turn this on.",
+                checked = companionSound, onCheckedChange = onCompanionSoundChange)
+            Spacer(Modifier.height(18.dp))
             SettingsToggleRow(
                 title = "Reduce motion",
                 subtitle = "Uses simpler transitions and disables decorative blocker animation.",
@@ -508,7 +535,7 @@ private fun SettingsSectionContent(
         SettingsSection.Protection -> {
             SettingsLinkRow(
                 title = "18+ content protection",
-                subtitle = "Browser, SafeSearch and DNS controls",
+                subtitle = "Explicit-search guard and filtered search shortcuts",
                 onClick = onNavigateToAdultProtection
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -572,10 +599,12 @@ private fun SettingsSectionContent(
                     disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             ) {
-                Text("Version 1.3")
+                Text("Version " + com.example.BuildConfig.VERSION_NAME)
             }
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
+            Spacer(Modifier.height(12.dp))
+            SettingsLinkRow("Replay the quick tour", "Three short tips for recording, browsing and your companion", onReplayTour)
             Spacer(modifier = Modifier.height(14.dp))
             SettingsLinkRow(
                 title = "Owner payment console",

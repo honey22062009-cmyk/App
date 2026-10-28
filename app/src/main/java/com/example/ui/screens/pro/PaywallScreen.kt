@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -59,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.preferences.SettingsPreferences
+import com.example.payments.OwnerAccess
 import com.example.payments.ManualPaymentManager
 import com.example.payments.ManualPlan
 import com.example.payments.PaymentRequest
@@ -83,20 +88,21 @@ fun PaywallDialog(
 fun PaywallScreen(
     settings: SettingsPreferences,
     onBack: () -> Unit,
-    onOpenCustomization: () -> Unit
+    onOpenCustomization: () -> Unit,
+    onOpenInsights: () -> Unit = {},
+    onOpenProgress: () -> Unit = {}
 ) {
-    ManualPaywallContent(
-        settings = settings,
-        onDismiss = onBack,
-        onOpenCustomization = onOpenCustomization
-    )
+    ManualPaywallContent(settings, onBack, onOpenCustomization, false, onOpenInsights, onOpenProgress)
 }
 
 @Composable
 private fun ManualPaywallContent(
     settings: SettingsPreferences,
     onDismiss: () -> Unit,
-    onOpenCustomization: () -> Unit
+    onOpenCustomization: () -> Unit,
+    inDialog: Boolean = true,
+    onOpenInsights: () -> Unit = {},
+    onOpenProgress: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val manager = remember(context, settings) {
@@ -106,6 +112,7 @@ private fun ManualPaywallContent(
         onDispose { manager.close() }
     }
 
+    val ownerAccess by OwnerAccess.hasAccess.collectAsState()
     val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
     val expiresAt by settings.proExpiresAtFlow.collectAsState(initial = 0L)
     val savedRequestId by settings.lastPaymentRequestIdFlow.collectAsState(initial = "")
@@ -136,10 +143,7 @@ private fun ManualPaywallContent(
         settings.refreshExpiredProEntitlement()
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    ProContainer(inDialog, onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -148,8 +152,8 @@ private fun ManualPaywallContent(
         ) {
             GlassCard(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 680.dp),
+                    .widthIn(max = 820.dp)
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(32.dp),
                 variant = GlassVariant.Elevated,
                 backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.74f),
@@ -159,22 +163,22 @@ private fun ManualPaywallContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                if (isPro) "Strict Blocker Pro" else "Upgrade to Pro",
+                                if (ownerAccess) "Pro · Owner access" else if (isPro) "Your Pro workspace" else "Meet Strict Blocker Pro",
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 if (isPro) {
-                                    "Premium is active on this device."
+                                    if (ownerAccess) "Every Pro feature is available to your verified owner account. No payment needed." else "Pro is active. Open your premium tools below."
                                 } else {
-                                    "Pay by UPI. The owner manually verifies the payment before Pro unlocks."
+                                    "All in this app. No separate Pro download. Compare the features, then choose a plan below."
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        IconButton(onClick = onDismiss) {
+                        if (inDialog) IconButton(onClick = onDismiss) {
                             Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -233,7 +237,7 @@ private fun ManualPaywallContent(
                     }
 
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 560.dp),
+                        modifier = Modifier.heightIn(max = if (inDialog) 560.dp else 1600.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         item {
@@ -250,7 +254,8 @@ private fun ManualPaywallContent(
                                     PremiumFeature("Animated blocker styles")
                                     PremiumFeature("Focus insights and trends")
                                     PremiumFeature("Up to 8 app groups")
-                                    PremiumFeature("More personalization")
+                                    PremiumFeature("Customize your Progress cards")
+                                    Text("Free includes daily recording, all six companions, Browser Guard and basic schedules.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -273,6 +278,12 @@ private fun ManualPaywallContent(
                                         }
                                     }
                                 }
+                            }
+                            item {
+                                FilledTonalButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text("Open Pro insights") }
+                            }
+                            item {
+                                FilledTonalButton(onClick = onOpenProgress, modifier = Modifier.fillMaxWidth()) { Text("Personalize Progress cards") }
                             }
                             item {
                                 Button(
@@ -303,10 +314,10 @@ private fun ManualPaywallContent(
                             item {
                                 PlanOption(
                                     title = "Yearly",
-                                    subtitle = "365 days · best value",
+                                    subtitle = "365 days · one approval",
                                     price = "₹599",
                                     icon = Icons.Default.Savings,
-                                    badge = "BEST VALUE",
+                                    badge = "FULL YEAR",
                                     selected = selectedPlan == ManualPlan.YEARLY,
                                     onClick = {
                                         selectedPlan = ManualPlan.YEARLY
@@ -486,7 +497,7 @@ private fun ManualPaywallContent(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Premium unlocks only after the owner approves the matching payment request.",
+                                    if (ownerAccess) "Owner access is verified against your signed-in admin account." else "UPI requests are manually reviewed. Pro unlocks only after approval; payment submission is not instant activation.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -498,6 +509,16 @@ private fun ManualPaywallContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProContainer(inDialog: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (inDialog) Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.padding(vertical = 24.dp).verticalScroll(rememberScrollState())) { content() }
+    } else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 900.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+            .padding(top = 24.dp, bottom = 136.dp)) { content() }
     }
 }
 

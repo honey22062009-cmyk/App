@@ -26,6 +26,10 @@ class SettingsPreferences(private val context: Context) {
         val PENDING_CHANGE_UNLOCK_TIME = longPreferencesKey("pending_change_unlock_time")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val SHOW_OVERLAY_SHIELD = booleanPreferencesKey("show_overlay_shield")
+        val ACCENT_STYLE = stringPreferencesKey("accent_style")
+        val QUICK_TOUR_SEEN = booleanPreferencesKey("quick_tour_seen_v1")
+        val COMPANION_SOUND = booleanPreferencesKey("companion_sound")
+        val BROWSER_INSPECTION_CONSENT = booleanPreferencesKey("browser_inspection_consent_v2")
         val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
 
         // Local-only onboarding/profile. These fields are intentionally not synced to Firebase.
@@ -93,7 +97,7 @@ class SettingsPreferences(private val context: Context) {
     }
 
     val themeModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.THEME_MODE] ?: "system"
+        preferences[PreferencesKeys.THEME_MODE] ?: "light"
     }
 
     val isProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -122,6 +126,19 @@ class SettingsPreferences(private val context: Context) {
     val userNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.USER_NAME] ?: ""
     }
+
+    val accentStyleFlow: Flow<String> = context.dataStore.data.map { it[PreferencesKeys.ACCENT_STYLE] ?: "rose" }
+    val quickTourSeenFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.QUICK_TOUR_SEEN] ?: false }
+    val companionSoundFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.COMPANION_SOUND] ?: false }
+    val browserInspectionConsentFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.BROWSER_INSPECTION_CONSENT] ?: false }
+
+    suspend fun setAccentStyle(style: String) {
+        require(style in setOf("rose", "lilac", "peach"))
+        context.dataStore.edit { it[PreferencesKeys.ACCENT_STYLE] = style }
+    }
+    suspend fun setQuickTourSeen(seen: Boolean) { context.dataStore.edit { it[PreferencesKeys.QUICK_TOUR_SEEN] = seen } }
+    suspend fun setCompanionSound(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.COMPANION_SOUND] = enabled } }
+    suspend fun setBrowserInspectionConsent(granted: Boolean) { context.dataStore.edit { it[PreferencesKeys.BROWSER_INSPECTION_CONSENT] = granted } }
 
     val userAgeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.USER_AGE] ?: 0
@@ -172,26 +189,6 @@ class SettingsPreferences(private val context: Context) {
     val adultUnlockNotBeforeFlow: Flow<Long> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] ?: 0L }
     val adultUnlockVerifiedFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_VERIFIED] ?: false }
     val adultCooldownSecondsFlow: Flow<Int> = context.dataStore.data.map { it[PreferencesKeys.ADULT_COOLDOWN_SECONDS] ?: 60 }
-
-    val isBlockIncognitoEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] ?: true
-    }
-
-    val isForceSafeSearchEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] ?: true
-    }
-
-    val isDnsFilterEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.DNS_FILTER_ENABLED] ?: true
-    }
-
-    val customDnsPrimaryFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.CUSTOM_DNS_PRIMARY] ?: "1.1.1.3"
-    }
-
-    val customDnsSecondaryFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.CUSTOM_DNS_SECONDARY] ?: "1.0.0.3"
-    }
 
     val adultBlocksCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
@@ -455,18 +452,12 @@ class SettingsPreferences(private val context: Context) {
     }
 
     suspend fun setAdultProtectionEnabled(enabled: Boolean) {
-        if (enabled) {
-            context.dataStore.edit { preferences ->
-                preferences[PreferencesKeys.ADULT_PROTECTION_ENABLED] = true
-                preferences[PreferencesKeys.STRICT_ADULT_MODE] = true
-                preferences[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] = 0L
-                preferences[PreferencesKeys.ADULT_UNLOCK_VERIFIED] = false
-                preferences[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = true
-                preferences[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = true
-                preferences[PreferencesKeys.DNS_FILTER_ENABLED] = true
-            }
-        } else {
-            requestAdultProtectionDisable()
+        context.dataStore.edit {
+            it[PreferencesKeys.ADULT_PROTECTION_ENABLED] = enabled
+            it[PreferencesKeys.STRICT_ADULT_MODE] = false
+            it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] = 0L
+            it[PreferencesKeys.DNS_FILTER_ENABLED] = false
+            it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = false
         }
     }
 
@@ -499,28 +490,6 @@ class SettingsPreferences(private val context: Context) {
 
     suspend fun setAdultCooldownSeconds(seconds: Int) {
         context.dataStore.edit { it[PreferencesKeys.ADULT_COOLDOWN_SECONDS] = seconds.coerceIn(30, 300) }
-    }
-
-    suspend fun setBlockIncognitoEnabled(enabled: Boolean) {
-        if (isStrictAdultModeFlow.first() && !enabled) return
-        context.dataStore.edit { it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = enabled }
-    }
-
-    suspend fun setForceSafeSearchEnabled(enabled: Boolean) {
-        if (isStrictAdultModeFlow.first() && !enabled) return
-        context.dataStore.edit { it[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = enabled }
-    }
-
-    suspend fun setDnsFilterEnabled(enabled: Boolean) {
-        if (isStrictAdultModeFlow.first() && !enabled) return
-        context.dataStore.edit { it[PreferencesKeys.DNS_FILTER_ENABLED] = enabled }
-    }
-
-    suspend fun setCustomDns(primary: String, secondary: String) {
-        context.dataStore.edit {
-            it[PreferencesKeys.CUSTOM_DNS_PRIMARY] = primary.trim()
-            it[PreferencesKeys.CUSTOM_DNS_SECONDARY] = secondary.trim()
-        }
     }
 
     suspend fun setAppGroups(groups: Set<String>) {
