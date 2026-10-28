@@ -143,9 +143,9 @@ fun FloatingGlassDock(
                                     if (selected) {
                                         Brush.linearGradient(
                                             listOf(
-                                                Color(0xFFE95D9B),
-                                                Color(0xFFF68A6B),
-                                                Color(0xFFA855C7)
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.primary
                                             )
                                         )
                                     } else {
@@ -160,7 +160,7 @@ fun FloatingGlassDock(
                             Icon(
                                 imageVector = if (selected) screen.selectedIcon else screen.unselectedIcon,
                                 contentDescription = screen.title,
-                                tint = if (selected) Color.White
+                                tint = if (selected) MaterialTheme.colorScheme.onPrimary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )

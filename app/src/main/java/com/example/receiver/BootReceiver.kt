@@ -33,6 +33,7 @@ class BootReceiver : BroadcastReceiver() {
                 val appContext = context.applicationContext
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
+                        TrackerReminderScheduler.refreshNow(appContext)
                         val settings = AppBlockerRepository(appContext).settings
                         val adultProtectionEnabled = settings.isAdultProtectionEnabledFlow.first()
                         val dnsFilterEnabled = settings.isDnsFilterEnabledFlow.first()

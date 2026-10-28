@@ -27,14 +27,14 @@ sealed class Screen(
 ) {
     data object Dashboard : Screen(
         route = "dashboard",
-        title = "Dashboard",
+        title = "Home",
         selectedIcon = Icons.Filled.Dashboard,
         unselectedIcon = Icons.Outlined.Dashboard
     )
 
     data object Apps : Screen(
         route = "apps",
-        title = "Apps",
+        title = "Block",
         selectedIcon = Icons.Filled.Apps,
         unselectedIcon = Icons.Outlined.Apps
     )
@@ -109,6 +109,13 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.BarChart
     )
 
+    data object Progress : Screen(
+        route = "progress",
+        title = "Progress",
+        selectedIcon = Icons.Filled.BarChart,
+        unselectedIcon = Icons.Outlined.BarChart
+    )
+
     data object BlockerCustomization : Screen(
         route = "blocker_customization",
         title = "Block screen",
@@ -125,6 +132,6 @@ sealed class Screen(
 
     companion object {
         val navItems: List<Screen>
-            get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
+            get() = listOf(Dashboard, Apps, Progress, Settings)
     }
 }

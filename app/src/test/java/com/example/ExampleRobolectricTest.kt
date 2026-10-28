@@ -51,7 +51,7 @@ class ExampleRobolectricTest {
     @Test
     fun testScreenNavigationItems_neverNull() {
         val items = Screen.navItems
-        assertEquals(5, items.size)
+        assertEquals(4, items.size)
         items.forEach { screen ->
             assertNotNull(screen)
             assertNotNull(screen.route)

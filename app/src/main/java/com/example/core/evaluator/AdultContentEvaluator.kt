@@ -19,8 +19,13 @@ object AdultContentEvaluator {
         "com.opera.browser",
         "com.opera.mini.native",
         "com.opera.touch",
+        "com.opera.gx",
+        "com.opera.mini.native.beta",
+        "com.opera.browser.beta",
+        "org.mozilla.focus",
+        "org.mozilla.klar",
         "com.duckduckgo.mobile.android",
-        "com.UCMobile.intl",
+        "com.ucmobile.intl",
         "com.vivaldi.browser",
         "com.kiwibrowser.browser",
         "com.mi.globalbrowser",
@@ -221,12 +226,25 @@ object AdultContentEvaluator {
      */
     fun isBrowserPackage(packageName: String): Boolean {
         val lower = packageName.lowercase(Locale.ROOT)
-        return BROWSER_PACKAGES.contains(lower) ||
+        return BROWSER_PACKAGES.contains(lower) || lower.startsWith("com.opera.") ||
                 lower.contains("browser") ||
                 lower.contains("chrome") ||
                 lower.contains("firefox") ||
                 lower.contains("webview") ||
                 lower.contains("searchbox")
+    }
+
+    fun isPrivateOnlyBrowser(packageName: String): Boolean = packageName.lowercase(Locale.ROOT).let {
+        it.startsWith("org.torproject.") || it in setOf("org.mozilla.focus", "org.mozilla.klar")
+    }
+
+    fun isActivePrivateIndicator(raw: String, selected: Boolean = false): Boolean {
+        val text = raw.lowercase(Locale.ROOT).trim()
+        if (text.length > 240 || text.startsWith("new ") || text.startsWith("open new ")) return false
+        if (listOf("you've gone incognito", "you’re incognito", "you're incognito", "you are incognito",
+                "you are in private", "you're in private", "private browsing mode", "secret mode is on",
+                "incognito mode is on", "गुप्त मोड चालू").any(text::contains)) return true
+        return selected && listOf("incognito", "private", "inprivate", "secret").any(text::contains)
     }
 
     /**

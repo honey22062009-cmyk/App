@@ -96,6 +96,9 @@ private fun buildTabletDashboardRows(cards: List<String>): List<List<String>> {
 fun DashboardScreen(
     repository: AppBlockerRepository,
     initialTrackerAction: String? = null,
+    progressOnly: Boolean = false,
+    onDataEntryVisibilityChanged: (Boolean) -> Unit = {},
+    onTrackerActionConsumed: () -> Unit = {},
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
@@ -119,6 +122,7 @@ fun DashboardScreen(
     val seenMilestones by repository.settings.seenMilestonesFlow.collectAsState(initial = emptySet())
     val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
     val userName by repository.settings.userNameFlow.collectAsState(initial = "")
+    val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
     val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
     val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -127,6 +131,7 @@ fun DashboardScreen(
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
+    var showQuickEntry by remember { mutableStateOf(false) }
     var showResetEditor by remember { mutableStateOf(false) }
     var showSleepEditor by remember { mutableStateOf(false) }
     var showDailyPrompt by remember { mutableStateOf(false) }
@@ -139,6 +144,10 @@ fun DashboardScreen(
     var selectedCalendarDate by remember { mutableStateOf<LocalDate?>(null) }
     var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
 
+    val entryVisible = showQuickEntry || showResetEditor || showSleepEditor || showDailyPrompt || showGoal
+    LaunchedEffect(entryVisible) { onDataEntryVisibilityChanged(entryVisible) }
+    DisposableEffect(Unit) { onDispose { onDataEntryVisibilityChanged(false) } }
+
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
         repository.settings.refreshExpiredProEntitlement()
@@ -149,6 +158,7 @@ fun DashboardScreen(
             "sleep" -> showSleepEditor = true
             "daily" -> showDailyPrompt = true
         }
+        if (initialTrackerAction != null) onTrackerActionConsumed()
     }
 
 
@@ -214,9 +224,9 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val tablet = maxWidth >= 720.dp
-        val visibleCardOrder = remember(cardOrder, hiddenCards) {
-            cardOrder.filterNot { it in hiddenCards }
-        }
+        val progressKeys = setOf("stats", "graph", "calendar", "timeline", "milestones", "insights")
+        val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
+            else listOf("protection", "hero")
         val tabletRows = remember(visibleCardOrder) {
             buildTabletDashboardRows(visibleCardOrder)
         }
@@ -225,6 +235,8 @@ fun DashboardScreen(
                         "hero" -> StreakHeroCard(
                             stats = stats,
                             characterId = selectedCharacterId,
+                            companionName = companionName,
+                            onRecordToday = { showQuickEntry = true },
                             lastResetLabel = lastResetLabel,
                             goalDays = goalDays,
                             reduceMotion = reduceMotion,
@@ -303,15 +315,22 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item(key = "header") {
-                DashboardHeader(
-                    userName = userName,
-                    currentDays = stats.currentDays,
-                    isPro = isPro,
-                    onOpenPro = onOpenPro,
-                    onCustomize = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (progressOnly) "Your progress" else if (userName.isBlank()) "Your day" else "Hi, ${userName.trim()}",
+                        style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A better day.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (progressOnly) TextButton(onClick = {
                         if (isPro) showCustomization = true else onOpenPro()
-                    }
-                )
+                    }) { Text("Customize progress") }
+                }
+            }
+            if (!progressOnly) item(key = "shortcuts") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onNavigateToApps, modifier = Modifier.weight(1f)) { Text("Block apps") }
+                    TextButton(onClick = onNavigateToSchedules, modifier = Modifier.weight(1f)) { Text("Schedules") }
+                    TextButton(onClick = onNavigateToAdultProtection, modifier = Modifier.weight(1f)) { Text("18+ protection") }
+                }
             }
 
             if (tablet) {
@@ -347,6 +366,19 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showQuickEntry) {
+        QuickRecordSheet(
+            current = todayCheckIn,
+            currentSleep = todaySleep,
+            onDismiss = { showQuickEntry = false },
+            onReset = { showQuickEntry = false; editingReset = null; showResetEditor = true },
+            onSave = { rating, sleep ->
+                repository.settings.saveDailyEntry(today.toString(), rating, sleep)
+                showQuickEntry = false
+            }
+        )
     }
 
     if (showDailyPrompt) {
@@ -474,7 +506,7 @@ fun DashboardScreen(
 
     if (showCustomization) {
         DashboardCustomizationDialog(
-            order = cardOrder,
+            order = cardOrder.filter { it in setOf("stats", "graph", "calendar", "timeline", "milestones", "insights") },
             hidden = hiddenCards,
             onDismiss = { showCustomization = false },
             onSave = { order, hidden ->
@@ -489,80 +521,6 @@ fun DashboardScreen(
             days = days,
             onDismiss = { celebrationMilestone = null }
         )
-    }
-}
-
-@Composable
-private fun DashboardHeader(
-    userName: String,
-    currentDays: Int,
-    isPro: Boolean,
-    onOpenPro: () -> Unit,
-    onCustomize: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                if (userName.isBlank()) "Your day" else "Welcome back, ${userName.trim()}",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                "Day $currentDays · Your progress, recorded by you.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        IconButton(onClick = onCustomize) {
-            Icon(
-                Icons.Default.Tune,
-                contentDescription = "Customize dashboard",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Surface(
-            onClick = onOpenPro,
-            shape = RoundedCornerShape(18.dp),
-            color = Color.Transparent,
-            modifier = Modifier.widthIn(min = 72.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                WarmMagenta.copy(alpha = .95f),
-                                WarmCoral.copy(alpha = .92f),
-                                WarmPlum.copy(alpha = .90f)
-                            )
-                        ),
-                        RoundedCornerShape(18.dp)
-                    )
-                    .padding(horizontal = 11.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    if (isPro) Icons.Default.Star else Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(Modifier.size(5.dp))
-                Text(
-                    if (isPro) "PRO" else "PRO",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Black
-                )
-            }
-        }
     }
 }
 

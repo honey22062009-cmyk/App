@@ -11,6 +11,7 @@ import android.util.Log
 import com.example.core.di.AppContainer
 import com.example.core.di.DefaultAppContainer
 import com.example.core.system.AlarmScheduler
+import com.example.core.system.TrackerReminderScheduler
 import com.example.data.repository.AppBlockerRepository
 import com.example.service.AdultFilterVpnService
 import com.example.service.BlockerMonitoringService
@@ -34,6 +35,7 @@ class StrictBlockerApplication : Application() {
                 intent?.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
             ) {
                 AlarmScheduler.scheduleNextTransition(context)
+                TrackerReminderScheduler.refresh(context)
             }
         }
     }
@@ -46,6 +48,7 @@ class StrictBlockerApplication : Application() {
         // re-establish monitoring if the user has protection enabled.
         AlarmScheduler.scheduleNextTransition(this)
         repairProtectionServices()
+        TrackerReminderScheduler.refresh(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {

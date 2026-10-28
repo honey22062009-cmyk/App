@@ -30,6 +30,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.preferences.SettingsPreferences
 import com.example.payments.ManualPaymentManager
 import com.example.payments.PaymentRequest
+import com.example.payments.OwnerAccess
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -50,6 +53,7 @@ import java.util.Date
 @Composable
 fun OwnerConsoleScreen(
     settings: SettingsPreferences,
+    onPreviewPro: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -69,6 +73,16 @@ fun OwnerConsoleScreen(
     var signingIn by remember { mutableStateOf(false) }
     var requests by remember { mutableStateOf<List<PaymentRequest>>(emptyList()) }
     var pendingApproval by remember { mutableStateOf<PaymentRequest?>(null) }
+    val ownerAccess by OwnerAccess.hasAccess.collectAsState()
+
+    LaunchedEffect(manager, ownerAccess) {
+        signedIn = ownerAccess
+        if (ownerAccess) {
+            manager.observePendingOwnerRequests(onUpdate = { requests = it })
+        } else {
+            OwnerAccess.verify { signedIn = it }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -156,6 +170,14 @@ fun OwnerConsoleScreen(
                 }
             }
         } else {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Owner Pro access", fontWeight = FontWeight.Bold)
+                    Text("All Pro features are unlocked for your verified owner session. No payment needed.")
+                    Button(onClick = onPreviewPro) { Text("Try Pro customization") }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween

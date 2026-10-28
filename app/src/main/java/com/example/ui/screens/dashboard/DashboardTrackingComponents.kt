@@ -103,9 +103,9 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-internal val WarmMagenta = Color(0xFFE45B99)
-internal val WarmCoral = Color(0xFFF4866B)
-internal val WarmPlum = Color(0xFFA953C7)
+internal val WarmMagenta = Color(0xFF398773)
+internal val WarmCoral = Color(0xFFB16C45)
+internal val WarmPlum = Color(0xFF688375)
 internal val WarmMint = Color(0xFF62B49A)
 
 internal enum class GraphRange(val label: String, val days: Long?) {
@@ -124,276 +124,37 @@ internal data class JourneyItem(
 
 @Composable
 internal fun StreakHeroCard(
-    stats: TrackerStats,
-    characterId: String,
-    lastResetLabel: String,
-    goalDays: Int,
-    reduceMotion: Boolean,
-    tablet: Boolean,
-    onRecordReset: () -> Unit,
-    onEditGoal: () -> Unit
+    stats: TrackerStats, characterId: String, lastResetLabel: String,
+    goalDays: Int, reduceMotion: Boolean, tablet: Boolean,
+    onRecordReset: () -> Unit, onEditGoal: () -> Unit,
+    companionName: String = "", onRecordToday: () -> Unit = onRecordReset
 ) {
-    val goalProgress = if (goalDays > 0) (stats.currentDays.toFloat() / goalDays).coerceIn(0f, 1f) else 0f
-    val bestProgress = if (stats.bestDays <= 0) 0.06f
-    else (stats.currentDays.toFloat() / stats.bestDays.coerceAtLeast(1)).coerceIn(0.06f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = if (goalDays > 0) goalProgress.coerceAtLeast(0.04f) else bestProgress,
-        animationSpec = if (reduceMotion) tween(0) else tween(700),
-        label = "hero_progress"
-    )
-    val highlight = if (reduceMotion) {
-        0.15f
-    } else {
-        val infinite = rememberInfiniteTransition(label = "hero_glass")
-        val drift by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(10_000, easing = LinearEasing)),
-            label = "hero_highlight"
-        )
-        drift
-    }
-
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        variant = GlassVariant.Accent,
-        shape = RoundedCornerShape(30.dp),
-        backgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.12f),
-                            WarmMagenta.copy(alpha = 0.06f),
-                            Color.Transparent
-                        ),
-                        center = Offset(120f + 420f * highlight, 20f),
-                        radius = 520f
-                    )
-                )
-        ) {
-            if (tablet) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(22.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HeroRing(
-                        stats = stats,
-                        characterId = characterId,
-                        progress = animatedProgress,
-                        modifier = Modifier.weight(1f)
-                    )
-                    HeroActions(
-                        stats = stats,
-                        lastResetLabel = lastResetLabel,
-                        goalDays = goalDays,
-                        goalProgress = goalProgress,
-                        onRecordReset = onRecordReset,
-                        onEditGoal = onEditGoal,
-                        modifier = Modifier.weight(1f)
-                    )
+    GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp)) {
+        Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("YOUR STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    AnimatedContent(targetState = stats.currentDays,
+                        transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 240)) togetherWith fadeOut(tween(120)) },
+                        label = "streak_count") { days ->
+                        Text("$days", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
+                    }
+                    Text(if (stats.currentDays == 1) "day of progress" else "days of progress",
+                        style = MaterialTheme.typography.titleMedium)
+                    Text("Personal best · ${stats.bestDays} days", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = onEditGoal) { Text(if (goalDays > 0) "Goal · $goalDays days" else "Set a goal") }
                 }
-            } else {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    HeroRing(
-                        stats = stats,
-                        characterId = characterId,
-                        progress = animatedProgress,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    HeroActions(
-                        stats = stats,
-                        lastResetLabel = lastResetLabel,
-                        goalDays = goalDays,
-                        goalProgress = goalProgress,
-                        onRecordReset = onRecordReset,
-                        onEditGoal = onEditGoal,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion,
+                    Modifier.weight(if (tablet) 1.1f else 1.25f))
+            }
+            if (goalDays > 0) LinearProgressIndicator(
+                progress = { (stats.currentDays.toFloat() / goalDays).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(6.dp))
+            Button(onClick = onRecordToday, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Text("Record today")
             }
         }
-    }
-}
-
-@Composable
-private fun HeroRing(
-    stats: TrackerStats,
-    characterId: String,
-    progress: Float,
-    modifier: Modifier
-) {
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
-    Box(
-        modifier = modifier
-            .height(210.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(224.dp)) {
-            val stroke = size.minDimension * 0.052f
-            val inset = stroke
-            drawArc(
-                color = trackColor,
-                startAngle = 140f,
-                sweepAngle = 260f,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - inset * 2, size.height - inset * 2),
-                style = Stroke(stroke, cap = StrokeCap.Round)
-            )
-            drawArc(
-                brush = Brush.sweepGradient(listOf(WarmMagenta, WarmCoral, WarmPlum, WarmMagenta)),
-                startAngle = 140f,
-                sweepAngle = 260f * progress,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - inset * 2, size.height - inset * 2),
-                style = Stroke(stroke, cap = StrokeCap.Round)
-            )
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CompanionAvatar(
-                characterId = characterId,
-                modifier = Modifier.size(118.dp)
-            )
-            AnimatedContent(
-                targetState = stats.currentDays,
-                transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-                label = "streak_days"
-            ) { days ->
-                Text(
-                    text = days.toString(),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Text(
-                if (stats.currentDays == 1) "DAY" else "DAYS",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                "Current streak",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeroActions(
-    stats: TrackerStats,
-    lastResetLabel: String,
-    goalDays: Int,
-    goalProgress: Float,
-    onRecordReset: () -> Unit,
-    onEditGoal: () -> Unit,
-    modifier: Modifier
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Current streak",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "Last reset: $lastResetLabel",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (goalDays > 0) {
-            Text(
-                "Day ${stats.currentDays} of $goalDays",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            LinearProgressIndicator(
-                progress = { goalProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                color = WarmMagenta,
-                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
-            )
-        } else {
-            Text(
-                "No personal goal set",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = onRecordReset,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Record reset")
-            }
-            OutlinedButton(
-                onClick = onEditGoal,
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Icon(Icons.Default.Flag, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text(if (goalDays > 0) "Goal" else "Set goal")
-            }
-        }
-        Text(
-            "Manual tracker only. Nothing is detected automatically.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun HumanPairIllustration() {
-    Canvas(
-        modifier = Modifier
-            .size(width = 126.dp, height = 78.dp)
-            .semantics { contentDescription = "Two stylized human figures" }
-    ) {
-        fun figure(centerX: Float, main: Color, light: Color, width: Float) {
-            val headY = size.height * 0.19f
-            val headR = size.minDimension * 0.11f
-            drawCircle(
-                Color.Black.copy(alpha = 0.16f),
-                radius = headR + 2f,
-                center = Offset(centerX + 3f, headY + 3f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(listOf(light, main)),
-                radius = headR,
-                center = Offset(centerX, headY)
-            )
-            val torsoTop = size.height * 0.36f
-            val torsoHeight = size.height * 0.31f
-            drawRoundRect(
-                brush = Brush.linearGradient(listOf(light, main)),
-                topLeft = Offset(centerX - width / 2f, torsoTop),
-                size = Size(width, torsoHeight),
-                cornerRadius = CornerRadius(16f, 16f)
-            )
-            val limb = size.width * 0.05f
-            drawLine(main, Offset(centerX - width * .32f, torsoTop + 8f), Offset(centerX - width * .78f, size.height * .60f), limb, StrokeCap.Round)
-            drawLine(main, Offset(centerX + width * .32f, torsoTop + 8f), Offset(centerX + width * .78f, size.height * .60f), limb, StrokeCap.Round)
-            drawLine(main, Offset(centerX - width * .18f, torsoTop + torsoHeight), Offset(centerX - width * .30f, size.height * .92f), limb * 1.1f, StrokeCap.Round)
-            drawLine(main, Offset(centerX + width * .18f, torsoTop + torsoHeight), Offset(centerX + width * .30f, size.height * .92f), limb * 1.1f, StrokeCap.Round)
-        }
-        figure(size.width * .34f, WarmPlum, Color(0xFFE0A4F3), size.width * .23f)
-        figure(size.width * .66f, WarmMagenta, Color(0xFFFFB1D0), size.width * .22f)
     }
 }
 
@@ -995,6 +756,7 @@ internal fun ResetEditorDialog(
     var timestamp by remember(editing) { mutableStateOf(editing?.timestamp ?: System.currentTimeMillis()) }
     var category by remember(editing) { mutableStateOf(editing?.category) }
     var note by remember(editing) { mutableStateOf(editing?.note.orEmpty()) }
+    var details by remember { mutableStateOf(editing != null) }
     val categories = listOf("Boredom", "Stress", "Habit", "Social media", "Trouble sleeping", "Other")
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a") }
 
@@ -1031,6 +793,8 @@ internal fun ResetEditorDialog(
                 if (editing == null) {
                     Text("This closes the current $currentDays-day streak and starts a new one at the time you choose.")
                 }
+                TextButton(onClick = { details = !details }) { Text(if (details) "Hide details" else "Add details or change time") }
+                if (details) {
                 Text("When?", fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { timestamp = System.currentTimeMillis() }) { Text("Now") }
@@ -1064,11 +828,12 @@ internal fun ResetEditorDialog(
                     minLines = 2,
                     maxLines = 4
                 )
+                }
             }
         },
         confirmButton = {
             Button(onClick = { onSave(timestamp, category, note.trim().takeIf { it.isNotBlank() }) }) {
-                Text(if (editing == null) "Record" else "Save")
+                Text(if (editing == null) "Reset streak now" else "Save")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
@@ -1260,7 +1025,7 @@ internal fun DashboardCustomizationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
-        title = { Text("Customize dashboard", fontWeight = FontWeight.Bold) },
+        title = { Text("Customize progress", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Visibility and order are saved on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1295,12 +1060,12 @@ internal fun DashboardCustomizationDialog(
                 }
                 TextButton(
                     onClick = {
-                        localOrder = SettingsPreferences.defaultDashboardCardOrder()
+                        localOrder = SettingsPreferences.defaultDashboardCardOrder().filter { it in order }
                         localHidden = emptySet()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Reset dashboard layout")
+                    Text("Reset progress layout")
                 }
             }
         },

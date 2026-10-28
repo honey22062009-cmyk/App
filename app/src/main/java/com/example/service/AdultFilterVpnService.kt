@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.system.OsConstants
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -14,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.core.evaluator.AdultContentEvaluator
+import com.example.core.evaluator.DnsPolicy
 import com.example.data.repository.AppBlockerRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +62,10 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
         private val _isVpnActive = MutableStateFlow(false)
         val isVpnActive: StateFlow<Boolean> = _isVpnActive.asStateFlow()
+        private val _alwaysOn = MutableStateFlow(false)
+        val alwaysOn: StateFlow<Boolean> = _alwaysOn.asStateFlow()
+        private val _queries = MutableStateFlow(0L)
+        val processedQueries: StateFlow<Long> = _queries.asStateFlow()
 
         fun isVpnConfigured(context: Context): Boolean {
             return prepare(context) == null
@@ -143,9 +149,11 @@ class AdultFilterVpnService : VpnService(), Runnable {
     }
 
     private fun startVpn() {
-        if (isRunning) return
+        if (isRunning) {
+            _alwaysOn.value = Build.VERSION.SDK_INT >= 29 && isAlwaysOn
+            return
+        }
         isRunning = true
-        _isVpnActive.value = true
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -174,6 +182,8 @@ class AdultFilterVpnService : VpnService(), Runnable {
             val builder = Builder()
                 .setSession("Strict Blocker DNS Protection")
                 .setMtu(1500)
+                .setBlocking(true)
+                .allowFamily(OsConstants.AF_INET6)
                 .addAddress("10.18.0.2", 32)
 
             configuredDns.forEach { dns ->
@@ -200,6 +210,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
             }
             socket.soTimeout = 2500
             udpSocket = socket
+            _isVpnActive.value = true
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, buildForegroundNotification())
+            _alwaysOn.value = Build.VERSION.SDK_INT >= 29 && isAlwaysOn
 
             val configuredDnsAddresses = configuredDns.map { InetAddress.getByName(it) }
             val defaultUpstreamDns = configuredDnsAddresses.first()
@@ -247,7 +260,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
                 val dnsPayload = ByteArray(dnsPayloadLen)
                 System.arraycopy(buffer, dnsPayloadOffset, dnsPayload, 0, dnsPayloadLen)
 
-                val queriedDomain = extractDomainFromDnsQuery(dnsPayload)
+                val question = DnsPolicy.question(dnsPayload) ?: continue
+                val queriedDomain = question.name
+                _queries.value = _queries.value + 1
 
                 // Inspect queried domain with Adult Content Evaluator
                 if (queriedDomain.isNotBlank() && (AdultContentEvaluator.isAdultDomain(queriedDomain) ||
@@ -258,7 +273,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
                     }
 
                     // Return NXDOMAIN blocked response
-                    val forgedDns = buildNxDomainResponse(dnsPayload)
+                    val forgedDns = DnsPolicy.answer(dnsPayload, question, code = 3)
                     val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, forgedDns)
                     try {
                         outStream.write(responsePacket)
@@ -280,22 +295,39 @@ class AdultFilterVpnService : VpnService(), Runnable {
 
                 // Forward clean DNS queries through the protected socket to avoid VPN loops.
                 try {
-                    val outPacket = DatagramPacket(dnsPayload, dnsPayloadLen, upstreamDns, 53)
+                    val safeTarget = if (runBlocking { repository.settings.isForceSafeSearchEnabledFlow.first() })
+                        DnsPolicy.safeSearchTarget(queriedDomain) else null
+                    // Suppress HTTPS/SVCB shortcuts for mapped search hosts; the client falls back to A/AAAA.
+                    if (safeTarget != null && question.type !in setOf(1, 28)) {
+                        outStream.write(buildIpv4UdpPacket(buffer, ipHeaderLength, DnsPolicy.answer(dnsPayload, question)))
+                        continue
+                    }
+                    val upstreamQuery = safeTarget?.let { DnsPolicy.queryFor(dnsPayload, it, question.type) } ?: dnsPayload
+                    val outPacket = DatagramPacket(upstreamQuery, upstreamQuery.size, upstreamDns, 53)
                     socket.send(outPacket)
 
                     val inPacket = DatagramPacket(responseBuffer, responseBuffer.size)
                     socket.receive(inPacket)
-                    if (inPacket.port != 53 || !inPacket.address.address.contentEquals(upstreamDns.address)) {
+                    if (inPacket.length < 12 || inPacket.port != 53 ||
+                        !inPacket.address.address.contentEquals(upstreamDns.address) ||
+                        responseBuffer[0] != dnsPayload[0] || responseBuffer[1] != dnsPayload[1]) {
                         continue
                     }
 
                     val upstreamDnsPayload = ByteArray(inPacket.length)
                     System.arraycopy(responseBuffer, 0, upstreamDnsPayload, 0, inPacket.length)
 
-                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, upstreamDnsPayload)
+                    val finalPayload = if (safeTarget != null) {
+                        if ((upstreamDnsPayload[3].toInt() and 15) != 0) DnsPolicy.answer(dnsPayload, question, code = 2)
+                        else DnsPolicy.answer(dnsPayload, question, target = safeTarget,
+                            addresses = DnsPolicy.addresses(upstreamDnsPayload, question.type))
+                    } else upstreamDnsPayload
+                    val responsePacket = buildIpv4UdpPacket(buffer, ipHeaderLength, finalPayload)
                     outStream.write(responsePacket)
                 } catch (_: Exception) {
-                    // Upstream timeout or drop; fail gracefully.
+                    // A timeout must not become an unfiltered response or a silent success.
+                    runCatching { outStream.write(buildIpv4UdpPacket(buffer, ipHeaderLength,
+                        DnsPolicy.answer(dnsPayload, question, code = 2))) }
                 }
             }
         } catch (e: Exception) {
@@ -313,32 +345,6 @@ class AdultFilterVpnService : VpnService(), Runnable {
                 scheduleTunnelRestart()
             }
         }
-    }
-
-    private fun extractDomainFromDnsQuery(payload: ByteArray): String {
-        var idx = 12 // Skip DNS 12-byte header
-        val sb = StringBuilder()
-        while (idx < payload.size) {
-            val len = payload[idx].toInt() and 0xFF
-            if (len == 0) break
-            if ((len and 0xC0) == 0xC0) break // Compression offset
-            idx++
-            if (idx + len > payload.size) break
-            if (sb.isNotEmpty()) sb.append('.')
-            sb.append(String(payload, idx, len, Charsets.US_ASCII))
-            idx += len
-        }
-        return sb.toString().trim()
-    }
-
-    private fun buildNxDomainResponse(queryPayload: ByteArray): ByteArray {
-        val response = queryPayload.copyOf()
-        if (response.size >= 4) {
-            // Flags: Response flag (QR=1) + RCODE=3 (NXDOMAIN)
-            response[2] = (response[2].toInt() or 0x81).toByte()
-            response[3] = (response[3].toInt() or 0x83).toByte()
-        }
-        return response
     }
 
     private fun buildIpv4UdpPacket(origIpPacket: ByteArray, ihl: Int, dnsPayload: ByteArray): ByteArray {
@@ -439,6 +445,7 @@ class AdultFilterVpnService : VpnService(), Runnable {
         restartAttempt = 0
         isRunning = false
         _isVpnActive.value = false
+        _alwaysOn.value = false
         vpnThread?.interrupt()
         cleanup()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -459,6 +466,12 @@ class AdultFilterVpnService : VpnService(), Runnable {
         } catch (_: IOException) {}
         vpnInterface = null
         _isVpnActive.value = false
+        _alwaysOn.value = false
+    }
+
+    override fun onRevoke() {
+        stopVpn()
+        super.onRevoke()
     }
 
     override fun onDestroy() {
@@ -490,9 +503,9 @@ class AdultFilterVpnService : VpnService(), Runnable {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("18 Blocker: Adult Protection Active")
-            .setContentText("Device-wide family DNS filter is protecting browsers and apps.")
-            .setSmallIcon(R.drawable.ic_launcher_fg)
+            .setContentTitle(if (_isVpnActive.value) "Strict Blocker · DNS filter running" else "Strict Blocker · Connecting DNS filter")
+            .setContentText("Filters system DNS. Browser inspection adds URL and private-tab checks.")
+            .setSmallIcon(R.drawable.ic_notification_shield)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

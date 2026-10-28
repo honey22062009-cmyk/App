@@ -13,6 +13,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import com.example.payments.OwnerAccess
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -107,7 +109,10 @@ class SettingsPreferences(private val context: Context) {
     }
 
     val isOnboardingCompletedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false
+        // Recover profiles saved by older builds before they wrote the completion flag.
+        preferences[PreferencesKeys.ONBOARDING_COMPLETED] == true ||
+            (!preferences[PreferencesKeys.USER_NAME].isNullOrBlank() &&
+                (preferences[PreferencesKeys.USER_AGE] ?: 0) in 13..120)
     }
 
     val isOverlayShieldEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -286,10 +291,10 @@ class SettingsPreferences(private val context: Context) {
             .toSet()
     }
 
-    val isProEntitledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+    val isProEntitledFlow: Flow<Boolean> = combine(context.dataStore.data, OwnerAccess.hasAccess) { preferences, owner ->
         val entitled = preferences[PreferencesKeys.PRO_ENTITLED] ?: false
         val expiresAt = preferences[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
-        entitled && (expiresAt == 0L || expiresAt > System.currentTimeMillis())
+        owner || (entitled && (expiresAt == 0L || expiresAt > System.currentTimeMillis()))
     }
 
     val proExpiresAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -399,6 +404,24 @@ class SettingsPreferences(private val context: Context) {
                 preferences.remove(PreferencesKeys.CHARACTER_NAME)
             } else {
                 preferences[PreferencesKeys.CHARACTER_NAME] = safeCompanionName
+            }
+        }
+    }
+
+    suspend fun saveDailyEntry(date: String, rating: String, sleepMinutes: Int?) {
+        val day = java.time.LocalDate.parse(date)
+        require(rating in DailyCheckIn.allowedRatings)
+        context.dataStore.edit { p ->
+            val checkIns = (p[PreferencesKeys.DAILY_CHECK_INS] ?: emptySet()).toMutableSet()
+            checkIns.removeAll { DailyCheckIn.decode(it)?.localDate == day }
+            checkIns.add(DailyCheckIn(day, rating).encode())
+            p[PreferencesKeys.DAILY_CHECK_INS] = checkIns
+            if (sleepMinutes != null) {
+                val sleep = (p[PreferencesKeys.SLEEP_ENTRIES] ?: emptySet()).toMutableSet()
+                val previous = sleep.mapNotNull(SleepEntry::decode).firstOrNull { it.localDate == day }
+                sleep.removeAll { SleepEntry.decode(it)?.localDate == day }
+                sleep.add(SleepEntry(day, sleepMinutes.coerceIn(0, 1440), previous?.note).encode())
+                p[PreferencesKeys.SLEEP_ENTRIES] = sleep
             }
         }
     }
@@ -696,8 +719,10 @@ class SettingsPreferences(private val context: Context) {
             if (!enabled) {
                 preferences.remove(PreferencesKeys.PRO_EXPIRES_AT)
                 preferences.remove(PreferencesKeys.PRO_PAYMENT_REQUEST_ID)
-                preferences[PreferencesKeys.BLOCKER_STYLE] = "classic"
-                preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
+                if (!OwnerAccess.hasAccess.value) {
+                    preferences[PreferencesKeys.BLOCKER_STYLE] = "classic"
+                    preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
+                }
             }
         }
     }

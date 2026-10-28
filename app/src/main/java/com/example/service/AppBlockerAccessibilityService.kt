@@ -35,6 +35,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     private var lastBlockedPackage: String? = null
     private var lastBlockTimestamp: Long = 0L
+    private var lastInspectionAt = 0L
 
     private var lastAdultTriggerTimestamp: Long = 0L
     private var adultBlockedPackage: String? = null
@@ -73,7 +74,13 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
         val now = System.currentTimeMillis()
 
+        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && now - lastInspectionAt < 120L) return
+        lastInspectionAt = now
+        // The framework recycles the original event after this callback. Own the asynchronous copy.
+        @Suppress("DEPRECATION")
+        val ownedEvent = AccessibilityEvent.obtain(event)
         serviceScope.launch {
+            try {
             // If explicit content was just detected in this app, keep the offending app
             // out of view for the configured cooldown even if its next accessibility event
             // no longer exposes the original text.
@@ -89,7 +96,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             val adultProtectionEnabled = repository.settings.isAdultProtectionEnabledFlow.first()
             if (adultProtectionEnabled) {
                 if (now - lastAdultTriggerTimestamp > 400L) {
-                    val isAdultBlocked = inspectForAdultContent(packageName, event)
+                    val isAdultBlocked = inspectForAdultContent(packageName, ownedEvent)
                     if (isAdultBlocked) {
                         lastAdultTriggerTimestamp = now
                         return@launch
@@ -138,6 +145,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                     runCatching { startActivity(intent) }
                 }
             }
+            } finally {
+                @Suppress("DEPRECATION")
+                ownedEvent.recycle()
+            }
         }
     }
 
@@ -152,6 +163,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         if (!isBrowser) return false
 
         val blockIncognito = repository.settings.isBlockIncognitoEnabledFlow.first()
+        if (blockIncognito && AdultContentEvaluator.isPrivateOnlyBrowser(packageName)) {
+            triggerAdultBlock(packageName, "Private-only browser", "Private browsing guard")
+            return true
+        }
 
         // Accessibility text-change events can originate from login, comment, or chat
         // fields inside a browser. Do not evaluate their contents as URL/search text.
@@ -194,6 +209,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             null
         } ?: return false
 
+        if (rootNode.packageName?.toString() != packageName) return false
+
         // Known browser address bar and omnibox resource IDs
         val addressBarIds = listOf(
             "com.android.chrome:id/url_bar",
@@ -235,6 +252,12 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             while (editableNodes.isNotEmpty() && inspectedEditableCandidates < 160) {
                 val node = editableNodes.removeFirst()
                 inspectedEditableCandidates++
+                if (blockIncognito && !node.isPassword && !node.isEditable &&
+                    (AdultContentEvaluator.isActivePrivateIndicator(node.text?.toString().orEmpty(), node.isSelected || node.isChecked) ||
+                     AdultContentEvaluator.isActivePrivateIndicator(node.contentDescription?.toString().orEmpty(), node.isSelected || node.isChecked))) {
+                    triggerAdultBlock(packageName, "Private browsing window", "Private browsing guard")
+                    return true
+                }
                 val eval = evaluateEditableBrowserNode(node)
                 if (eval is AdultContentEvaluator.EvaluationResult.Blocked) {
                     if (eval.category != AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED || blockIncognito) {
@@ -258,7 +281,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         try {
             windows.forEach { window ->
                 val root = window.root ?: return@forEach
-                if (root != rootNode) {
+                if (root != rootNode && root.packageName?.toString() == packageName) {
                     collectNodeText(root, windowTextBuilder, maxDepth = 10, maxNodes = intArrayOf(120))
                 }
             }
@@ -289,7 +312,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         // Detect installed third-party browsers by capability instead of relying only on
         // a package-name list. This closes the easy "install another browser" bypass.
         return try {
-            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"))
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")).addCategory(Intent.CATEGORY_BROWSABLE)
             packageManager.queryIntentActivities(webIntent, PackageManager.MATCH_ALL)
                 .any { it.activityInfo?.packageName == packageName }
         } catch (_: Exception) {
@@ -298,7 +321,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun evaluateEditableBrowserNode(node: AccessibilityNodeInfo?): AdultContentEvaluator.EvaluationResult {
-        if (node == null || !node.isEditable || node.isPassword) {
+        if (node == null || node.isPassword) {
             return AdultContentEvaluator.EvaluationResult.Clean
         }
 
@@ -315,7 +338,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             node.contentDescription?.toString(),
             node.hintText?.toString()
         ).filterNotNull().joinToString(" ").lowercase(Locale.ROOT)
-        return listOf("url", "address", "omnibox", "location bar", "search", "website")
+        return listOf("url", "address", "omnibox", "omnibar", "location_bar", "location bar", "search", "website", "url_field")
             .any(metadata::contains)
     }
 

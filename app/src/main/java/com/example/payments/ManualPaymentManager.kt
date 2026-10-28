@@ -244,7 +244,10 @@ class ManualPaymentManager(
                 firestore.collection(ADMINS).document(uid).get()
                     .addOnSuccessListener { admin ->
                         if (admin.exists()) {
-                            onResult(Result.success(Unit))
+                            OwnerAccess.verify { verified ->
+                                if (verified) onResult(Result.success(Unit))
+                                else onResult(Result.failure(IllegalStateException("Could not verify owner access with the server.")))
+                            }
                         } else {
                             auth.signOut()
                             onResult(Result.failure(IllegalStateException("This Firebase account is not marked as a Strict Blocker owner.")))
@@ -328,6 +331,7 @@ class ManualPaymentManager(
     }
 
     fun ownerSignOut() {
+        OwnerAccess.clear()
         ownerListener?.remove()
         ownerListener = null
         auth.signOut()

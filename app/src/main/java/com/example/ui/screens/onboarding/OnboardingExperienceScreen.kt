@@ -46,6 +46,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.flow.first
+import androidx.compose.foundation.layout.imePadding
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -76,12 +81,12 @@ private data class CharacterOption(
 )
 
 private val characterOptions = listOf(
-    CharacterOption("nova", "Nova", Color(0xFFE45B99), Color(0xFFFFB0C9)),
-    CharacterOption("milo", "Milo", Color(0xFFA953C7), Color(0xFFD7A5EA)),
-    CharacterOption("aria", "Aria", Color(0xFFF4866B), Color(0xFFFFC2A8)),
-    CharacterOption("kai", "Kai", Color(0xFF8C5CC7), Color(0xFFC7A5EF)),
-    CharacterOption("luna", "Luna", Color(0xFF62B49A), Color(0xFFA7DCCB)),
-    CharacterOption("sol", "Sol", Color(0xFFD36A89), Color(0xFFF1A0B5))
+    CharacterOption("nova", "Nova · Fox", Color(0xFFE45B99), Color(0xFFFFB0C9)),
+    CharacterOption("milo", "Milo · Bear", Color(0xFFA953C7), Color(0xFFD7A5EA)),
+    CharacterOption("aria", "Aria · Cat", Color(0xFFF4866B), Color(0xFFFFC2A8)),
+    CharacterOption("kai", "Kai · Panda", Color(0xFF8C5CC7), Color(0xFFC7A5EF)),
+    CharacterOption("luna", "Luna · Rabbit", Color(0xFF62B49A), Color(0xFFA7DCCB)),
+    CharacterOption("sol", "Sol · Owl", Color(0xFFD36A89), Color(0xFFF1A0B5))
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -92,12 +97,21 @@ fun OnboardingExperienceScreen(
     reduceMotion: Boolean,
     onFinished: () -> Unit
 ) {
-    var step by remember { mutableIntStateOf(0) }
-    var name by remember { mutableStateOf("") }
-    var ageText by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("prefer_not_to_say") }
-    var characterId by remember { mutableStateOf("nova") }
-    var companionName by remember { mutableStateOf("") }
+    var step by rememberSaveable { mutableIntStateOf(0) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var ageText by rememberSaveable { mutableStateOf("") }
+    var gender by rememberSaveable { mutableStateOf("prefer_not_to_say") }
+    var characterId by rememberSaveable { mutableStateOf("nova") }
+    var companionName by rememberSaveable { mutableStateOf("") }
+
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(settings) {
+        if (name.isBlank()) name = settings.userNameFlow.first()
+        if (ageText.isBlank()) ageText = settings.userAgeFlow.first().takeIf { it > 0 }?.toString().orEmpty()
+        if (companionName.isBlank()) companionName = settings.characterNameFlow.first()
+    }
+    BackHandler(enabled = step > 0 && !saving) { step-- }
 
     val age = ageText.toIntOrNull()
     val canContinue = when (step) {
@@ -109,6 +123,7 @@ fun OnboardingExperienceScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -137,7 +152,7 @@ fun OnboardingExperienceScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (step > 0) {
-                    IconButton(onClick = { step-- }) {
+                    IconButton(onClick = { if (!saving) step-- }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 } else {
@@ -214,6 +229,7 @@ fun OnboardingExperienceScreen(
                             )
                         }
 
+                        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -223,6 +239,8 @@ fun OnboardingExperienceScreen(
                                 OutlinedButton(
                                     onClick = {
                                         scope.launch {
+                                            saving = true
+                                            try {
                                             settings.saveLocalProfile(
                                                 name = name,
                                                 age = age ?: 13,
@@ -231,6 +249,9 @@ fun OnboardingExperienceScreen(
                                                 companionName = null
                                             )
                                             onFinished()
+                                            } catch (_: Exception) {
+                                                error = "Could not save your setup. Please try again."
+                                            } finally { saving = false }
                                         }
                                     },
                                     modifier = Modifier.weight(1f),
@@ -246,6 +267,8 @@ fun OnboardingExperienceScreen(
                                         step++
                                     } else {
                                         scope.launch {
+                                            saving = true
+                                            try {
                                             settings.saveLocalProfile(
                                                 name = name,
                                                 age = age ?: 13,
@@ -254,15 +277,18 @@ fun OnboardingExperienceScreen(
                                                 companionName = companionName
                                             )
                                             onFinished()
+                                            } catch (_: Exception) {
+                                                error = "Could not save your setup. Please try again."
+                                            } finally { saving = false }
                                         }
                                     }
                                 },
-                                enabled = canContinue,
+                                enabled = canContinue && !saving,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(18.dp),
                                 contentPadding = PaddingValues(vertical = 14.dp)
                             ) {
-                                Text(if (current == 0) "Get started" else if (current == 5) "Continue" else "Next")
+                                Text(if (saving) "Saving…" else if (current == 0) "Get started" else if (current == 5) "Continue" else "Next")
                                 Spacer(Modifier.size(8.dp))
                                 Icon(
                                     if (current == 5) Icons.Default.Check else Icons.Default.ArrowForward,
@@ -391,7 +417,7 @@ private fun CharacterStep(selected: String, onSelected: (String) -> Unit, wide: 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Choose your companion", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
-            "A stylized dashboard character. Neutral, non-sexualized, and purely visual.",
+            "Meet your 3D companion. Turn, pet and play with them on Home.",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         FlowRow(
@@ -444,7 +470,7 @@ private fun CompanionNameStep(
     onNameChange: (String) -> Unit,
     characterId: String
 ) {
-    val defaultName = characterOptions.firstOrNull { it.id == characterId }?.label ?: "Companion"
+    val defaultName = characterOptions.firstOrNull { it.id == characterId }?.label?.substringBefore(" ·") ?: "Companion"
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(22.dp),
@@ -469,99 +495,6 @@ private fun CompanionNameStep(
 }
 
 @Composable
-fun CompanionAvatar(
-    characterId: String,
-    modifier: Modifier = Modifier
-) {
-    val option = characterOptions.firstOrNull { it.id == characterId } ?: characterOptions.first()
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        drawCircle(
-            brush = Brush.radialGradient(
-                listOf(option.secondary.copy(alpha = .34f), Color.Transparent)
-            ),
-            radius = w * .48f,
-            center = Offset(w * .50f, h * .53f)
-        )
-
-        // Soft shadow.
-        drawOval(
-            color = Color.Black.copy(alpha = .12f),
-            topLeft = Offset(w * .23f, h * .84f),
-            size = Size(w * .54f, h * .10f)
-        )
-
-        // Legs.
-        drawLine(
-            option.primary,
-            Offset(w * .43f, h * .65f),
-            Offset(w * .38f, h * .86f),
-            strokeWidth = w * .085f,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            option.primary,
-            Offset(w * .57f, h * .65f),
-            Offset(w * .62f, h * .86f),
-            strokeWidth = w * .085f,
-            cap = StrokeCap.Round
-        )
-
-        // Body / simple clothing silhouette.
-        drawRoundRect(
-            brush = Brush.verticalGradient(listOf(option.secondary, option.primary)),
-            topLeft = Offset(w * .31f, h * .36f),
-            size = Size(w * .38f, h * .36f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * .14f)
-        )
-
-        // Arms.
-        drawLine(
-            option.secondary,
-            Offset(w * .32f, h * .45f),
-            Offset(w * .20f, h * .61f),
-            strokeWidth = w * .075f,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            option.secondary,
-            Offset(w * .68f, h * .45f),
-            Offset(w * .78f, h * .58f),
-            strokeWidth = w * .075f,
-            cap = StrokeCap.Round
-        )
-
-        // Head and subtle highlight.
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFFFFE2D0), Color(0xFFDCA789)),
-                center = Offset(w * .45f, h * .20f),
-                radius = w * .24f
-            ),
-            radius = w * .19f,
-            center = Offset(w * .50f, h * .22f)
-        )
-        drawCircle(
-            Color.White.copy(alpha = .32f),
-            radius = w * .045f,
-            center = Offset(w * .44f, h * .17f)
-        )
-
-        // Hair/cap treatment varies slightly by id so silhouettes feel distinct.
-        val hairColor = when (option.id) {
-            "milo", "kai" -> Color(0xFF38263F)
-            "luna" -> Color(0xFF5A3A31)
-            "aria" -> Color(0xFF6D3B2D)
-            else -> Color(0xFF42303B)
-        }
-        drawArc(
-            color = hairColor,
-            startAngle = 190f,
-            sweepAngle = 160f,
-            useCenter = true,
-            topLeft = Offset(w * .31f, h * .04f),
-            size = Size(w * .38f, h * .30f)
-        )
-    }
+fun CompanionAvatar(characterId: String, modifier: Modifier = Modifier) {
+    com.example.ui.components.CompanionScene(characterId, modifier)
 }

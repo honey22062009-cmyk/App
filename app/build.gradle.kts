@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
     minSdk = 26
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.3"
+    versionCode = 4
+    versionName = "1.3.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

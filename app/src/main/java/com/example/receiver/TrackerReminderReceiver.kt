@@ -13,6 +13,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.data.preferences.SettingsPreferences
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import com.example.core.system.TrackerReminderScheduler
 
 class TrackerReminderReceiver : BroadcastReceiver() {
@@ -21,21 +24,27 @@ class TrackerReminderReceiver : BroadcastReceiver() {
         val type = when (action) {
             TrackerReminderScheduler.ACTION_DAILY_CHECK_IN -> "daily"
             TrackerReminderScheduler.ACTION_SLEEP -> "sleep"
+            TrackerReminderScheduler.ACTION_TEST -> "test"
             else -> return
         }
 
-        createChannels(context)
-        if (
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-        ) {
-            postNotification(context, type)
+        val pending = goAsync()
+        receiverScope.launch {
+            try {
+                val settings = SettingsPreferences(context.applicationContext)
+                val enabled = when (type) {
+                    "sleep" -> settings.sleepReminderEnabledFlow.first()
+                    "daily" -> settings.dailyReminderEnabledFlow.first()
+                    else -> true
+                }
+                createChannels(context)
+                if (enabled && (Build.VERSION.SDK_INT < 33 ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)) {
+                    postNotification(context, type)
+                }
+                TrackerReminderScheduler.refreshNow(context)
+            } finally { pending.finish() }
         }
-
-        // One-shot alarms are intentionally re-scheduled after firing so there is
-        // never an aggressive retry loop.
-        TrackerReminderScheduler.refresh(context)
     }
 
     private fun postNotification(context: Context, type: String) {
@@ -56,10 +65,11 @@ class TrackerReminderReceiver : BroadcastReceiver() {
             context,
             if (isSleep) CHANNEL_SLEEP else CHANNEL_DAILY
         )
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(if (isSleep) "Sleep log" else "Daily check-in")
+            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setContentTitle(if (type == "test") "Reminder test" else if (isSleep) "Sleep log" else "Daily check-in")
             .setContentText(
-                if (isSleep) "How much sleep did you get last night?"
+                if (type == "test") "Your scheduled test reminder arrived. Daily reminders use this same path."
+                else if (isSleep) "How much sleep did you get last night?"
                 else "Take a moment to check in with today's progress."
             )
             .setContentIntent(contentIntent)
@@ -94,7 +104,8 @@ class TrackerReminderReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        private const val CHANNEL_DAILY = "daily_check_in"
-        private const val CHANNEL_SLEEP = "sleep_reminder"
+        private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        const val CHANNEL_DAILY = "daily_check_in"
+        const val CHANNEL_SLEEP = "sleep_reminder"
     }
 }

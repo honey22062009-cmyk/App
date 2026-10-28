@@ -107,7 +107,7 @@ fun SplashScreen(
                         .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f))
                 )
                 Image(
-                    painter = painterResource(R.drawable.app_icon_18_blocker_1792376066440),
+                    painter = painterResource(R.drawable.brand_logo),
                     contentDescription = null,
                     modifier = Modifier
                         .size(72.dp)

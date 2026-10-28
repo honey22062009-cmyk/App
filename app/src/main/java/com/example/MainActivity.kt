@@ -18,6 +18,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,6 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.payments.OwnerAccess
+import com.example.core.system.TrackerReminderScheduler
 import androidx.compose.ui.unit.dp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
@@ -77,6 +83,7 @@ class MainActivity : ComponentActivity() {
 
         targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
         trackerAction = intent?.getStringExtra(EXTRA_TRACKER_ACTION)
+        intent?.removeExtra(EXTRA_TRACKER_ACTION)
 
         setContent {
             val context = LocalContext.current
@@ -114,6 +121,7 @@ class MainActivity : ComponentActivity() {
         }
         if (intent.hasExtra(EXTRA_TRACKER_ACTION)) {
             trackerAction = intent.getStringExtra(EXTRA_TRACKER_ACTION)
+            intent.removeExtra(EXTRA_TRACKER_ACTION)
         }
     }
 }
@@ -125,7 +133,7 @@ fun MainAppContent(
     initialTrackerAction: String?,
     reduceMotion: Boolean
 ) {
-    var isSplashVisible by remember { mutableStateOf(true) }
+    var isSplashVisible by rememberSaveable { mutableStateOf(true) }
 
     if (isSplashVisible) {
         SplashScreen(
@@ -164,21 +172,17 @@ fun MainAppScaffold(
     var isInitialRouteResolved by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showPaywallDialog by remember { mutableStateOf(false) }
+    var dataEntryVisible by remember { mutableStateOf(false) }
+    var pendingTrackerAction by remember(initialTrackerAction) { mutableStateOf(initialTrackerAction) }
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
     LaunchedEffect(repository, initialTargetPackage, initialTrackerAction) {
-        repository.settings.refreshExpiredProEntitlement()
-        val lastPaymentRequestId = repository.settings.lastPaymentRequestIdFlow.first()
-        if (lastPaymentRequestId.isNotBlank()) {
-            ManualPaymentManager(
-                context.applicationContext,
-                repository.settings
-            ).refreshUserRequestOnce(lastPaymentRequestId)
-        }
-
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
-        if (!initialTargetPackage.isNullOrEmpty()) {
+        if (!onboardingCompleted) {
+            currentScreen = Screen.Onboarding
+        } else if (!initialTargetPackage.isNullOrEmpty()) {
             selectedSchedulePackage = initialTargetPackage
             currentScreen = Screen.Schedules
         } else if (!initialTrackerAction.isNullOrEmpty() && onboardingCompleted) {
@@ -189,6 +193,18 @@ fun MainAppScaffold(
             currentScreen = Screen.Onboarding
         }
         isInitialRouteResolved = true
+    }
+
+    // Local navigation must never wait for Firebase or a network connection.
+    LaunchedEffect(repository) {
+        repository.settings.refreshExpiredProEntitlement()
+        OwnerAccess.restore()
+        TrackerReminderScheduler.refresh(context)
+        val requestId = repository.settings.lastPaymentRequestIdFlow.first()
+        if (requestId.isNotBlank()) {
+            ManualPaymentManager(context.applicationContext, repository.settings)
+                .refreshUserRequestOnce(requestId)
+        }
     }
 
     // On first launch, Back should leave the permission guide rather than silently
@@ -223,7 +239,8 @@ fun MainAppScaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                if (currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions) {
+                if (currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions &&
+                    !dataEntryVisible && !keyboardVisible) {
                     FloatingGlassDock(
                         currentScreen = currentScreen,
                         onSelect = { screen -> currentScreen = screen },
@@ -256,7 +273,9 @@ fun MainAppScaffold(
                         currentScreen = targetScreen,
                         repository = repository,
                         selectedSchedulePackage = selectedSchedulePackage,
-                        initialTrackerAction = initialTrackerAction,
+                        initialTrackerAction = pendingTrackerAction,
+                        onTrackerActionConsumed = { pendingTrackerAction = null },
+                        onDataEntryVisibilityChanged = { dataEntryVisible = it },
                         onNavigateToScreen = { screen -> currentScreen = screen },
                         onOpenAccountDialog = {
                             showAccountDialog = true
@@ -300,6 +319,8 @@ fun ScreenContent(
     repository: AppBlockerRepository,
     selectedSchedulePackage: String?,
     initialTrackerAction: String?,
+    onDataEntryVisibilityChanged: (Boolean) -> Unit = {},
+    onTrackerActionConsumed: () -> Unit = {},
     onNavigateToScreen: (Screen) -> Unit,
     onOpenAccountDialog: () -> Unit,
     onOpenPaywallDialog: () -> Unit,
@@ -308,10 +329,13 @@ fun ScreenContent(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     when (currentScreen) {
-        Screen.Dashboard -> {
+        Screen.Dashboard, Screen.Progress -> {
             DashboardScreen(
                 repository = repository,
                 initialTrackerAction = initialTrackerAction,
+                progressOnly = currentScreen == Screen.Progress,
+                onTrackerActionConsumed = onTrackerActionConsumed,
+                onDataEntryVisibilityChanged = onDataEntryVisibilityChanged,
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
@@ -417,6 +441,7 @@ fun ScreenContent(
         Screen.OwnerConsole -> {
             OwnerConsoleScreen(
                 settings = repository.settings,
+                onPreviewPro = { onNavigateToScreen(Screen.BlockerCustomization) },
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }

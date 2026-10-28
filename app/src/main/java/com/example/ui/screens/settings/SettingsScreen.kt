@@ -1,6 +1,8 @@
 package com.example.ui.screens.settings
 
 import android.app.TimePickerDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -499,40 +501,8 @@ private fun SettingsSectionContent(
                 onChange = onSleepReminderChange
             )
             Spacer(modifier = Modifier.height(16.dp))
-            if (!notificationsAllowed) {
-                SettingsLinkRow(
-                    title = "Allow notifications",
-                    subtitle = "Android currently blocks notifications for Strict Blocker.",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName)
-                                }
-                            )
-                        }
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmsAllowed) {
-                SettingsLinkRow(
-                    title = "Allow exact reminder times",
-                    subtitle = "Without Alarms & reminders access, Android may deliver reminders late.",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                    Uri.parse("package:${context.packageName}")
-                                )
-                            )
-                        }
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            SettingsDescription("Delivery also depends on battery policies and notification-channel settings.")
+            ReminderDiagnostics()
+
         }
 
         SettingsSection.Protection -> {
@@ -592,7 +562,7 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.3")
+            SettingsDescription("Version " + com.example.BuildConfig.VERSION_NAME)
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { },
@@ -681,13 +651,23 @@ private fun ReminderSettingRow(
     onChange: (Boolean, Int, Int) -> Unit
 ) {
     val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onChange(true, hour, minute)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SettingsToggleRow(
             title = title,
             subtitle = subtitle,
             checked = enabled,
-            onCheckedChange = { onChange(it, hour, minute) }
+            onCheckedChange = { value ->
+                if (value && Build.VERSION.SDK_INT >= 33 && !PermissionHelper.isNotificationPermissionGranted(context))
+                    launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                else onChange(value, hour, minute)
+            }
         )
+        if (enabled) Text(
+            "Next: " + TrackerReminderScheduler.nextOccurrence(hour, minute).format(java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM · h:mm a")),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button(
             onClick = {
                 TimePickerDialog(
