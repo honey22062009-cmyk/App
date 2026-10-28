@@ -89,9 +89,7 @@ jobs:
           profile: pixel_c
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            gradle :app:connectedDebugAndroidTest --stacktrace --no-daemon
-            adb pull /sdcard/Pictures/StrictBlockerQA/ tablet-ui-screenshots/
+          script: bash scripts/run-tablet-ui.sh
       - name: Upload tablet UI evidence
         if: always()
         uses: actions/upload-artifact@v4

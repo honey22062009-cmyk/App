@@ -32,7 +32,23 @@ class ReliabilityUiTest {
         compose.waitForIdle()
         Thread.sleep(500) // Allow the separate OpenGL surface to submit its first frame.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not produce a screenshot" }
+        var bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not produce a screenshot" }
+        fun furPixels(image: Bitmap): Int {
+            val pixels = IntArray(image.width * image.height)
+            image.getPixels(pixels, 0, image.width, 0, 0, image.width, image.height)
+            return pixels.count { pixel ->
+                val r = (pixel shr 16) and 255; val g = (pixel shr 8) and 255; val b = pixel and 255
+                r in 80..245 && g in 40..190 && b in 20..150 && r > g * 1.15 && g > b * 1.1
+            }
+        }
+        var renderedPixels = if (name == "02-companions") furPixels(bitmap) else Int.MAX_VALUE
+        val deadline = android.os.SystemClock.uptimeMillis() + 5000
+        while (renderedPixels <= 500 && android.os.SystemClock.uptimeMillis() < deadline) {
+            bitmap.recycle()
+            Thread.sleep(250)
+            bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            renderedPixels = furPixels(bitmap)
+        }
         val resolver = instrumentation.targetContext.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
@@ -42,15 +58,8 @@ class ReliabilityUiTest {
         val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
         checkNotNull(resolver.openOutputStream(uri)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         if (name == "02-companions") {
-            // The default fox has warm fur; the surrounding setup is green/cream.
-            // Catch an empty native GL preview even when all Compose labels exist.
-            val pixels = IntArray(bitmap.width * bitmap.height)
-            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-            val furPixels = pixels.count { pixel ->
-                val r = (pixel shr 16) and 255; val g = (pixel shr 8) and 255; val b = pixel and 255
-                r in 80..245 && g in 40..190 && b in 20..150 && r > g * 1.15 && g > b * 1.1
-            }
-            assertTrue("The live 3D companion preview must be visible", furPixels > 500)
+            // Visible native pixels are required, not just a Compose label.
+            assertTrue("The live 3D companion preview must be visible", renderedPixels > 500)
         }
         bitmap.recycle()
     }

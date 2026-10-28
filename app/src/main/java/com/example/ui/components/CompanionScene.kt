@@ -2,7 +2,10 @@ package com.example.ui.components
 
 import android.content.Context
 import android.opengl.GLES20
-import android.opengl.GLSurfaceView
+import android.opengl.EGL14
+import android.graphics.SurfaceTexture
+import android.view.TextureView
+import android.view.Surface
 import android.opengl.Matrix
 import android.os.SystemClock
 import android.view.MotionEvent
@@ -36,8 +39,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
 import kotlin.math.*
 
 /** Real, lit, depth-tested 3D geometry. No network, WebView or downloaded model. */
@@ -54,7 +55,7 @@ fun CompanionScene(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val background = (backgroundColor ?: MaterialTheme.colorScheme.surface).toArgb()
-    val view = remember(context) { CompanionSurface(context) }
+    val view = remember(context) { CompanionTextureView(context) }
     var warmingUp by remember(view) { mutableStateOf(true) }
     LaunchedEffect(view) {
         // Static previews need frames after the parent entrance transition, too.
@@ -88,8 +89,7 @@ fun CompanionScene(
             it.scene.character = characterId
             it.scene.background = background
             it.scene.reducedMotion = reduceMotion
-            it.renderMode = if (warmingUp || (interactive && !reduceMotion)) GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                else GLSurfaceView.RENDERMODE_WHEN_DIRTY
+            it.continuous = warmingUp || (interactive && !reduceMotion)
             it.react(reaction, reactionKey)
             it.requestRender()
         }
@@ -114,8 +114,12 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
     }
 }
 
-private class CompanionSurface(context: Context) : GLSurfaceView(context) {
-    val scene = CompanionRenderer()
+private class CompanionTextureView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
+    val scene = CompanionState()
+    @Volatile private var worker: DrawThread? = null
+    @Volatile private var paused = false
+    @Volatile var continuous = false
+        set(value) { field = value; requestRender() }
     var interactive = false
     private var previousX = 0f
     private var previousY = 0f
@@ -131,10 +135,100 @@ private class CompanionSurface(context: Context) : GLSurfaceView(context) {
     })
 
     init {
-        setEGLContextClientVersion(2)
-        preserveEGLContextOnPause = true
-        setRenderer(scene)
-        renderMode = RENDERMODE_WHEN_DIRTY
+        // TextureView participates in Compose alpha, clipping and screen transitions.
+        isOpaque = false
+        surfaceTextureListener = this
+    }
+
+    fun onResume() { paused = false; requestRender() }
+    fun onPause() { paused = true; requestRender() }
+    fun requestRender() { worker?.requestFrame() }
+
+    override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+        worker?.stopRendering()
+        worker = DrawThread(texture, width, height).apply { start() }
+    }
+    override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+        worker?.resize(width, height)
+    }
+    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+    override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+        val current = worker
+        worker = null
+        current?.stopRendering()
+        if (current == null) texture.release()
+        // The render thread releases its SurfaceTexture only after EGL has detached.
+        return false
+    }
+
+    private inner class DrawThread(
+        private val texture: SurfaceTexture,
+        @Volatile private var frameWidth: Int,
+        @Volatile private var frameHeight: Int
+    ) : Thread("StrictBlocker-Companion") {
+        private val signal = Object()
+        @Volatile private var running = true
+        @Volatile private var requested = true
+        @Volatile private var resized = true
+        fun requestFrame() { requested = true; synchronized(signal) { signal.notifyAll() } }
+        fun resize(width: Int, height: Int) {
+            frameWidth = width; frameHeight = height; resized = true; requestFrame()
+        }
+        fun stopRendering() { running = false; synchronized(signal) { signal.notifyAll() } }
+
+        override fun run() {
+            val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+            var context = EGL14.EGL_NO_CONTEXT
+            var target = EGL14.EGL_NO_SURFACE
+            val surface = Surface(texture)
+            try {
+                val version = IntArray(2)
+                check(EGL14.eglInitialize(display, version, 0, version, 1))
+                val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+                val count = IntArray(1)
+                val attributes = intArrayOf(
+                    EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                    EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT,
+                    EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8, EGL14.EGL_BLUE_SIZE, 8,
+                    EGL14.EGL_ALPHA_SIZE, 8, EGL14.EGL_DEPTH_SIZE, 16, EGL14.EGL_NONE)
+                check(EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) && count[0] > 0)
+                context = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
+                    intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE), 0)
+                check(context != EGL14.EGL_NO_CONTEXT)
+                target = EGL14.eglCreateWindowSurface(display, configs[0], surface, intArrayOf(EGL14.EGL_NONE), 0)
+                check(target != EGL14.EGL_NO_SURFACE && EGL14.eglMakeCurrent(display, target, target, context))
+                EGL14.eglSwapInterval(display, 1)
+                val renderer = CompanionRenderer(scene)
+                renderer.initialize()
+                while (running) {
+                    synchronized(signal) {
+                        while (running && (paused || (!requested && !continuous))) signal.wait()
+                    }
+                    if (!running) break
+                    requested = false
+                    val started = SystemClock.uptimeMillis()
+                    if (resized) { resized = false; renderer.resize(frameWidth, frameHeight) }
+                    renderer.drawFrame()
+                    if (!EGL14.eglSwapBuffers(display, target)) break
+                    if (continuous) {
+                        val remaining = 33L - (SystemClock.uptimeMillis() - started)
+                        if (remaining > 0) SystemClock.sleep(remaining)
+                    }
+                }
+            } catch (error: Exception) {
+                android.util.Log.w("StrictBlocker", "Companion renderer stopped", error)
+            } finally {
+                if (display != EGL14.EGL_NO_DISPLAY) {
+                    EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                    if (target != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, target)
+                    if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)
+                    EGL14.eglTerminate(display)
+                    EGL14.eglReleaseThread()
+                }
+                surface.release()
+                texture.release()
+            }
+        }
     }
 
     fun react(action: String, key: Int) {
@@ -182,7 +276,7 @@ private class CompanionSurface(context: Context) : GLSurfaceView(context) {
     }
 }
 
-private class CompanionRenderer : GLSurfaceView.Renderer {
+private class CompanionState {
     @Volatile var character = "nova"
     @Volatile var background = 0xfffafaf8.toInt()
     @Volatile var reducedMotion = false
@@ -191,6 +285,17 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
     @Volatile var zoom = 4.8f
     @Volatile var reaction = "idle"
     @Volatile var reactionAt = 0L
+}
+
+private class CompanionRenderer(private val state: CompanionState) {
+    private val character get() = state.character
+    private val background get() = state.background
+    private val reducedMotion get() = state.reducedMotion
+    private val yaw get() = state.yaw
+    private val pitch get() = state.pitch
+    private val zoom get() = state.zoom
+    private val reaction get() = state.reaction
+    private val reactionAt get() = state.reactionAt
     private var program = 0
     private lateinit var sphere: Mesh
     private lateinit var cone: Mesh
@@ -204,7 +309,7 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
     private val normal = FloatArray(16)
     private var aspect = 1f
 
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+    fun initialize() {
         program = GLES20.glCreateProgram()
         fun shader(type: Int, source: String): Int = GLES20.glCreateShader(type).also {
             GLES20.glShaderSource(it, source); GLES20.glCompileShader(it)
@@ -242,13 +347,13 @@ private class CompanionRenderer : GLSurfaceView.Renderer {
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
     }
 
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+    fun resize(width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
         aspect = width.toFloat() / height.coerceAtLeast(1)
         Matrix.perspectiveM(projection, 0, 37f, aspect, .1f, 40f)
     }
 
-    override fun onDrawFrame(gl: GL10?) {
+    fun drawFrame() {
         val bg = background
         GLES20.glClearColor(((bg shr 16) and 255) / 255f, ((bg shr 8) and 255) / 255f, (bg and 255) / 255f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
