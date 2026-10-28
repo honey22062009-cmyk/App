@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlinx.coroutines.delay
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -45,12 +48,20 @@ fun CompanionScene(
     interactive: Boolean = false,
     reduceMotion: Boolean = false,
     reaction: String = "idle",
-    reactionKey: Int = 0
+    reactionKey: Int = 0,
+    backgroundColor: androidx.compose.ui.graphics.Color? = null
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val background = MaterialTheme.colorScheme.surface.toArgb()
+    val background = (backgroundColor ?: MaterialTheme.colorScheme.surface).toArgb()
     val view = remember(context) { CompanionSurface(context) }
+    var warmingUp by remember(view) { mutableStateOf(true) }
+    LaunchedEffect(view) {
+        // Static previews need frames after the parent entrance transition, too.
+        delay(1200)
+        warmingUp = false
+        view.requestRender()
+    }
     DisposableEffect(view, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -60,6 +71,7 @@ fun CompanionScene(
             }
         }
         lifecycle.addObserver(observer)
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
         onDispose {
             lifecycle.removeObserver(observer)
             view.onPause()
@@ -67,13 +79,16 @@ fun CompanionScene(
     }
     AndroidView(
         factory = { view },
-        modifier = modifier.semantics { contentDescription = "3D companion. Drag to rotate, pinch to zoom, tap to pet." },
+        modifier = modifier.onGloballyPositioned { view.requestRender() }.semantics {
+            contentDescription = if (interactive) "3D companion. Drag to rotate, pinch to zoom, tap to pet."
+                else "3D companion preview"
+        },
         update = {
             it.interactive = interactive
             it.scene.character = characterId
             it.scene.background = background
             it.scene.reducedMotion = reduceMotion
-            it.renderMode = if (interactive && !reduceMotion) GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            it.renderMode = if (warmingUp || (interactive && !reduceMotion)) GLSurfaceView.RENDERMODE_CONTINUOUSLY
                 else GLSurfaceView.RENDERMODE_WHEN_DIRTY
             it.react(reaction, reactionKey)
             it.requestRender()
@@ -82,11 +97,12 @@ fun CompanionScene(
 }
 
 @Composable
-fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolean, modifier: Modifier = Modifier) {
+fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolean, modifier: Modifier = Modifier,
+    backgroundColor: androidx.compose.ui.graphics.Color? = null) {
     var reaction by remember { mutableStateOf("idle") }
     var key by remember { mutableStateOf(0) }
     Column(modifier) {
-        CompanionScene(characterId, Modifier.fillMaxWidth().height(230.dp), true, reduceMotion, reaction, key)
+        CompanionScene(characterId, Modifier.fillMaxWidth().height(230.dp), true, reduceMotion, reaction, key, backgroundColor)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin").forEach { (id, label) ->
                 TextButton(onClick = { reaction = id; key++ }, modifier = Modifier.weight(1f),

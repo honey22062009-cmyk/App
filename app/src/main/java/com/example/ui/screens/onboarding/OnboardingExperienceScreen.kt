@@ -67,6 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
@@ -106,6 +108,14 @@ fun OnboardingExperienceScreen(
 
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val scroll = rememberScrollState()
+    LaunchedEffect(step) {
+        focus.clearFocus(force = true)
+        keyboard?.hide()
+        scroll.scrollTo(0)
+    }
     LaunchedEffect(settings) {
         if (name.isBlank()) name = settings.userNameFlow.first()
         if (ageText.isBlank()) ageText = settings.userAgeFlow.first().takeIf { it > 0 }?.toString().orEmpty()
@@ -138,7 +148,7 @@ fun OnboardingExperienceScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(
                     horizontal = if (wide) 48.dp else 20.dp,
                     vertical = 22.dp
@@ -147,8 +157,8 @@ fun OnboardingExperienceScreen(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 860.dp),
+                    .widthIn(max = 860.dp)
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (step > 0) {
@@ -181,8 +191,8 @@ fun OnboardingExperienceScreen(
             LinearProgressIndicator(
                 progress = { (step + 1) / 6f },
                 modifier = Modifier
-                    .fillMaxWidth()
                     .widthIn(max = 860.dp)
+                    .fillMaxWidth()
                     .height(6.dp)
             )
             Spacer(Modifier.height(24.dp))
@@ -201,8 +211,8 @@ fun OnboardingExperienceScreen(
             ) { current ->
                 GlassCard(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 860.dp),
+                        .widthIn(max = 860.dp)
+                        .fillMaxWidth(),
                     variant = GlassVariant.Accent,
                     shape = RoundedCornerShape(30.dp)
                 ) {
@@ -220,7 +230,8 @@ fun OnboardingExperienceScreen(
                             4 -> CharacterStep(
                                 selected = characterId,
                                 onSelected = { characterId = it },
-                                wide = wide
+                                wide = wide,
+                                reduceMotion = reduceMotion
                             )
                             else -> CompanionNameStep(
                                 companionName = companionName,
@@ -254,6 +265,7 @@ fun OnboardingExperienceScreen(
                                             } finally { saving = false }
                                         }
                                     },
+                                    enabled = !saving,
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(18.dp)
                                 ) {
@@ -413,52 +425,22 @@ private fun GenderStep(gender: String, onGenderChange: (String) -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CharacterStep(selected: String, onSelected: (String) -> Unit, wide: Boolean) {
+private fun CharacterStep(selected: String, onSelected: (String) -> Unit, wide: Boolean, reduceMotion: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Choose your companion", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(
-            "Meet your 3D companion. Turn, pet and play with them on Home.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        Text("Pick a character, then turn, pet or play with them right here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        com.example.ui.components.InteractiveCompanion(
+            characterId = selected,
+            name = characterOptions.firstOrNull { it.id == selected }?.label?.substringBefore(" ·").orEmpty(),
+            reduceMotion = reduceMotion,
+            backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.fillMaxWidth()
         )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             characterOptions.forEach { option ->
-                val isSelected = selected == option.id
-                Surface(
-                    modifier = Modifier
-                        .widthIn(min = if (wide) 180.dp else 140.dp)
-                        .weight(1f, fill = false)
-                        .border(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant,
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                        .clickable { onSelected(option.id) },
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CompanionAvatar(
-                            characterId = option.id,
-                            modifier = Modifier.size(116.dp)
-                        )
-                        Text(option.label, fontWeight = FontWeight.Bold)
-                        if (isSelected) {
-                            Text(
-                                "Selected",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
+                FilterChip(selected = selected == option.id, onClick = { onSelected(option.id) },
+                    label = { Text(option.label) }, modifier = Modifier.widthIn(min = if (wide) 220.dp else 110.dp))
             }
         }
     }
@@ -496,5 +478,5 @@ private fun CompanionNameStep(
 
 @Composable
 fun CompanionAvatar(characterId: String, modifier: Modifier = Modifier) {
-    com.example.ui.components.CompanionScene(characterId, modifier)
+    com.example.ui.components.CompanionScene(characterId, modifier, backgroundColor = MaterialTheme.colorScheme.primaryContainer)
 }

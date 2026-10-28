@@ -41,6 +41,17 @@ class ReliabilityUiTest {
         }
         val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
         checkNotNull(resolver.openOutputStream(uri)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (name == "02-companions") {
+            // The default fox has warm fur; the surrounding setup is green/cream.
+            // Catch an empty native GL preview even when all Compose labels exist.
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            val furPixels = pixels.count { pixel ->
+                val r = (pixel shr 16) and 255; val g = (pixel shr 8) and 255; val b = pixel and 255
+                r in 80..245 && g in 40..190 && b in 20..150 && r > g * 1.15 && g > b * 1.1
+            }
+            assertTrue("The live 3D companion preview must be visible", furPixels > 500)
+        }
         bitmap.recycle()
     }
 

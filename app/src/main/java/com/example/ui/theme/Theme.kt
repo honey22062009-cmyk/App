@@ -23,6 +23,14 @@ private val AppShapes = Shapes(
 )
 
 private val DarkColorScheme = darkColorScheme(
+    surfaceTint = BrandPrimaryDark,
+    surfaceDim = DarkBackground,
+    surfaceBright = Color(0xFF33423A),
+    surfaceContainerLowest = Color(0xFF0B130F),
+    surfaceContainerLow = DarkSurface,
+    surfaceContainer = DarkSurfaceVariant,
+    surfaceContainerHigh = Color(0xFF2A382F),
+    surfaceContainerHighest = Color(0xFF33423A),
     primary = BrandPrimaryDark,
     onPrimary = Color(0xFF103D2C),
     primaryContainer = Color(0xFF2A4F3D),
@@ -50,6 +58,14 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
+    surfaceTint = BrandPrimary,
+    surfaceDim = Color(0xFFDCE3D7),
+    surfaceBright = LightSurface,
+    surfaceContainerLowest = LightSurface,
+    surfaceContainerLow = LightSurface,
+    surfaceContainer = Color(0xFFF0F2E9),
+    surfaceContainerHigh = Color(0xFFE9EDE2),
+    surfaceContainerHighest = LightSurfaceVariant,
     primary = BrandPrimary,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFD9EDDF),

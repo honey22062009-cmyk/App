@@ -155,100 +155,23 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val spec = GlassDefaults.spec(
-        variant = variant,
-        customBackground = backgroundColor,
-        customBorder = borderColor,
-        customBlur = blurRadius,
-        borderWidth = borderWidth
-    )
-    val dark = GlassDefaults.isDarkTheme()
-    val edgeBrush = if (borderColor != null) {
-        Brush.linearGradient(listOf(borderColor.copy(alpha = 0.55f), borderColor.copy(alpha = 0.20f)))
-    } else {
-        Brush.linearGradient(
-            listOf(
-                Color.White.copy(alpha = if (dark) 0.22f else 0.78f),
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
-            )
-        )
+    val color = backgroundColor ?: when (variant) {
+        GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer
+        GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer
+        GlassVariant.Warning -> MaterialTheme.colorScheme.secondaryContainer
+        GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer
+        GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceContainerLow
+        else -> MaterialTheme.colorScheme.surface
     }
-
-    val glassContent: @Composable () -> Unit = {
-        Box {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                spec.backgroundColor.copy(alpha = if (dark) 0.68f else 0.80f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = if (dark) 0.50f else 0.62f),
-                                spec.backgroundColor.copy(alpha = if (dark) 0.56f else 0.72f)
-                            )
-                        )
-                    )
-            )
-            if (specularHighlight) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = if (dark) 0.16f else 0.42f),
-                                    Color.White.copy(alpha = if (dark) 0.05f else 0.12f),
-                                    Color.Transparent
-                                ),
-                                center = androidx.compose.ui.geometry.Offset(120f, 20f),
-                                radius = 420f
-                            )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.035f),
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.04f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-            }
-            content()
-        }
-    }
-
+    val border = BorderStroke(borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
     if (onClick != null) {
-        Surface(
-            onClick = onClick,
-            modifier = modifier.clip(shape),
-            shape = shape,
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 0.dp,
-            shadowElevation = if (elevation > 0.dp) elevation else 12.dp,
-            border = BorderStroke(borderWidth, edgeBrush),
-            content = glassContent
-        )
+        Surface(onClick = onClick, modifier = modifier, shape = shape, color = color,
+            contentColor = MaterialTheme.colorScheme.onSurface, border = border,
+            tonalElevation = 0.dp, shadowElevation = elevation, content = content)
     } else {
-        Surface(
-            modifier = modifier.clip(shape),
-            shape = shape,
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 0.dp,
-            shadowElevation = if (elevation > 0.dp) elevation else 12.dp,
-            border = BorderStroke(borderWidth, edgeBrush),
-            content = glassContent
-        )
+        Surface(modifier = modifier, shape = shape, color = color,
+            contentColor = MaterialTheme.colorScheme.onSurface, border = border,
+            tonalElevation = 0.dp, shadowElevation = elevation, content = content)
     }
 }
 
