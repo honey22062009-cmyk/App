@@ -99,12 +99,14 @@ class ReliabilityUiTest {
         }
         compose.activityRule.scenario.recreate()
         waitFor("Hi, Honey")
-        compose.onNodeWithText("Wave").performScrollTo().performClick()
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Wave"))
+        compose.onNodeWithText("Wave").performClick()
         compose.onNodeWithText("Feed").performScrollTo().performClick()
         compose.onNodeWithText("Crunch, crunch. Thank you!").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("3D companion. Drag to rotate, pinch to zoom, tap to pet.").performScrollTo()
         capture("08-bunny")
-        compose.onNodeWithText("Record today").performScrollTo().performClick()
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Record today"))
+        compose.onNodeWithText("Record today").performClick()
         waitFor("How was today?")
         compose.onNodeWithText("Home").assertDoesNotExist()
         capture("04-recording")
@@ -120,7 +122,14 @@ class ReliabilityUiTest {
         compose.onNodeWithText("Tough").performClick()
         compose.onNodeWithText("Save today's entry").performClick()
         compose.waitUntil(10_000) { runBlocking { settings.dailyCheckInsFlow.first().single().rating == "difficult" } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("How was today?").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("dashboard_list").performScrollToIndex(0)
+        compose.onNodeWithText("Saved today").assertIsDisplayed()
         compose.activityRule.scenario.recreate()
+        // A LazyColumn can restore its previous scroll position on recreation.
+        // Verify the saved entry after deliberately returning to Home's top.
+        waitFor("Home")
+        compose.onNodeWithTag("dashboard_list").performScrollToIndex(0)
         waitFor("Hi, Honey")
         assertEquals("difficult", runBlocking { settings.dailyCheckInsFlow.first().single().rating })
         compose.onNodeWithText("Saved today").assertIsDisplayed()

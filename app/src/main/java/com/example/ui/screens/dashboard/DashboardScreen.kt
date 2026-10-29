@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -109,6 +111,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     val zone = remember { ZoneId.systemDefault() }
 
     val trackerStartedAt by repository.settings.trackerStartedAtFlow.collectAsState(initial = 0L)
@@ -311,7 +314,8 @@ fun DashboardScreen(
 
 
         LazyColumn(
-            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter),
+            state = listState,
+            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
             contentPadding = PaddingValues(
                 start = if (tablet) 22.dp else 12.dp,
                 end = if (tablet) 22.dp else 12.dp,
@@ -404,6 +408,11 @@ fun DashboardScreen(
             onSave = { rating, sleep, removeSleep ->
                 repository.settings.saveDailyEntry(LocalDate.now(zone).toString(), rating, sleep, removeSleep)
                 showQuickEntry = false
+                // The receipt belongs at the top of Home. Run scrolling in the
+                // screen's scope so dismissing the sheet cannot cancel it.
+                scope.launch {
+                    if (reduceMotion) listState.scrollToItem(0) else listState.animateScrollToItem(0)
+                }
             }
         )
     }
