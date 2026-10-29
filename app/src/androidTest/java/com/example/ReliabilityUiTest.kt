@@ -158,7 +158,8 @@ class ReliabilityUiTest {
         waitFor("Your progress")
         capture("05-progress")
         compose.onNodeWithText("Settings").performClick()
-        waitFor("Preferences and protection")
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("settings_screen_root").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("settings_screen_root").assertIsDisplayed()
         capture("06-settings")
     }
 
