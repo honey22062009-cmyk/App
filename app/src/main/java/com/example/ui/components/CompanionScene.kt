@@ -169,6 +169,26 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
     }
 }
 
+/** EGL_DEFAULT_DISPLAY is process-wide. One leaving scene must not terminate a sibling's context. */
+private object CompanionEglDisplay {
+    private var display = EGL14.EGL_NO_DISPLAY
+
+    @Synchronized fun acquire(): android.opengl.EGLDisplay {
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            val next = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+            check(next != EGL14.EGL_NO_DISPLAY)
+            val version = IntArray(2)
+            check(EGL14.eglInitialize(next, version, 0, version, 1))
+            display = next
+        }
+        return display
+    }
+
+    // Keep the default display initialized for the process. HWUI may also use it.
+    // Each scene still destroys its own surface/context and releases its render thread.
+
+}
+
 private class CompanionTextureView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
     val scene = CompanionState()
     @Volatile private var worker: DrawThread? = null
@@ -233,13 +253,12 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
         fun stopRendering() { running = false; synchronized(signal) { signal.notifyAll() } }
 
         override fun run() {
-            val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+            var display = EGL14.EGL_NO_DISPLAY
             var context = EGL14.EGL_NO_CONTEXT
             var target = EGL14.EGL_NO_SURFACE
             val surface = Surface(texture)
             try {
-                val version = IntArray(2)
-                check(EGL14.eglInitialize(display, version, 0, version, 1))
+                display = CompanionEglDisplay.acquire()
                 val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
                 val count = IntArray(1)
                 val attributes = intArrayOf(
@@ -265,7 +284,10 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
                     val started = SystemClock.uptimeMillis()
                     if (resized) { resized = false; renderer.resize(frameWidth, frameHeight) }
                     renderer.drawFrame()
-                    if (!EGL14.eglSwapBuffers(display, target)) break
+                    if (!EGL14.eglSwapBuffers(display, target)) {
+                        android.util.Log.w("StrictBlocker", "Companion surface lost: ${EGL14.eglGetError().toString(16)}")
+                        break
+                    }
                     if (continuous) {
                         val remaining = 33L - (SystemClock.uptimeMillis() - started)
                         if (remaining > 0) SystemClock.sleep(remaining)
@@ -278,7 +300,6 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
                     EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
                     if (target != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, target)
                     if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)
-                    EGL14.eglTerminate(display)
                     EGL14.eglReleaseThread()
                 }
                 surface.release()

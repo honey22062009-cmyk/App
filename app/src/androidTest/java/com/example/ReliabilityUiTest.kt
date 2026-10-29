@@ -33,6 +33,8 @@ class ReliabilityUiTest {
         Thread.sleep(500) // Allow the separate OpenGL surface to submit its first frame.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         var bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not produce a screenshot" }
+        val sceneBounds = if (name == "08-bunny") compose.onNodeWithContentDescription(
+            "3D companion. Drag to rotate, pinch to zoom, tap to pet.").fetchSemanticsNode().boundsInRoot else null
         fun furPixels(image: Bitmap): Int {
             val pixels = IntArray(image.width * image.height)
             image.getPixels(pixels, 0, image.width, 0, 0, image.width, image.height)
@@ -41,13 +43,31 @@ class ReliabilityUiTest {
                 r in 80..245 && g in 40..190 && b in 20..150 && r > g * 1.15 && g > b * 1.1
             }
         }
-        var renderedPixels = if (name == "02-companions") furPixels(bitmap) else Int.MAX_VALUE
+        fun bunnyPixels(image: Bitmap): Int {
+            val bounds = checkNotNull(sceneBounds)
+            var ivory = 0; var eyes = 0
+            for (y in bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(image.height)) {
+                for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(image.width)) {
+                    val pixel = image.getPixel(x, y)
+                    val r = (pixel shr 16) and 255; val g = (pixel shr 8) and 255; val b = pixel and 255
+                    if (r in 150..255 && g in 120..245 && b in 100..240 && r-g in 5..40 && g-b in 1..30) ivory++
+                    if (r in 30..90 && g in 20..80 && b in 30..100 && r > g) eyes++
+                }
+            }
+            return if (eyes >= 5) ivory else 0
+        }
+        fun renderedPixels(image: Bitmap): Int = when (name) {
+            "02-companions" -> furPixels(image)
+            "08-bunny" -> bunnyPixels(image)
+            else -> Int.MAX_VALUE
+        }
+        var rendered = renderedPixels(bitmap)
         val deadline = android.os.SystemClock.uptimeMillis() + 5000
-        while (renderedPixels <= 500 && android.os.SystemClock.uptimeMillis() < deadline) {
+        while (rendered <= 500 && android.os.SystemClock.uptimeMillis() < deadline) {
             bitmap.recycle()
             Thread.sleep(250)
             bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
-            renderedPixels = furPixels(bitmap)
+            rendered = renderedPixels(bitmap)
         }
         val resolver = instrumentation.targetContext.contentResolver
         val values = ContentValues().apply {
@@ -57,9 +77,9 @@ class ReliabilityUiTest {
         }
         val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
         checkNotNull(resolver.openOutputStream(uri)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        if (name == "02-companions") {
-            // Visible native pixels are required, not just a Compose label.
-            assertTrue("The live 3D companion preview must be visible", renderedPixels > 500)
+        if (name in setOf("02-companions", "08-bunny")) {
+            // Require native model pixels inside the live scene, including after activity recreation.
+            assertTrue("The 3D model must be visible in $name", rendered > 500)
         }
         bitmap.recycle()
     }
