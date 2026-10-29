@@ -23,18 +23,26 @@ private val AppShapes = Shapes(
 )
 
 private val DarkColorScheme = darkColorScheme(
+    surfaceTint = BrandPrimaryDark,
+    surfaceDim = DarkBackground,
+    surfaceBright = Color(0xFF44384B),
+    surfaceContainerLowest = Color(0xFF141018),
+    surfaceContainerLow = DarkSurface,
+    surfaceContainer = DarkSurfaceVariant,
+    surfaceContainerHigh = Color(0xFF3C3142),
+    surfaceContainerHighest = Color(0xFF44384B),
     primary = BrandPrimaryDark,
-    onPrimary = Color(0xFF10205A),
-    primaryContainer = Color(0xFF26356B),
-    onPrimaryContainer = Color(0xFFE0E6FF),
-    secondary = Color(0xFFBCC5DD),
-    onSecondary = Color(0xFF273043),
-    secondaryContainer = Color(0xFF303746),
-    onSecondaryContainer = Color(0xFFE0E5F0),
+    onPrimary = Color(0xFF552344),
+    primaryContainer = Color(0xFF663450),
+    onPrimaryContainer = Color(0xFFFFD8EB),
+    secondary = BrandCoralDark,
+    onSecondary = Color(0xFF5B281F),
+    secondaryContainer = Color(0xFF713C31),
+    onSecondaryContainer = Color(0xFFFFDAD4),
     tertiary = BrandEmeraldDark,
-    onTertiary = Color(0xFF08372D),
-    tertiaryContainer = Color(0xFF154B40),
-    onTertiaryContainer = Color(0xFFD5F5EC),
+    onTertiary = Color(0xFF222F62),
+    tertiaryContainer = Color(0xFF3D477C),
+    onTertiaryContainer = Color(0xFFDEE4FF),
     background = DarkBackground,
     onBackground = DarkOnBackground,
     surface = DarkSurface,
@@ -50,18 +58,26 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
+    surfaceTint = BrandPrimary,
+    surfaceDim = Color(0xFFECE0E9),
+    surfaceBright = LightSurface,
+    surfaceContainerLowest = LightSurface,
+    surfaceContainerLow = LightSurface,
+    surfaceContainer = Color(0xFFFCF0F7),
+    surfaceContainerHigh = Color(0xFFF9E9F3),
+    surfaceContainerHighest = LightSurfaceVariant,
     primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE2E7FF),
-    onPrimaryContainer = Color(0xFF17265F),
-    secondary = Color(0xFF586176),
+    primaryContainer = Color(0xFFFAD9EA),
+    onPrimaryContainer = Color(0xFF5D2649),
+    secondary = BrandCoral,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE0E5F2),
-    onSecondaryContainer = Color(0xFF313A4D),
+    secondaryContainer = Color(0xFFFFDAD4),
+    onSecondaryContainer = Color(0xFF4A1913),
     tertiary = BrandEmerald,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD9F3EB),
-    onTertiaryContainer = Color(0xFF0F4B3F),
+    tertiaryContainer = Color(0xFFE3E7FF),
+    onTertiaryContainer = Color(0xFF354378),
     background = LightBackground,
     onBackground = LightOnBackground,
     surface = LightSurface,
@@ -80,9 +96,10 @@ private val LightColorScheme = lightColorScheme(
 fun StrictBlockerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    accentStyle: String = "rose",
     content: @Composable () -> Unit
 ) {
-    val scheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -91,6 +108,19 @@ fun StrictBlockerTheme(
         else -> LightColorScheme
     }
 
+    val scheme = when (accentStyle) {
+        "lilac" -> baseScheme.copy(
+            primary = if (darkTheme) BrandPlumDark else BrandPlum,
+            onPrimary = if (darkTheme) Color(0xFF342350) else Color.White,
+            primaryContainer = if (darkTheme) Color(0xFF4B3A64) else Color(0xFFEEE1FF),
+            onPrimaryContainer = if (darkTheme) Color(0xFFF0E3FF) else Color(0xFF46335E))
+        "peach" -> baseScheme.copy(
+            primary = if (darkTheme) BrandCoralDark else BrandCoral,
+            onPrimary = if (darkTheme) Color(0xFF572B22) else Color.White,
+            primaryContainer = if (darkTheme) Color(0xFF663C33) else Color(0xFFFFE0D5),
+            onPrimaryContainer = if (darkTheme) Color(0xFFFFDFD2) else Color(0xFF64382D))
+        else -> baseScheme
+    }
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography,
@@ -104,4 +134,4 @@ fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
-) = StrictBlockerTheme(darkTheme, dynamicColor, content)
+) = StrictBlockerTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, content = content)

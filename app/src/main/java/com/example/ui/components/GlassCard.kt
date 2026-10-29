@@ -2,8 +2,6 @@ package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,13 +62,13 @@ object GlassDefaults {
         borderWidth: Dp = 1.dp
     ): GlassSpec {
         val background = customBackground ?: when (variant) {
-            GlassVariant.Standard -> MaterialTheme.colorScheme.surface
-            GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-            GlassVariant.Elevated -> MaterialTheme.colorScheme.surface
-            GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-            GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
-            GlassVariant.Warning -> MaterialTheme.colorScheme.surfaceVariant
-            GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
+            GlassVariant.Standard -> MaterialTheme.colorScheme.surface.copy(alpha = if (isDarkTheme()) 0.66f else 0.74f)
+            GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkTheme()) 0.46f else 0.58f)
+            GlassVariant.Elevated -> MaterialTheme.colorScheme.surface.copy(alpha = if (isDarkTheme()) 0.78f else 0.84f)
+            GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDarkTheme()) 0.44f else 0.52f)
+            GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isDarkTheme()) 0.40f else 0.50f)
+            GlassVariant.Warning -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (isDarkTheme()) 0.40f else 0.52f)
+            GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (isDarkTheme()) 0.46f else 0.58f)
         }
         val border = customBorder ?: when (variant) {
             GlassVariant.Accent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
@@ -79,9 +78,21 @@ object GlassDefaults {
         }
         return GlassSpec(
             backgroundColor = background,
-            borderBrush = Brush.linearGradient(listOf(border, border)),
-            specularBrush = null,
-            blurRadius = customBlur ?: 0.dp,
+            borderBrush = Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDarkTheme()) 0.18f else 0.72f),
+                    border.copy(alpha = 0.34f),
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                )
+            ),
+            specularBrush = Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDarkTheme()) 0.09f else 0.34f),
+                    Color.Transparent,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.035f)
+                )
+            ),
+            blurRadius = customBlur ?: 18.dp,
             borderWidth = borderWidth
         )
     }
@@ -128,40 +139,41 @@ fun AppSurface(
 }
 
 /**
- * Compatibility wrapper for existing screens. The old glass effects were deliberately
- * removed: no blur, specular shine, gradient border, or brand-tinted shadow.
+ * Compatibility wrapper for existing screens. It now renders a restrained,
+ * theme-aware translucent surface with a soft specular layer and gradient edge.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(14.dp),
+    shape: Shape = RoundedCornerShape(24.dp),
     variant: GlassVariant = GlassVariant.Standard,
     borderWidth: Dp = 1.dp,
     borderColor: Color? = null,
     backgroundColor: Color? = null,
     blurRadius: Dp? = null,
-    specularHighlight: Boolean = false,
+    specularHighlight: Boolean = true,
     elevation: Dp = 0.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val spec = GlassDefaults.spec(
-        variant = variant,
-        customBackground = backgroundColor,
-        customBorder = borderColor,
-        customBlur = blurRadius,
-        borderWidth = borderWidth
-    )
-
-    val base = modifier
-        .clip(shape)
-        .border(spec.borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant, shape)
-        .background(spec.backgroundColor, shape)
-
-    Box(
-        modifier = if (onClick != null) base.clickable(onClick = onClick) else base
-    ) {
-        content()
+    val requested = backgroundColor ?: when (variant) {
+        GlassVariant.Accent -> MaterialTheme.colorScheme.primaryContainer
+        GlassVariant.Success -> MaterialTheme.colorScheme.tertiaryContainer
+        GlassVariant.Warning -> MaterialTheme.colorScheme.secondaryContainer
+        GlassVariant.Error -> MaterialTheme.colorScheme.errorContainer
+        GlassVariant.Subtle -> MaterialTheme.colorScheme.surfaceContainerLow
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val color = requested.compositeOver(MaterialTheme.colorScheme.surface)
+    val border = BorderStroke(borderWidth, borderColor ?: MaterialTheme.colorScheme.outlineVariant)
+    if (onClick != null) {
+        Surface(onClick = onClick, modifier = modifier, shape = shape, color = color,
+            contentColor = MaterialTheme.colorScheme.onSurface, border = border,
+            tonalElevation = 0.dp, shadowElevation = elevation, content = content)
+    } else {
+        Surface(modifier = modifier, shape = shape, color = color,
+            contentColor = MaterialTheme.colorScheme.onSurface, border = border,
+            tonalElevation = 0.dp, shadowElevation = elevation, content = content)
     }
 }
 

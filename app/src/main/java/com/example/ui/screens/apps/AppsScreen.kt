@@ -79,7 +79,8 @@ import java.util.Locale
 @Composable
 fun AppsScreen(
     repository: AppBlockerRepository,
-    onConfigureScheduleForApp: (String) -> Unit
+    onConfigureScheduleForApp: (String) -> Unit,
+    onNavigateToPaywall: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
@@ -89,6 +90,8 @@ fun AppsScreen(
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
+    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
+    val groupLimit = if (isPro) 8 else 1
 
     val selectedPackages = remember { mutableStateListOf<String>() }
 
@@ -158,15 +161,36 @@ fun AppsScreen(
                     )
                 }
 
-                OutlinedButton(onClick = { showGroupDialog = true }) {
+                OutlinedButton(
+                    onClick = {
+                        if (groups.size >= groupLimit) {
+                            if (!isPro) onNavigateToPaywall()
+                        } else {
+                            showGroupDialog = true
+                        }
+                    },
+                    enabled = groups.size < groupLimit || !isPro
+                ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("New group")
+                    Text(
+                        when {
+                            groups.size < groupLimit -> "New group"
+                            !isPro -> "Unlock groups"
+                            else -> "Group limit reached"
+                        }
+                    )
                 }
             }
 
             if (groups.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${groups.size}/$groupLimit groups" + if (!isPro) " • Pro unlocks up to 8" else "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -464,14 +488,19 @@ fun AppsScreen(
             onDismiss = { showGroupDialog = false },
             onSave = { name, packages ->
                 coroutineScope.launch {
-                    repository.saveAppGroup(name, packages)
-                    packages.forEach { pkg ->
-                        installedApps.firstOrNull { it.packageName == pkg }?.let { app ->
-                            repository.setAppManaged(app.packageName, app.appName, true)
+                    val saved = repository.saveAppGroup(name, packages)
+                    if (saved) {
+                        packages.forEach { pkg ->
+                            installedApps.firstOrNull { it.packageName == pkg }?.let { app ->
+                                repository.setAppManaged(app.packageName, app.appName, true)
+                            }
                         }
+                        showGroupDialog = false
+                        refreshApps()
+                    } else {
+                        showGroupDialog = false
+                        onNavigateToPaywall()
                     }
-                    showGroupDialog = false
-                    refreshApps()
                 }
             }
         )
@@ -488,6 +517,9 @@ fun AppGroupDialog(
     val chosen = remember { mutableStateListOf<String>() }
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(28.dp),
         onDismissRequest = onDismiss,
         title = { Text("Create app group") },
         text = {

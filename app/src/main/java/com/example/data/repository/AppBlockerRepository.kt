@@ -157,10 +157,19 @@ class AppBlockerRepository(
         AlarmScheduler.scheduleNextTransition(context)
     }
 
-    suspend fun saveAppGroup(name: String, packageNames: Set<String>) {
+    suspend fun saveAppGroup(name: String, packageNames: Set<String>): Boolean {
         val cleanName = name.trim()
-        if (cleanName.isBlank()) return
+        if (cleanName.isBlank()) return false
+
         val current = appGroupsFlow.first().toMutableList()
+        val isEditingExisting = current.any { it.name.equals(cleanName, ignoreCase = true) }
+        val isPro = settings.isProEntitledFlow.first()
+        val groupLimit = if (isPro) 8 else 1
+
+        if (!isEditingExisting && current.size >= groupLimit) {
+            return false
+        }
+
         current.removeAll { it.name.equals(cleanName, ignoreCase = true) }
         current.add(AppGroup(cleanName, packageNames))
         settings.setAppGroups(
@@ -168,6 +177,7 @@ class AppBlockerRepository(
                 group.name + "::" + group.packageNames.sorted().joinToString(",")
             }.toSet()
         )
+        return true
     }
 
     suspend fun deleteAppGroup(name: String) {
@@ -271,6 +281,17 @@ class AppBlockerRepository(
                 reason = reason
             )
         )
+        pruneBlockHistoryInternal()
+    }
+
+    suspend fun pruneBlockHistoryNow() = withContext(Dispatchers.IO) {
+        pruneBlockHistoryInternal()
+    }
+
+    private suspend fun pruneBlockHistoryInternal() {
+        val retentionDays = settings.blockHistoryRetentionDaysFlow.first().coerceIn(7, 365)
+        val cutoff = System.currentTimeMillis() - retentionDays * 24L * 60L * 60L * 1000L
+        blockEventDao.deleteOlderThan(cutoff)
     }
 
     suspend fun recordAdultBlockEvent(reason: String = "18+ Adult Content Blocked") = withContext(Dispatchers.IO) {
@@ -283,6 +304,7 @@ class AppBlockerRepository(
                 reason = reason
             )
         )
+        pruneBlockHistoryInternal()
     }
 
     /**

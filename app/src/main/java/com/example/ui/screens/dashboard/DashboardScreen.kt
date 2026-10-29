@@ -1,114 +1,227 @@
 package com.example.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.example.core.system.PermissionHelper
-import com.example.data.repository.AppBlockerRepository
-import com.example.data.repository.NextTransitionInfo
-import com.example.ui.components.AppIconImage
-import com.example.ui.components.AppSurface
-import com.example.ui.theme.LayoutSpacing
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.core.system.ProtectionHealth
+import com.example.core.system.ProtectionHealthSnapshot
+import com.example.data.preferences.DailyCheckIn
+import com.example.data.preferences.TrackerCalculator
+import com.example.data.preferences.TrackerResetRecord
+import com.example.data.repository.AppBlockerRepository
+import com.example.ui.components.GlassCard
+import com.example.ui.components.GlassVariant
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private fun buildTabletDashboardRows(cards: List<String>): List<List<String>> {
+    val fullWidthCards = setOf("hero", "checkin", "graph", "stats", "protection")
+    val rows = mutableListOf<List<String>>()
+    var index = 0
+    while (index < cards.size) {
+        val current = cards[index]
+        if (current in fullWidthCards) {
+            rows += listOf(current)
+            index++
+        } else {
+            val next = cards.getOrNull(index + 1)
+            if (next != null && next !in fullWidthCards) {
+                rows += listOf(current, next)
+                index += 2
+            } else {
+                rows += listOf(current)
+                index++
+            }
+        }
+    }
+    return rows
+}
 
 @Composable
 fun DashboardScreen(
     repository: AppBlockerRepository,
+    initialTrackerAction: String? = null,
+    progressOnly: Boolean = false,
+    onDataEntryVisibilityChanged: (Boolean) -> Unit = {},
+    onTrackerActionConsumed: () -> Unit = {},
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+    onNavigateToAdultProtection: () -> Unit = {},
+    onOpenPro: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
-    val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
-    val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
-    val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
-    val totalBlocksCount by repository.totalBlocksCountFlow.collectAsState(initial = 0)
-    val recentBlocks by repository.recentBlocksFlow.collectAsState(initial = emptyList())
-    val activeManagedApps = managedApps.filter { it.isManaged }
-
-    var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
-
-    var permissionsHealthy by remember(context) { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val zone = remember { ZoneId.systemDefault() }
 
-    // Android settings are opened outside this activity. Refresh on resume so the
-    // dashboard never relies on a stale permission snapshot.
-    DisposableEffect(context, lifecycleOwner) {
-        fun refreshPermissions() {
-            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.canScheduleExactAlarms(context)
+    val trackerStartedAt by repository.settings.trackerStartedAtFlow.collectAsState(initial = 0L)
+    val resetRecords by repository.settings.trackerResetRecordsFlow.collectAsState(initial = emptyList())
+    val checkIns by repository.settings.dailyCheckInsFlow.collectAsState(initial = emptyList())
+    val sleepEntries by repository.settings.sleepEntriesFlow.collectAsState(initial = emptyList())
+    val goalDays by repository.settings.trackerGoalDaysFlow.collectAsState(initial = 0)
+    val cardOrder by repository.settings.dashboardCardOrderFlow.collectAsState(
+        initial = com.example.data.preferences.SettingsPreferences.defaultDashboardCardOrder()
+    )
+    val hiddenCards by repository.settings.dashboardHiddenCardsFlow.collectAsState(initial = emptySet())
+    val seenMilestones by repository.settings.seenMilestonesFlow.collectAsState(initial = emptySet())
+    val reduceMotion by repository.settings.reduceMotionFlow.collectAsState(initial = false)
+    val userName by repository.settings.userNameFlow.collectAsState(initial = "")
+    val tourSeen by repository.settings.quickTourSeenFlow.collectAsState(initial = true)
+    val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
+    val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
+    val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
+    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
+    val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
+    val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
+    val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
+
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
+    var showQuickEntry by rememberSaveable { mutableStateOf(false) }
+    var showResetEditor by remember { mutableStateOf(false) }
+    var showSleepEditor by remember { mutableStateOf(false) }
+    var showDailyPrompt by remember { mutableStateOf(false) }
+    var editingReset by remember { mutableStateOf<TrackerResetRecord?>(null) }
+    var deleteCandidate by remember { mutableStateOf<TrackerResetRecord?>(null) }
+    var showGoal by remember { mutableStateOf(false) }
+    var showMilestones by remember { mutableStateOf(false) }
+    var showTimeline by remember { mutableStateOf(false) }
+    var showCustomization by remember { mutableStateOf(false) }
+    var selectedCalendarDate by remember { mutableStateOf<LocalDate?>(null) }
+    var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
+
+    val entryVisible = showQuickEntry || showResetEditor || showSleepEditor || showDailyPrompt || showGoal
+    LaunchedEffect(entryVisible) { onDataEntryVisibilityChanged(entryVisible) }
+    DisposableEffect(Unit) { onDispose { onDataEntryVisibilityChanged(false) } }
+
+    LaunchedEffect(Unit) {
+        repository.settings.ensureStreakTrackerStarted()
+        repository.settings.refreshExpiredProEntitlement()
+    }
+
+    LaunchedEffect(initialTrackerAction) {
+        when (initialTrackerAction) {
+            "sleep" -> showSleepEditor = true
+            "daily" -> showQuickEntry = true
         }
+        if (initialTrackerAction != null) onTrackerActionConsumed()
+    }
 
+
+    // Refresh day-based tracker values at local midnight without running a per-second timer.
+    LaunchedEffect(zone) {
+        while (true) {
+            val current = System.currentTimeMillis()
+            val nextMidnight = Instant.ofEpochMilli(current)
+                .atZone(zone)
+                .toLocalDate()
+                .plusDays(1)
+                .atStartOfDay(zone)
+                .toInstant()
+                .toEpochMilli()
+            delay((nextMidnight - current + 1_000L).coerceAtLeast(1_000L))
+            nowMillis = System.currentTimeMillis()
+        }
+    }
+
+    DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                nowMillis = System.currentTimeMillis()
+                health = ProtectionHealth.snapshot(context)
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        refreshPermissions()
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(activeManagedApps) {
-        nextTransition = repository.findNextGlobalTransition()
+    val stats = remember(trackerStartedAt, resetRecords, nowMillis, zone) {
+        TrackerCalculator.stats(trackerStartedAt, resetRecords, nowMillis, zone)
+    }
+    val latestReset = resetRecords.maxByOrNull { it.timestamp }
+    val lastResetLabel = remember(latestReset, zone) {
+        latestReset?.let {
+            Instant.ofEpochMilli(it.timestamp).atZone(zone)
+                .format(DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.getDefault()))
+        } ?: "No reset logged"
+    }
+    val today = remember(nowMillis, zone) { Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate() }
+    val todayCheckIn = remember(checkIns, today) { checkIns.firstOrNull { it.localDate == today } }
+    val todaySleep = remember(sleepEntries, today) { sleepEntries.firstOrNull { it.localDate == today } }
+    val insight = remember(stats, resetRecords, nowMillis, zone) {
+        buildInsight(stats, resetRecords, nowMillis, zone)
+    }
+    val journeyItems = remember(stats, trackerStartedAt, resetRecords, goalDays, nowMillis, zone) {
+        buildJourneyItems(stats, trackerStartedAt, resetRecords, goalDays, nowMillis, zone)
+    }
+
+    LaunchedEffect(stats.currentDays, seenMilestones) {
+        val milestone = listOf(1, 3, 7, 14, 30, 60, 90, 180, 365)
+            .lastOrNull { stats.currentDays >= it && it !in seenMilestones }
+        if (milestone != null) {
+            celebrationMilestone = milestone
+            repository.settings.markMilestoneSeen(milestone)
+        }
     }
 
     BoxWithConstraints(
@@ -116,376 +229,385 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        val horizontalPadding = if (maxWidth >= 720.dp) LayoutSpacing.xl else LayoutSpacing.md
-        // Use the extra landscape space instead of forcing tablet content into a narrow
-        // phone-like column. Keep a cap so very large displays remain easy to scan.
-        val contentWidth = when {
-            maxWidth >= 1280.dp -> 1180.dp
-            maxWidth >= 1000.dp -> maxWidth - 72.dp
-            maxWidth >= 720.dp -> maxWidth - 40.dp
-            else -> maxWidth
+        val tablet = maxWidth >= 720.dp
+        val wideHome = maxWidth >= 1000.dp && !progressOnly
+        val progressKeys = setOf("stats", "graph", "calendar", "timeline", "milestones", "insights")
+        val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
+            else if (wideHome) listOf("protection") else listOf("protection", "hero")
+        val tabletRows = remember(visibleCardOrder) {
+            buildTabletDashboardRows(visibleCardOrder)
         }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = horizontalPadding, vertical = LayoutSpacing.lg)
-                .testTag("dashboard_lazy_column"),
-            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text(
-                        text = "Strict Blocker",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Manage app access, schedules and protection",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            item {
-                AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = if (isProtectionEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
+        val renderDashboardCard: @Composable (String) -> Unit = { key ->
+                    when (key) {
+                        "hero" -> StreakHeroCard(
+                            stats = stats,
+                            characterId = selectedCharacterId,
+                            companionName = companionName,
+                            onRecordToday = { showQuickEntry = true },
+                            lastResetLabel = lastResetLabel,
+                            goalDays = goalDays,
+                            reduceMotion = reduceMotion,
+                            tablet = tablet,
+                            soundEnabled = companionSound,
+                            onSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
+                            onRecordReset = {
+                                editingReset = null
+                                showResetEditor = true
+                            },
+                            onEditGoal = { showGoal = true }
                         )
-                        Spacer(Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = when {
-                                    !isProtectionEnabled -> "Protection paused"
-                                    !permissionsHealthy -> "Setup required"
-                                    else -> "Protection enabled"
-                                },
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(LayoutSpacing.xxs))
-                            Text(
-                                text = "${activeManagedApps.size} managed apps",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = when {
-                                    !isProtectionEnabled -> "App blocking is paused. Turn protection on to enforce your saved rules."
-                                    !permissionsHealthy -> "The setting is on, but required Android permissions need attention."
-                                    else -> "Core permissions are available. Blocking follows your saved app rules."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = isProtectionEnabled,
-                            onCheckedChange = { enabled ->
+    
+                        "stats" -> StatsStrip(stats, tablet)
+    
+                        "graph" -> StreakGraphCard(
+                            trackerStartedAt = trackerStartedAt,
+                            resets = resetRecords,
+                            zone = zone,
+                            tablet = tablet
+                        )
+    
+                        "milestones" -> MilestoneCard(
+                            stats = stats,
+                            onViewAll = { showMilestones = true }
+                        )
+    
+                        "checkin" -> DailyCheckInCard(
+                            currentDays = stats.currentDays,
+                            todayCheckIn = todayCheckIn,
+                            todaySleep = todaySleep,
+                            onOpenCheckIn = { showDailyPrompt = true },
+                            onRecordReset = {
+                                editingReset = null
+                                showResetEditor = true
+                            },
+                            onAddSleep = { showSleepEditor = true }
+                        )
+
+                        "calendar" -> CalendarHeatmapCard(
+                            trackerStartedAt = trackerStartedAt,
+                            resets = resetRecords,
+                            checkIns = checkIns,
+                            zone = zone,
+                            onDateSelected = { selectedCalendarDate = it }
+                        )
+    
+                        "insights" -> InsightCard(insight)
+    
+                        "timeline" -> JourneyPreviewCard(
+                            items = journeyItems,
+                            onOpen = { showTimeline = true }
+                        )
+    
+                        "protection" -> ProtectionStatusCard(
+                            enabled = isProtectionEnabled,
+                            health = health,
+                            activeManagedApps = managedApps.count { it.isManaged },
+                            totalBlocks = totalBlocks,
+                            onToggle = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
-                            modifier = Modifier
-                                .testTag("protection_toggle_switch")
-                                .semantics {
-                                    contentDescription = "Protection"
-                                    stateDescription = if (isProtectionEnabled) "On" else "Off"
-                                }
+                            onOpenSetup = onNavigateToPermissions
                         )
                     }
-                }
-            }
+        }
 
-            if (!permissionsHealthy) {
-                item {
-                    AppSurface(
-                        modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                        backgroundColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f),
-                        borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.25f),
-                        onClick = onNavigateToPermissions
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Protection needs attention",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Review Accessibility, Usage access, overlay and exact-alarm access.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    "Review permissions",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
+            contentPadding = PaddingValues(
+                start = if (tablet) 22.dp else 12.dp,
+                end = if (tablet) 22.dp else 12.dp,
+                top = 18.dp,
+                bottom = 128.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item(key = "header") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(if (progressOnly) "Your progress" else if (userName.isBlank()) "Your day" else "Hi, ${userName.trim()}",
+                            style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                        Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A softer landing.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(if (isPro) " Pro active" else " Explore Pro") }
+                }
+                if (progressOnly) TextButton(onClick = {
+                    if (isPro) showCustomization = true else onOpenPro()
+                }) { Text("Customize progress") }
+            }
+            if (!progressOnly && !tourSeen) item(key = "quick_tour") {
+                QuickTourCard(reduceMotion = reduceMotion,
+                    onDone = { scope.launch { repository.settings.setQuickTourSeen(true) } })
+            }
+            if (!progressOnly && !wideHome) item(key = "today") {
+                TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today,
+                    reduceMotion, onRecord = { showQuickEntry = true })
+            }
+
+            if (!progressOnly) item(key = "shortcuts") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onNavigateToApps, modifier = Modifier.weight(1f)) { Text("Block apps") }
+                    TextButton(onClick = onNavigateToSchedules, modifier = Modifier.weight(1f)) { Text("Schedules") }
+                    TextButton(onClick = onNavigateToAdultProtection, modifier = Modifier.weight(1f)) { Text("18+ protection") }
                 }
             }
 
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Quick access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        QuickAction("Apps", Icons.Default.Apps, onNavigateToApps, Modifier.weight(1f))
-                        QuickAction("Schedules", Icons.Default.CalendarMonth, onNavigateToSchedules, Modifier.weight(1f))
-                        QuickAction("Adult protection", Icons.Default.Security, onNavigateToAdultProtection, Modifier.weight(1.35f))
+            if (wideHome) item(key = "home_focus_row") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                    Box(Modifier.weight(.85f)) {
+                        TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today, reduceMotion, onRecord = { showQuickEntry = true })
                     }
+                    Box(Modifier.weight(1.65f)) { renderDashboardCard("hero") }
                 }
             }
 
-            if (activeManagedApps.isEmpty()) {
-                item {
-                    AppSurface(
-                        modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                        onClick = onNavigateToApps
-                    ) {
+            if (tablet) {
+                items(
+                    items = tabletRows,
+                    key = { row -> row.joinToString("+") }
+                ) { row ->
+                    if (row.size == 1) {
+                        renderDashboardCard(row.single())
+                    } else {
                         Row(
-                            modifier = Modifier.padding(LayoutSpacing.md),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Icon(
-                                Icons.Default.Apps,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(Modifier.width(LayoutSpacing.sm))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "No apps managed yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Choose which apps should follow your schedules.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Manage apps",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                AppSurface(
-                    modifier = Modifier.width(contentWidth).fillMaxWidth(),
-                    onClick = onNavigateToAdultProtection
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Security,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Adult Content Protection",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                if (isAdultProtectionEnabled) {
-                                    if (adultBlocksCount > 0) "${adultBlocksCount} restricted attempts blocked"
-                                    else "Web, search and device protection enabled"
-                                } else {
-                                    "Protection is off"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("At a glance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    AppSurface(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            StatusRow(
-                                icon = Icons.Default.CalendarMonth,
-                                title = "Next schedule change",
-                                value = nextTransition?.let {
-                                    val time = it.transitionDateTime.format(
-                                        DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-                                    )
-                                    "$time · ${if (it.isOpening) "opens" else "closes"} · ${it.appName}"
-                                } ?: "No upcoming transition"
-                            )
-                            Spacer(Modifier.height(14.dp))
-                            StatusRow(
-                                icon = Icons.Default.History,
-                                title = "Recorded blocked attempts",
-                                value = totalBlocksCount.toString()
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
-
-            if (recentBlocks.isEmpty()) {
-                item {
-                    AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                        Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    "No blocked attempts yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    "Recent blocked app launches will appear here.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            row.forEach { key ->
+                                val cardWeight = if ("calendar" in row) {
+                                    if (key == "calendar") 1.25f else 0.75f
+                                } else 1f
+                                Box(modifier = Modifier.weight(cardWeight)) {
+                                    renderDashboardCard(key)
+                                }
                             }
                         }
                     }
                 }
             } else {
-                items(recentBlocks.take(8)) { event ->
-                    AppSurface(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            AppIconImage(packageName = event.appPackage, size = 36.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    event.appName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    event.reason,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                            Text(
-                                event.formattedTime,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                items(
+                    items = visibleCardOrder,
+                    key = { it }
+                ) { key ->
+                    renderDashboardCard(key)
                 }
             }
         }
     }
-}
 
-@Composable
-private fun QuickAction(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    AppSurface(
-        modifier = modifier.heightIn(min = 76.dp),
-        backgroundColor = MaterialTheme.colorScheme.surface,
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(LayoutSpacing.xs)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-                maxLines = 2
-            )
-        }
+    if (showQuickEntry) {
+        QuickRecordSheet(
+            current = todayCheckIn,
+            currentSleep = todaySleep,
+            onDismiss = { showQuickEntry = false },
+            onReset = { showQuickEntry = false; editingReset = null; showResetEditor = true },
+            onSave = { rating, sleep, removeSleep ->
+                repository.settings.saveDailyEntry(LocalDate.now(zone).toString(), rating, sleep, removeSleep)
+                showQuickEntry = false
+                // The receipt belongs at the top of Home. Run scrolling in the
+                // screen's scope so dismissing the sheet cannot cancel it.
+                scope.launch {
+                    if (reduceMotion) listState.scrollToItem(0) else listState.animateScrollToItem(0)
+                }
+            }
+        )
+    }
+
+    if (showDailyPrompt) {
+        DailyCheckInPromptDialog(
+            current = todayCheckIn,
+            onDismiss = { showDailyPrompt = false },
+            onSelect = { rating ->
+                scope.launch {
+                    repository.settings.saveDailyCheckIn(today.toString(), rating)
+                }
+                showDailyPrompt = false
+            },
+            onRecordReset = {
+                showDailyPrompt = false
+                editingReset = null
+                showResetEditor = true
+            }
+        )
+    }
+
+    if (showSleepEditor) {
+        SleepEntryDialog(
+            current = todaySleep,
+            onDismiss = { showSleepEditor = false },
+            onSave = { minutes, note ->
+                scope.launch {
+                    repository.settings.saveSleepEntry(today.toString(), minutes, note)
+                }
+                showSleepEditor = false
+            }
+        )
+    }
+
+    if (showResetEditor) {
+        ResetEditorDialog(
+            editing = editingReset,
+            currentDays = stats.currentDays,
+            onDismiss = {
+                showResetEditor = false
+                editingReset = null
+            },
+            onSave = { timestamp, category, note ->
+                val existing = editingReset
+                scope.launch {
+                    if (existing == null) {
+                        repository.settings.recordTrackerReset(timestamp, category, note)
+                    } else {
+                        repository.settings.updateTrackerReset(existing.id, timestamp, category, note)
+                    }
+                }
+                showResetEditor = false
+                editingReset = null
+                nowMillis = System.currentTimeMillis()
+            }
+        )
+    }
+
+    if (showGoal) {
+        GoalDialog(
+            currentGoal = goalDays,
+            onDismiss = { showGoal = false },
+            onSave = { days ->
+                scope.launch { repository.settings.setTrackerGoalDays(days) }
+                showGoal = false
+            }
+        )
+    }
+
+    if (showMilestones) {
+        MilestonesDialog(
+            stats = stats,
+            trackerStartedAt = trackerStartedAt,
+            resets = resetRecords,
+            zone = zone,
+            onDismiss = { showMilestones = false }
+        )
+    }
+
+    if (showTimeline) {
+        TimelineDialog(
+            items = journeyItems,
+            resets = resetRecords,
+            onDismiss = { showTimeline = false },
+            onEdit = { record ->
+                showTimeline = false
+                editingReset = record
+                showResetEditor = true
+            },
+            onDelete = { record -> deleteCandidate = record }
+        )
+    }
+
+    deleteCandidate?.let { record ->
+        AlertDialog(
+            onDismissRequest = { deleteCandidate = null },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+            title = { Text("Delete this reset?", fontWeight = FontWeight.Bold) },
+            text = { Text("The tracker will recalculate streak history after this entry is removed.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch { repository.settings.deleteTrackerReset(record.id) }
+                        deleteCandidate = null
+                        nowMillis = System.currentTimeMillis()
+                    }
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    selectedCalendarDate?.let { date ->
+        CalendarDetailDialog(
+            date = date,
+            streakDay = TrackerCalculator.streakAt(date, trackerStartedAt, resetRecords, zone),
+            resets = resetRecords,
+            checkIn = checkIns.firstOrNull { it.localDate == date },
+            zone = zone,
+            onDismiss = { selectedCalendarDate = null }
+        )
+    }
+
+    if (showCustomization) {
+        DashboardCustomizationDialog(
+            order = cardOrder.filter { it in setOf("stats", "graph", "calendar", "timeline", "milestones", "insights") },
+            hidden = hiddenCards,
+            onDismiss = { showCustomization = false },
+            onSave = { order, hidden ->
+                scope.launch { repository.settings.setDashboardLayout(order, hidden) }
+                showCustomization = false
+            }
+        )
+    }
+
+    celebrationMilestone?.let { days ->
+        MilestoneCelebrationDialog(
+            days = days,
+            onDismiss = { celebrationMilestone = null }
+        )
     }
 }
 
 @Composable
-private fun StatusRow(icon: ImageVector, title: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
+private fun ProtectionStatusCard(
+    enabled: Boolean,
+    health: ProtectionHealthSnapshot,
+    activeManagedApps: Int,
+    totalBlocks: Int,
+    onToggle: (Boolean) -> Unit,
+    onOpenSetup: () -> Unit
+) {
+    val needsAttention = !health.coreReady || health.reliabilityScore < 100
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = needsAttention, onClick = onOpenSetup),
+        variant = if (needsAttention) GlassVariant.Warning else GlassVariant.Subtle,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                icon,
+                if (needsAttention) Icons.Default.Warning else Icons.Default.Shield,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                tint = if (needsAttention) MaterialTheme.colorScheme.secondary else WarmMint
             )
+            Spacer(Modifier.size(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        !enabled -> "App blocking paused"
+                        !health.coreReady -> "Finish app blocking setup"
+                        health.reliabilityScore < 100 -> "App blocking · review reliability"
+                        else -> "App blocking ready"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (needsAttention) {
+                        health.degradedReasons.firstOrNull() ?: "Review Android permissions."
+                    } else {
+                        "$activeManagedApps restricted apps · $totalBlocks blocks"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
     }
 }

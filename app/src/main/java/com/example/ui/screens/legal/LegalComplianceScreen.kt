@@ -86,7 +86,7 @@ fun LegalComplianceScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Zero-telemetry audit, compliance transparency, and right to erasure",
+                            text = "Local-first blocking, Firebase payment verification, and data controls",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -119,11 +119,11 @@ fun LegalComplianceScreen(
                     title = "Privacy Policy & Data Minimization",
                     icon = Icons.Default.Security,
                     iconTint = MaterialTheme.colorScheme.tertiary,
-                    content = "Strict Blocker operates on a strict zero-telemetry, privacy-first principle:\n\n" +
-                            "• 100% Local Storage: All application schedules, configuration, and interception events are stored exclusively in the on-device Room SQLite database.\n" +
-                            "• Data Minimization: The app only records the minimum necessary attributes (package name, local day/hour/minute schedule ranges, and block event timestamps).\n" +
-                            "• Zero Cloud Servers: The application maintains no remote servers, has no network endpoints, and never transmits device state, usage metrics, or metadata off your device.\n" +
-                            "• Accessibility Boundaries: The Accessibility Service explicitly configures canRetrieveWindowContent=false. It physically cannot inspect, record, or access keystrokes, passwords, screen text, or messages."
+                    content = "Strict Blocker is local-first for blocking data, with a limited Firebase connection for manual Pro payments:\n\n" +
+                            "• Local blocking data: Managed apps, schedules, preferences, and block history stay on the device through Room/DataStore.\n" +
+                            "• Manual payment records: When a user requests Pro activation, Firebase Authentication and Cloud Firestore store the payment request ID, selected plan, amount, UPI transaction reference, a one-way device hash, request status, and timestamps needed for approval.\n" +
+                            "• No analytics or advertising: Firebase Analytics and advertising SDKs are not used by this payment flow.\n" +
+                            "• Accessibility boundaries: With consent, Browser Guard checks visible address/search fields in browser windows. Passwords, unrelated editable values and page paragraphs are excluded; inspected values are not saved or uploaded."
                 )
             }
 
@@ -143,12 +143,14 @@ fun LegalComplianceScreen(
             // Section 3: Free & Open Architecture
             item {
                 LegalSectionCard(
-                    title = "Fee Transparency & No Monetization",
+                    title = "Pricing & Manual Payment Verification",
                     icon = Icons.Default.CheckCircle,
                     iconTint = MaterialTheme.colorScheme.tertiary,
-                    content = "• Free & Open Source: Strict Blocker is completely free software.\n" +
-                            "• No Hidden Fees: There are no subscription fees, in-app purchases, micro-transactions, or locked tier features.\n" +
-                            "• No Payment Information: Because the application processes no financial transactions and collects no billing details, refund claims do not apply."
+                    content = "• Free core features remain available without Pro.\n" +
+                            "• Pro plans shown in the app are ₹39 for 30 days and ₹599 for 365 days.\n" +
+                            "• Payments are sent through the user's chosen UPI app. Strict Blocker does not receive card numbers, bank passwords, or UPI PINs.\n" +
+                            "• The owner manually verifies the submitted UPI transaction reference before approving Pro. Approval is not automatic bank verification.\n" +
+                            "• Refund terms and a monitored support contact should be provided before public commercial distribution."
                 )
             }
 
@@ -169,11 +171,12 @@ fun LegalComplianceScreen(
                     title = "Third-Party SDK & Code Audit",
                     icon = Icons.Default.Security,
                     iconTint = MaterialTheme.colorScheme.secondary,
-                    content = "A complete audit of our build dependencies confirms:\n\n" +
-                            "• Advertising SDKs: NONE (Zero AdMob, Unity, AppLovin, etc.)\n" +
-                            "• Analytics SDKs: NONE (Zero Firebase Analytics, Mixpanel, Adjust, etc.)\n" +
-                            "• Social Trackers: NONE (Zero Facebook SDK, etc.)\n" +
-                            "• Network Calls: NONE (Zero HTTP REST clients active in production)"
+                    content = "Current production dependencies include:\n\n" +
+                            "• Advertising SDKs: NONE.\n" +
+                            "• Analytics SDKs: NONE.\n" +
+                            "• Firebase Authentication: used for anonymous payment-request identity and the owner's authenticated approval account.\n" +
+                            "• Cloud Firestore: used only for manual payment requests, approval status, and Pro entitlement timing.\n" +
+                            "• Browser inspection: with consent, evaluates visible URL and search fields locally. No VPN or DNS proxy is installed. Inspected text is not saved or uploaded."
                 )
             }
 
@@ -183,9 +186,7 @@ fun LegalComplianceScreen(
                     title = "Children's Privacy & Age Consent",
                     icon = Icons.Default.Lock,
                     iconTint = Color(0xFFA78BFA),
-                    content = "Strict Blocker complies with the Children's Online Privacy Protection Act (COPPA) and GDPR Article 8 (GDPR-K):\n\n" +
-                            "• Because the application collects zero personally identifiable information (PII) from any user, it does not collect personal data from children under the age of 13 (or under 16 in the EEA).\n" +
-                            "• Parents and guardians can safely deploy this tool on children's or school tablets (such as Samsung Galaxy Tab A9+) without privacy risks."
+                    content = "Strict Blocker is designed to minimize personal data. The manual Pro flow can transmit a payment request reference, UPI transaction reference, plan information, timestamps, and a one-way device hash to Firebase. Public distribution to children or school environments requires an appropriate privacy review, consent model, and legally accurate policy for the regions where the app is offered."
                 )
             }
 
@@ -216,7 +217,7 @@ fun LegalComplianceScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "In compliance with GDPR Article 17 and CCPA, you have the absolute right to purge all data. Tapping below permanently deletes all managed app lists, custom schedules, block logs, and preferences stored in the on-device database.",
+                            text = "Tapping below deletes managed app lists, schedules, local block logs, and local preferences from this device. Manual payment records stored in Firebase are not deleted by this local reset and must be handled separately by the service owner when required.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 18.sp
@@ -260,6 +261,9 @@ fun LegalComplianceScreen(
     // Confirmation Dialog for Data Deletion
     if (showDeleteConfirmDialog) {
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(28.dp),
             onDismissRequest = { showDeleteConfirmDialog = false },
             icon = {
                 Icon(
@@ -289,7 +293,7 @@ fun LegalComplianceScreen(
                         coroutineScope.launch {
                             repository.deleteAllUserData()
                             showDeleteConfirmDialog = false
-                            deletionSuccessMessage = "All local records have been successfully erased from the database."
+                            deletionSuccessMessage = "Local Strict Blocker data has been erased from this device. Firebase payment records, if any, are separate."
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
