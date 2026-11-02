@@ -130,7 +130,6 @@ fun DashboardScreen(
     val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
     val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
     val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
@@ -334,7 +333,7 @@ fun DashboardScreen(
                     TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(" Explore Pro") }
                 }
                 if (progressOnly) TextButton(onClick = {
-                    if (isPro) showCustomization = true else onOpenPro()
+                    showCustomization = true
                 }) { Text("Customize progress") }
             }
             if (!progressOnly && !tourSeen) item(key = "quick_tour") {
