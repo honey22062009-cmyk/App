@@ -151,11 +151,11 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 ## Privacy Policy, Terms & Legal Compliance
 
-- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. The manual Pro-payment flow uses Firebase Authentication and Cloud Firestore for payment request IDs, plan/amount, UPI transaction references, one-way device hashes, review status, and entitlement expiry. No Firebase Analytics or advertising SDK is configured. Browser Guard evaluates visible browser address/search fields on-device after consent; inspected values are not stored or uploaded. There is no VPN service or DNS proxy.
+- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. No payment-request database, licensing service, Firebase Analytics or advertising SDK is configured. Browser Guard evaluates visible browser address/search fields on-device after consent; inspected values are not stored or uploaded. There is no VPN service or DNS proxy.
 - **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
 - **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
 - **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
-- **Pricing and payments**: The Android app offers a manual UPI Pro flow: ₹39 for 30 days and ₹599 for 365 days. The user pays through an installed UPI app, submits the UPI transaction reference, and an authenticated owner manually approves or rejects the request in the app. Firebase does not verify the bank transfer automatically.
+- **Payments**: This build has no checkout, UPI payment, subscription, purchase or payment-verification workflow. The Pro destination is reserved for future features.
 - **Refund Policy**: A real support contact and clear refund terms must be published before accepting payment. The repository does not implement automated refunds.
 - **Cookie Policy**: The native Android application does not use HTTP cookies, tracking pixels, or web beacons. Review the hosting provider's behavior for the optional website.
 - **Third-Party SDKs**: Zero advertising, tracking, or analytics SDKs bundled in the APK.
