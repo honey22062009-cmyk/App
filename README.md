@@ -176,11 +176,11 @@ The native app remains local-first: managed applications and schedules are store
 
 First-run users are sent to the existing permission/setup guide. Continuing from that guide records onboarding completion locally, so returning users are not sent through setup again.
 
-### Authentication and billing status
+### Pro area and payments
 
-The app now includes Firebase Authentication and Cloud Firestore for the manual Pro-payment workflow. Regular users can be represented by Firebase Anonymous Authentication solely for payment-request ownership; the owner uses an Email/Password Firebase account whose UID must exist in the Firestore `admins` collection. Firestore rules restrict normal users to creating and reading their own payment requests, while only an authenticated admin can approve or reject them.
+The Pro destination remains visible in navigation as a reserved space for future features. This build has no subscriptions, paid plans, checkout, UPI flow, payment requests, owner approval console or in-app billing integration. Existing core app features remain available without purchasing anything.
 
-The current Pro prices are ₹39 for 30 days and ₹599 for 365 days. Payment itself happens in the user's UPI app. Strict Blocker does not automatically verify the bank transfer; the owner must compare the submitted transaction reference with the actual received payment before approval. Approved entitlements are restored from Firestore when the app reopens and expire according to the approved plan.
+The website in `website/` is informational only and does not collect payments or customer order details.
 
 ### Verification
 
