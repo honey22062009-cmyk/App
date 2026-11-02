@@ -13,6 +13,8 @@ The application ID remains `com.aistudio.strictblocker.kzvwpq`. Existing Room da
 
 ## Browser and DNS fixes
 
+The SafeSearch preference previously had no consumer in the enforcement path. It now controls DNS responses mapping Google search domains to `forcesafesearch.google.com` and Bing search domains to `strict.bing.com`, including country search hosts. A/AAAA answers preserve the original question and transaction, and HTTPS/SVCB shortcuts receive no-data responses for mapped hosts. Other engines are not advertised as forced SafeSearch.
+
 
 
 The DNS TUN descriptor now uses blocking I/O. Previously the default nonblocking read could exit the worker before traffic arrived. The UI only marks the filter connected after the interface and protected upstream socket are established, handles revocation, reports live query counts and reads Android's actual always-on state. A DNS-only tunnel is not a full-traffic VPN; Android's “Block connections without VPN” setting is explicitly discouraged for this implementation.
