@@ -338,7 +338,6 @@ fun ScreenContent(
             AppsScreen(
                 repository = repository,
                 onConfigureScheduleForApp = onConfigureScheduleForApp,
-                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) }
             )
         }
         Screen.Schedules -> {
@@ -385,7 +384,6 @@ fun ScreenContent(
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onNavigateToPaywall = { onNavigateToScreen(Screen.Paywall) },
                 onNavigateToBlockerCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
                 onNavigateToAccount = onOpenAccountDialog,
                 onNavigateToInsights = { onNavigateToScreen(Screen.Insights) },
