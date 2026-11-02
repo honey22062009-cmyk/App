@@ -395,7 +395,6 @@ fun ScreenContent(
                         onNavigateToScreen(Screen.Dashboard)
                     }
                 },
-                onNavigateToOwnerConsole = { onNavigateToScreen(Screen.OwnerConsole) }
             )
         }
         Screen.Account -> {
