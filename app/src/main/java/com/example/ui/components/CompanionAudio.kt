@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.speech.tts.TextToSpeech
+import android.os.Bundle
 import com.example.R
 import java.util.Locale
 
@@ -30,33 +31,71 @@ internal class CompanionAudio(private val context: Context, private val onStatus
         }
     }
     fun say(text: String) {
-        if (closed) return
-        if (ready) { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "companion"); return }
+        if (closed || text.isBlank()) return
+        if (ready) {
+            speakNow(text)
+            return
+        }
         pendingSpeech = text
         if (tts != null) return
-        onStatus("Preparing an offline voice…")
+
+        onStatus("Preparing your companion's offline voice…")
         tts = TextToSpeech(context.applicationContext) { status ->
-            if (closed) { tts?.shutdown(); return@TextToSpeech }
+            if (closed) {
+                tts?.shutdown()
+                return@TextToSpeech
+            }
             val engine = tts
-            val voice = if (status == TextToSpeech.SUCCESS) engine?.voices.orEmpty().filter {
-                !it.isNetworkConnectionRequired && "notInstalled" !in it.features && it.locale.language == Locale.getDefault().language
-            }.maxByOrNull { it.quality } ?: engine?.voices.orEmpty().filter {
-                !it.isNetworkConnectionRequired && "notInstalled" !in it.features && it.locale.language == "en"
-            }.maxByOrNull { it.quality } else null
+            val offlineVoices = if (status == TextToSpeech.SUCCESS) {
+                engine?.voices.orEmpty().filter { voice ->
+                    !voice.isNetworkConnectionRequired &&
+                        "notInstalled" !in voice.features &&
+                        voice.quality >= TextToSpeech.VOICE_QUALITY_NORMAL
+                }
+            } else {
+                emptyList()
+            }
+            val language = Locale.getDefault().language
+            val voice = offlineVoices
+                .filter { it.locale.language == language }
+                .maxByOrNull { it.quality }
+                ?: offlineVoices
+                    .filter { it.locale.language == "en" }
+                    .maxByOrNull { it.quality }
+                ?: offlineVoices.maxByOrNull { it.quality }
+
             if (engine != null && voice != null) {
                 engine.voice = voice
-                engine.setPitch(1.18f); engine.setSpeechRate(.9f)
+                engine.setLanguage(voice.locale)
+                // Slightly softer pitch and measured pacing sound less like a system alert.
+                engine.setPitch(1.08f)
+                engine.setSpeechRate(.94f)
+                engine.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
                 ready = true
-                pendingSpeech?.let { engine.speak(it, TextToSpeech.QUEUE_FLUSH, null, "companion") }
+                pendingSpeech?.let(::speakNow)
                 pendingSpeech = null
-                onStatus("Offline companion voice")
+                onStatus("Offline companion voice ready")
             } else {
                 pendingSpeech = null
-                onStatus("No offline voice installed. Sound effects still work.")
+                onStatus("No offline voice is installed. Sound effects still work.")
                 effect("wave")
             }
         }
     }
+
+    private fun speakNow(text: String) {
+        val parameters = Bundle().apply {
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, .92f)
+            putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, 0f)
+        }
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, parameters, "companion-${System.currentTimeMillis()}")
+    }
+
     fun stop() {
         pendingSpeech = null
         tts?.stop()
