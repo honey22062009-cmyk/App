@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,6 +84,7 @@ fun AppsScreen(
     onNavigateToPaywall: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Managed", "Unmanaged"
     var installedApps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
@@ -90,7 +92,7 @@ fun AppsScreen(
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = false)
+    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val groupLimit = if (isPro) 8 else 1
 
     val selectedPackages = remember { mutableStateListOf<String>() }
@@ -499,7 +501,7 @@ fun AppsScreen(
                         refreshApps()
                     } else {
                         showGroupDialog = false
-                        android.widget.Toast.makeText(LocalContext.current.applicationContext, "Could not save this group. Check its name and try again.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, "Could not save this group. Check its name and try again.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             }
