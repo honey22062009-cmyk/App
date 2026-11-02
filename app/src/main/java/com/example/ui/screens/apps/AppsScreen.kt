@@ -91,8 +91,7 @@ fun AppsScreen(
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
-    val groupLimit = if (isPro) 8 else 1
+    val groupLimit = 8
 
     val selectedPackages = remember { mutableStateListOf<String>() }
 
@@ -180,7 +179,7 @@ fun AppsScreen(
             if (groups.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "${groups.size}/$groupLimit groups" + if (!isPro) " • Pro unlocks up to 8" else "",
+                    text = "${groups.size}/$groupLimit groups",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
