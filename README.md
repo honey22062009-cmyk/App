@@ -185,3 +185,4 @@ The website in `website/` is informational only and does not collect payments or
 ### Verification
 
 The repository's Android CI workflow builds the debug APK and runs `gradle :app:testDebugUnitTest`. A branch/PR CI result should be treated as the build/test evidence; no physical-device test is implied by a successful CI run.
+
