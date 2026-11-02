@@ -284,8 +284,8 @@ class SettingsPreferences(private val context: Context) {
             .toSet()
     }
 
-    // Pro is a reserved destination for future features. No paid entitlements exist in this build.
-    val isProEntitledFlow: Flow<Boolean> = flowOf(false)
+    // Formerly premium features are available to everyone. Pro is only a future-features destination.
+    val areAllFeaturesUnlockedFlow: Flow<Boolean> = flowOf(true)
 
 
     val blockerStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
