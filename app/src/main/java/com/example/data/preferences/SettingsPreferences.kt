@@ -276,6 +276,9 @@ class SettingsPreferences(private val context: Context) {
         }
     }
 
+    // All former premium features are available without payment; Pro is a future-features destination.
+    val areAllFeaturesUnlockedFlow: Flow<Boolean> = flowOf(true)
+
     val seenMilestonesFlow: Flow<Set<Int>> = context.dataStore.data.map { preferences ->
         (preferences[PreferencesKeys.SEEN_MILESTONES] ?: emptySet())
             .mapNotNull { it.toIntOrNull() }
