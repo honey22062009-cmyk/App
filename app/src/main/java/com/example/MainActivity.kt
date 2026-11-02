@@ -41,12 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.example.payments.OwnerAccess
 import com.example.core.system.TrackerReminderScheduler
 import androidx.compose.ui.unit.dp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
-import com.example.payments.ManualPaymentManager
 import com.example.ui.components.FloatingGlassDock
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.account.AccountDialog
@@ -59,9 +57,7 @@ import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.OnboardingExperienceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
-import com.example.ui.screens.owner.OwnerConsoleScreen
 import com.example.ui.screens.pro.BlockerCustomizationScreen
-import com.example.ui.screens.pro.PaywallDialog
 import com.example.ui.screens.pro.PaywallScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
@@ -184,7 +180,6 @@ fun MainAppScaffold(
     }
     var isInitialRouteResolved by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
-    var showPaywallDialog by remember { mutableStateOf(false) }
     var dataEntryVisible by remember { mutableStateOf(false) }
     var pendingTrackerAction by remember(initialTrackerAction) { mutableStateOf(initialTrackerAction) }
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -210,14 +205,7 @@ fun MainAppScaffold(
 
     // Local navigation must never wait for Firebase or a network connection.
     LaunchedEffect(repository) {
-        repository.settings.refreshExpiredProEntitlement()
-        OwnerAccess.restore()
         TrackerReminderScheduler.refresh(context)
-        val requestId = repository.settings.lastPaymentRequestIdFlow.first()
-        if (requestId.isNotBlank()) {
-            ManualPaymentManager(context.applicationContext, repository.settings)
-                .refreshUserRequestOnce(requestId)
-        }
     }
 
     // On first launch, Back should leave the permission guide rather than silently
@@ -233,7 +221,6 @@ fun MainAppScaffold(
             Screen.BlockerCustomization,
             Screen.Account,
             Screen.Insights,
-            Screen.OwnerConsole -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -296,7 +283,6 @@ fun MainAppScaffold(
                         onOpenAccountDialog = {
                             showAccountDialog = true
                         },
-                        onOpenPaywallDialog = { showPaywallDialog = true },
                         onConfigureScheduleForApp = { pkg ->
                             selectedSchedulePackage = pkg
                             currentScreen = Screen.Schedules
@@ -317,16 +303,6 @@ fun MainAppScaffold(
         )
     }
 
-    if (showPaywallDialog) {
-        PaywallDialog(
-            settings = repository.settings,
-            onDismiss = { showPaywallDialog = false },
-            onOpenCustomization = {
-                showPaywallDialog = false
-                currentScreen = Screen.BlockerCustomization
-            }
-        )
-    }
 }
 
 @Composable
@@ -339,7 +315,6 @@ fun ScreenContent(
     onTrackerActionConsumed: () -> Unit = {},
     onNavigateToScreen: (Screen) -> Unit,
     onOpenAccountDialog: () -> Unit,
-    onOpenPaywallDialog: () -> Unit,
     onConfigureScheduleForApp: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -461,13 +436,6 @@ fun ScreenContent(
             LegalComplianceScreen(
                 repository = repository,
                 onNavigateBack = { onNavigateToScreen(Screen.Settings) }
-            )
-        }
-        Screen.OwnerConsole -> {
-            OwnerConsoleScreen(
-                settings = repository.settings,
-                onPreviewPro = { onNavigateToScreen(Screen.BlockerCustomization) },
-                onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
     }
