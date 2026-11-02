@@ -125,13 +125,6 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.Settings
     )
 
-    data object OwnerConsole : Screen(
-        route = "owner_console",
-        title = "Owner console",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
-
     companion object {
         val navItems: List<Screen>
             get() = listOf(Dashboard, Apps, Progress, Paywall, Settings)
