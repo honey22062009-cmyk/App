@@ -35,7 +35,6 @@ import java.time.ZoneId
 @Composable
 fun InsightsScreen(
     repository: AppBlockerRepository,
-    onUpgrade: () -> Unit,
     onBack: () -> Unit
 ) {
     val now = remember { System.currentTimeMillis() }
