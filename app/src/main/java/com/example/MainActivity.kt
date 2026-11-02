@@ -220,7 +220,7 @@ fun MainAppScaffold(
             Screen.Paywall,
             Screen.BlockerCustomization,
             Screen.Account,
-            Screen.Insights,
+            Screen.Insights -> currentScreen = Screen.Dashboard
             else -> currentScreen = Screen.Dashboard
         }
     }
