@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun BlockerCustomizationScreen(
     settings: SettingsPreferences,
-    onUpgrade: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
