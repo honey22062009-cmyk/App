@@ -13,8 +13,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -284,8 +282,6 @@ class SettingsPreferences(private val context: Context) {
             .toSet()
     }
 
-    // Formerly premium features are available to everyone. Pro is only a future-features destination.
-    val areAllFeaturesUnlockedFlow: Flow<Boolean> = flowOf(true)
 
 
     val blockerStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
