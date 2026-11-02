@@ -51,7 +51,7 @@ fun BlockerCustomizationScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val isPro by settings.areAllFeaturesUnlockedFlow.collectAsState(initial = false)
+    val isPro by settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val style by settings.blockerStyleFlow.collectAsState(initial = "classic")
     val photoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
     val savedMessage by settings.blockerMessageFlow.collectAsState(
