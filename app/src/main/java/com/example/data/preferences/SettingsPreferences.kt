@@ -73,7 +73,7 @@ class SettingsPreferences(private val context: Context) {
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
 
-        // Pro / premium blocker customization
+        // User-selectable blocker customization
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
         val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
         val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
