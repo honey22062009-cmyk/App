@@ -315,7 +315,7 @@ fun DashboardScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
+            modifier = Modifier.widthIn(max = 1320.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
             contentPadding = PaddingValues(
                 start = if (tablet) 22.dp else 12.dp,
                 end = if (tablet) 22.dp else 12.dp,
