@@ -1,6 +1,6 @@
 # Strict Blocker 1.3.1 reliability and interface changes
 
-The application ID remains `com.aistudio.strictblocker.kzvwpq`. Existing Room data, DataStore keys, Firebase rules, payment verification, schedule enforcement and paid features are retained.
+The application ID remains `com.aistudio.strictblocker.kzvwpq`. Existing Room data, local profile/tracker settings and schedule enforcement are retained. The Pro destination is reserved for future features; payment verification and paid-feature entitlement flows have been removed.
 
 ## What changed
 
@@ -9,11 +9,11 @@ The application ID remains `com.aistudio.strictblocker.kzvwpq`. Existing Room da
 - A short recording sheet saves a rating and optional sleep together. Reset details are optional. Save failures leave the sheet open with an error; existing sleep notes are retained.
 - Six native, lit 3D animal companions replace the line illustration. They use local OpenGL ES meshes, depth testing and lighting, composited through TextureView so setup transitions and clipping work. Drag rotates, pinch zooms, tapping pets, and buttons trigger wave/jump/spin reactions. Selection uses a single live preview; decorative scenes render on demand after a short warmup. Active scenes pause with the Activity lifecycle and respect Reduce motion.
 - Setup clears keyboard focus between steps and constrains tablet forms to a readable width. Solid theme-aware cards remove the old translucent highlight artifacts. An evergreen and cream theme and vector shield identity replace the previous launcher image. Transitions, entry expansion, streak changes and companion poses provide motion.
-- Verified owners receive the same Pro entitlement path used throughout the app, without creating a payment. Verification requires the current Firebase UID to have an `admins` document fetched from the server. It is rechecked after process restart and cleared on sign-out or auth-user change; an email or local boolean cannot grant access. Owner console sessions restore without typing the password on every visit.
+- The Pro tab is visible but informational only. There are no subscription plans, payment requests, UPI links, owner approval console or Firestore payment-request rules. Firestore access is denied by default until a future feature introduces a separately reviewed data model.
 
 ## Browser and DNS fixes
 
-The SafeSearch preference previously had no consumer in the enforcement path. It now controls DNS responses mapping Google search domains to `forcesafesearch.google.com` and Bing search domains to `strict.bing.com`, including country search hosts. A/AAAA answers preserve the original question and transaction, and HTTPS/SVCB shortcuts receive no-data responses for mapped hosts. Other engines are not advertised as forced SafeSearch.
+
 
 The DNS TUN descriptor now uses blocking I/O. Previously the default nonblocking read could exit the worker before traffic arrived. The UI only marks the filter connected after the interface and protected upstream socket are established, handles revocation, reports live query counts and reads Android's actual always-on state. A DNS-only tunnel is not a full-traffic VPN; Android's “Block connections without VPN” setting is explicitly discouraged for this implementation.
 
@@ -38,7 +38,7 @@ The workflow runs Android lint, builds the APK, executes JVM/Robolectric tests, 
 
 Regression tests cover profile reopening/sign-out, completion recovery, atomic daily recording with sleep-note preservation, the 22:15 → 22:17 reminder case, actual alarm registration/cancellation, malformed DNS packets, A/AAAA/CNAME response construction, lookalike domain exclusions, Opera variants and private-mode signals.
 
-Physical Samsung delivery, each browser's current UI, built-in VPN/secure DNS modes, owner credentials and UPI transfers require real-device/account verification. A successful build or screenshot alone is not evidence for those paths.
+Physical Samsung delivery, each browser's current UI and device-specific background policies require real-device verification. A successful build or screenshot alone is not evidence for those paths.
 
 ## Primary implementation references
 
