@@ -90,7 +90,7 @@ fun AppsScreen(
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
-    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
+    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = false)
     val groupLimit = if (isPro) 8 else 1
 
     val selectedPackages = remember { mutableStateListOf<String>() }
@@ -499,7 +499,7 @@ fun AppsScreen(
                         refreshApps()
                     } else {
                         showGroupDialog = false
-                        onNavigateToPaywall()
+                        android.widget.Toast.makeText(LocalContext.current.applicationContext, "Could not save this group. Check its name and try again.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             }
