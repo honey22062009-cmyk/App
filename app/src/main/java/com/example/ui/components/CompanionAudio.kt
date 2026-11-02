@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.os.Bundle
 import com.example.R
 import java.util.Locale
@@ -50,7 +51,7 @@ internal class CompanionAudio(private val context: Context, private val onStatus
                 engine?.voices.orEmpty().filter { voice ->
                     !voice.isNetworkConnectionRequired &&
                         "notInstalled" !in voice.features &&
-                        voice.quality >= TextToSpeech.VOICE_QUALITY_NORMAL
+                        voice.quality >= Voice.QUALITY_NORMAL
                 }
             } else {
                 emptyList()
