@@ -404,7 +404,6 @@ fun ScreenContent(
         Screen.Insights -> {
             InsightsScreen(
                 repository = repository,
-                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
@@ -420,7 +419,6 @@ fun ScreenContent(
         Screen.BlockerCustomization -> {
             BlockerCustomizationScreen(
                 settings = repository.settings,
-                onUpgrade = { onNavigateToScreen(Screen.Paywall) },
                 onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
