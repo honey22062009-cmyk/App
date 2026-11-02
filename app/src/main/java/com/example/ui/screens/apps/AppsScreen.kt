@@ -80,8 +80,7 @@ import java.util.Locale
 @Composable
 fun AppsScreen(
     repository: AppBlockerRepository,
-    onConfigureScheduleForApp: (String) -> Unit,
-    onNavigateToPaywall: () -> Unit = {}
+    onConfigureScheduleForApp: (String) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -164,21 +163,14 @@ fun AppsScreen(
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        if (groups.size >= groupLimit) {
-                            if (!isPro) onNavigateToPaywall()
-                        } else {
-                            showGroupDialog = true
-                        }
-                    },
-                    enabled = groups.size < groupLimit || !isPro
+                    onClick = { showGroupDialog = true },
+                    enabled = groups.size < groupLimit
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         when {
                             groups.size < groupLimit -> "New group"
-                            !isPro -> "Unlock groups"
                             else -> "Group limit reached"
                         }
                     )
