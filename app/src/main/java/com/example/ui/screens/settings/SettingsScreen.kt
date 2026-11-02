@@ -318,7 +318,6 @@ fun SettingsScreen(
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
-                                onNavigateToOwnerConsole = onNavigateToOwnerConsole,
                                 onReduceMotionChange = { enabled ->
                                     scope.launch { repository.settings.setReduceMotion(enabled) }
                                 },
