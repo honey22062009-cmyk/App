@@ -156,7 +156,6 @@ fun DashboardScreen(
 
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
-        repository.settings.refreshExpiredProEntitlement()
     }
 
     LaunchedEffect(initialTrackerAction) {
