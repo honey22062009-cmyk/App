@@ -46,7 +46,6 @@ fun InsightsScreen(
     val sevenDaysAgo = remember(now) { now - 7L * 24L * 60L * 60L * 1000L }
     val thirtyDaysAgo = remember(now) { now - 30L * 24L * 60L * 60L * 1000L }
 
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val total by repository.totalBlocksCountFlow.collectAsState(initial = 0)
     val today by repository.blockEventDao.getBlocksSinceFlow(startOfToday).collectAsState(initial = 0)
     val sevenDays by repository.blockEventDao.getBlocksSinceFlow(sevenDaysAgo).collectAsState(initial = 0)
@@ -72,36 +71,7 @@ fun InsightsScreen(
             )
         }
 
-        if (!isPro) {
-            item {
-                AppSurface(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "Pro insights",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Unlock daily and monthly block statistics plus your most-triggered apps.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        Button(onClick = onUpgrade) {
-                            Icon(Icons.Default.Star, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("View Pro")
-                        }
-                    }
-                }
-            }
-        } else {
+
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -192,7 +162,7 @@ fun InsightsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
+        
 
         item {
             FilledTonalButton(
