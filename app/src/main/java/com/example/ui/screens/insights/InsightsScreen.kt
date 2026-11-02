@@ -46,7 +46,7 @@ fun InsightsScreen(
     val sevenDaysAgo = remember(now) { now - 7L * 24L * 60L * 60L * 1000L }
     val thirtyDaysAgo = remember(now) { now - 30L * 24L * 60L * 60L * 1000L }
 
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = false)
+    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val total by repository.totalBlocksCountFlow.collectAsState(initial = 0)
     val today by repository.blockEventDao.getBlocksSinceFlow(startOfToday).collectAsState(initial = 0)
     val sevenDays by repository.blockEventDao.getBlocksSinceFlow(sevenDaysAgo).collectAsState(initial = 0)
