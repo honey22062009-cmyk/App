@@ -312,7 +312,6 @@ fun SettingsScreen(
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
                                 onNavigateToAdultProtection = onNavigateToAdultProtection,
-                                onNavigateToPaywall = onNavigateToPaywall,
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
