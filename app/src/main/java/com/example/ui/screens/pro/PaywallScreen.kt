@@ -25,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.GlassCard
 
 /**
@@ -34,11 +33,7 @@ import com.example.ui.components.GlassCard
  */
 @Composable
 fun PaywallScreen(
-    settings: SettingsPreferences,
-    onBack: () -> Unit,
-    onOpenCustomization: () -> Unit,
-    onOpenInsights: () -> Unit = {},
-    onOpenProgress: () -> Unit = {}
+    onBack: () -> Unit
 ) {
     Column(
         modifier = Modifier
