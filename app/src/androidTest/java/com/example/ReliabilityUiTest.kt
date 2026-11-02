@@ -172,7 +172,7 @@ class ReliabilityUiTest {
         compose.activityRule.scenario.recreate()
         waitFor("Hi, Honey")
         compose.onNodeWithText("Pro").performClick()
-        waitFor("Meet Strict Blocker Pro")
+        waitFor("A space for what's next.")
         compose.onNodeWithTag("glass_dock").assertIsDisplayed()
         capture("10-pro")
         compose.onNodeWithText("Settings").performClick()
