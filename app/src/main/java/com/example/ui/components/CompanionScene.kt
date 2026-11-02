@@ -148,6 +148,7 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
         lastInteractionAt = SystemClock.uptimeMillis()
         reaction = action
         key++
+        caption = CompanionBehavior.dialogue(action)
         if (soundEnabled) {
             if (action != "talk") audio.effect(action)
             audio.say(caption)
