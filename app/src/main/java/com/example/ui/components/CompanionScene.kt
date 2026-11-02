@@ -131,21 +131,14 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
     // Automatic reactions are silent; speech only follows an intentional user action.
     LaunchedEffect(reduceMotion, characterId) {
         if (reduceMotion) return@LaunchedEffect
-        val idleActions = listOf(
-            "curious" to "Did you hear that? I thought I heard a tiny sound.",
-            "ear_twitch" to "Just checking that everything is cosy.",
-            "stretch" to "A little stretch makes room for a fresh start.",
-            "look_around" to "Taking a tiny look around. Everything seems peaceful.",
-            "rest" to "Taking one calm breath with you."
-        )
         while (true) {
             delay((7_500L..12_500L).random())
             val now = SystemClock.uptimeMillis()
             if (now - lastInteractionAt >= 6_500L) {
-                val (action, line) = idleActions.random()
-                reaction = action
+                val cue = CompanionBehavior.nextIdleCue()
+                reaction = cue.action
                 key++
-                caption = line
+                caption = cue.line
                 lastInteractionAt = now
             }
         }
@@ -155,18 +148,6 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
         lastInteractionAt = SystemClock.uptimeMillis()
         reaction = action
         key++
-        val lines = when (action) {
-            "wave" -> listOf("Hey, you made it back.", "Hi there. I saved you a little wave.", "Hello again. Ready when you are.")
-            "jump" -> listOf("One little hop, then the next.", "Boing! A tiny celebration.", "That was fun. My ears nearly took off.")
-            "spin" -> listOf("A fresh perspective. Wheee!", "Checking every angle. Very important bunny work.", "Ta-da. I have returned to my original position.")
-            "dance" -> listOf("Tiny victory dance!", "That deserves a little celebration.", "I call this the focused-feet shuffle.")
-            "snack" -> listOf("Crunch, crunch. Thank you!", "A tiny snack for a tiny assistant.", "Mmm. Back to being your study-side companion.")
-            "rest" -> listOf("Breathe in gently, then let it go.", "A quiet moment. No rush.", "Let's loosen up and take one calm breath.")
-            "talk" -> listOf("You don't need a perfect day. Just your next small step.", "You have already started. That counts.", "Take the next thing one piece at a time.", "A pause is allowed. Your progress is not a race.")
-            "pet" -> listOf("That was a very good head pat.", "I felt that. More of a gentle pat, please.", "Ears approved. Thank you.")
-            else -> listOf("I'm right here. Keep going at your own pace.")
-        }
-        caption = lines.random()
         if (soundEnabled) {
             if (action != "talk") audio.effect(action)
             audio.say(caption)
