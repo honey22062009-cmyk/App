@@ -163,7 +163,7 @@ class AppBlockerRepository(
 
         val current = appGroupsFlow.first().toMutableList()
         val isEditingExisting = current.any { it.name.equals(cleanName, ignoreCase = true) }
-        val isPro = settings.isProEntitledFlow.first()
+        val isPro = settings.areAllFeaturesUnlockedFlow.first()
         val groupLimit = if (isPro) 8 else 1
 
         if (!isEditingExisting && current.size >= groupLimit) {
