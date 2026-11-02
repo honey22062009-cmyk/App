@@ -409,11 +409,7 @@ fun ScreenContent(
         }
         Screen.Paywall -> {
             PaywallScreen(
-                settings = repository.settings,
-                onBack = { onNavigateToScreen(Screen.Settings) },
-                onOpenCustomization = { onNavigateToScreen(Screen.BlockerCustomization) },
-                onOpenInsights = { onNavigateToScreen(Screen.Insights) },
-                onOpenProgress = { onNavigateToScreen(Screen.Progress) }
+                onBack = { onNavigateToScreen(Screen.Settings) }
             )
         }
         Screen.BlockerCustomization -> {
