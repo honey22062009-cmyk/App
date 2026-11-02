@@ -9,7 +9,7 @@ Application ID remains `com.aistudio.strictblocker.kzvwpq`; versionCode is 5.
 - Home uses a wider responsive content frame on large tablets and adapts companion/streak content vertically on phones. The focus summary and companion share the available horizontal space instead of leaving a narrow fixed-width dashboard. Daily entry has a seven-day strip, a persistent saved receipt, rating/sleep details and a recorded-day count. Saving twice updates one calendar-day record. This is separate from the existing elapsed-time streak, whose first day correctly starts at zero completed 24-hour periods.
 - Recording waits for the DataStore transaction. The sheet stays open on a write error, ignores duplicate save taps and preserves cancellation. The current date is obtained at save time, so a sheet left open past midnight writes to the new day.
 - First Home visit offers three short, skippable tips. Finishing or skipping persists; Settings → About replays them. No extra form fields or forced permission grant.
-- Pro remains a primary dock destination, but is now a future-features workspace. It contains no paid plans, prices, checkout, UPI flow, subscriptions, entitlements or owner payment console. The current app remains usable without payment. Removed the inaccurate “best value” claim from the yearly price, which costs more than twelve monthly plans at current prices.
+- Pro remains a primary dock destination, but is now a future-features workspace. It contains no paid plans, prices, checkout, UPI flow, subscriptions, entitlements or owner payment console. The current app remains usable without payment, and all previously restricted app features are available without a paid tier.
 
 ## Companion
 
