@@ -130,7 +130,7 @@ fun DashboardScreen(
     val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
     val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
     val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
-    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = false)
+    val isPro by repository.settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
