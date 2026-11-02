@@ -76,10 +76,6 @@ class SettingsPreferences(private val context: Context) {
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
 
         // Pro / premium blocker customization
-        val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
-        val PRO_EXPIRES_AT = longPreferencesKey("pro_expires_at")
-        val PRO_PAYMENT_REQUEST_ID = stringPreferencesKey("pro_payment_request_id")
-        val LAST_PAYMENT_REQUEST_ID = stringPreferencesKey("last_payment_request_id")
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
         val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
         val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
