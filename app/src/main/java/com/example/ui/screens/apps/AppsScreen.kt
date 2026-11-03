@@ -389,14 +389,28 @@ fun AppsScreen(
                                 OutlinedButton(
                                     onClick = {
                                         coroutineScope.launch {
+                                            var guardianRemovalFailures = 0
                                             for (pkg in selectedPackages) {
                                                 val app = installedApps.firstOrNull { it.packageName == pkg }
                                                 if (app != null) {
                                                     repository.setAppManaged(pkg, app.appName, false)
+                                                    if (guardianManaged) {
+                                                        val result = withContext(Dispatchers.IO) {
+                                                            guardianPolicyManager.removeRestrictions(pkg)
+                                                        }
+                                                        if (result.isFailure) guardianRemovalFailures++
+                                                    }
                                                 }
                                             }
                                             selectedPackages.clear()
                                             refreshApps()
+                                            if (guardianRemovalFailures > 0) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Some apps are unprotected in Strict Blocker, but Android kept guardian restrictions on $guardianRemovalFailures apps. Review device-owner access.",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
                                         }
                                     },
                                     shape = RoundedCornerShape(8.dp)
@@ -523,8 +537,15 @@ fun AppsScreen(
                                 coroutineScope.launch {
                                     repository.setAppManaged(app.packageName, app.appName, isManaged)
                                     if (!isManaged && guardianManaged) {
-                                        withContext(Dispatchers.IO) {
+                                        val result = withContext(Dispatchers.IO) {
                                             guardianPolicyManager.removeRestrictions(app.packageName)
+                                        }
+                                        if (result.isFailure) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "App unprotected locally, but Android did not remove every guardian restriction.",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
                                 }
