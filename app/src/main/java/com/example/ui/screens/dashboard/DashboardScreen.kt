@@ -304,7 +304,8 @@ fun DashboardScreen(
                             onToggle = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
-                            onOpenSetup = onNavigateToPermissions
+                            onOpenSetup = onNavigateToPermissions,
+                            onOpenApps = onNavigateToApps
                         )
                     }
         }
@@ -565,13 +566,39 @@ private fun ProtectionStatusCard(
     activeManagedApps: Int,
     totalBlocks: Int,
     onToggle: (Boolean) -> Unit,
-    onOpenSetup: () -> Unit
+    onOpenSetup: () -> Unit,
+    onOpenApps: () -> Unit
 ) {
-    val needsAttention = !health.coreReady || health.reliabilityScore < 100
+    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0
+    val actionLabel = when {
+        !health.coreReady -> "Fix setup"
+        activeManagedApps == 0 -> "Choose apps"
+        health.recommendedIssues.isNotEmpty() -> "Improve reliability"
+        else -> null
+    }
+    val action = when {
+        !health.coreReady -> onOpenSetup
+        activeManagedApps == 0 -> onOpenApps
+        health.recommendedIssues.isNotEmpty() -> onOpenSetup
+        else -> null
+    }
+    val title = when {
+        !enabled -> "App blocking is paused"
+        !health.coreReady -> "Finish protection setup"
+        activeManagedApps == 0 -> "Choose apps to protect"
+        else -> "App blocking is active"
+    }
+    val detail = when {
+        !enabled -> "Turn protection on to enforce your schedules."
+        !health.coreReady -> health.coreIssues.firstOrNull() ?: "Open setup to restore required access."
+        activeManagedApps == 0 -> "No apps are selected yet. Add the apps you want Strict Blocker to protect."
+        health.recommendedIssues.isNotEmpty() ->
+            "$activeManagedApps apps protected · ${health.recommendedIssues.size} optional reliability settings can be improved."
+        else -> "$activeManagedApps apps protected · $totalBlocks blocks recorded"
+    }
+
     GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = needsAttention, onClick = onOpenSetup),
+        modifier = Modifier.fillMaxWidth(),
         variant = if (needsAttention) GlassVariant.Warning else GlassVariant.Subtle,
         shape = RoundedCornerShape(22.dp)
     ) {
@@ -586,24 +613,20 @@ private fun ProtectionStatusCard(
             )
             Spacer(Modifier.size(11.dp))
             Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
                 Text(
-                    when {
-                        !enabled -> "App blocking paused"
-                        !health.coreReady -> "Finish app blocking setup"
-                        health.reliabilityScore < 100 -> "App blocking · review reliability"
-                        else -> "App blocking ready"
-                    },
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    if (needsAttention) {
-                        health.degradedReasons.firstOrNull() ?: "Review Android permissions."
-                    } else {
-                        "$activeManagedApps restricted apps · $totalBlocks blocks"
-                    },
+                    detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (actionLabel != null && action != null) {
+                    TextButton(
+                        onClick = action,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(actionLabel)
+                    }
+                }
             }
             Switch(checked = enabled, onCheckedChange = onToggle)
         }
