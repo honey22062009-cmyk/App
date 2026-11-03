@@ -445,4 +445,34 @@ class ScheduleEvaluatorTest {
         assertTrue(ScheduleEvaluator.evaluate(listOf(disabledWindow), now).isBlocked)
     }
 
+
+    @Test
+    fun findNextTransition_skipsAnOverlappingWindowEndThatDoesNotBlockTheApp() {
+        val firstWindow = SchedulePeriod(
+            id = 80,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 18,
+            startMinute = 0,
+            endHour = 20,
+            endMinute = 0
+        )
+        val secondWindow = SchedulePeriod(
+            id = 81,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 19,
+            startMinute = 0,
+            endHour = 21,
+            endMinute = 0
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(19, 30)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(firstWindow, secondWindow), now)
+
+        assertNotNull(transition)
+        assertEquals(LocalDate.of(2026, 10, 19).atTime(21, 0), transition?.dateTime)
+        assertFalse(transition?.isOpening ?: true)
+    }
+
 }
