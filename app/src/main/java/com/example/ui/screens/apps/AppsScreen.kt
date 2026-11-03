@@ -72,6 +72,7 @@ import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.InstalledAppInfo
 import com.example.security.AppCapabilityScanner
 import com.example.security.AppCapabilityReport
+import com.example.security.GuardianPolicyManager
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
@@ -97,6 +98,10 @@ fun AppsScreen(
     var showCapabilityAudit by remember { mutableStateOf(false) }
     var capabilityReports by remember { mutableStateOf<List<AppCapabilityReport>>(emptyList()) }
     var isCapabilityAuditLoading by remember { mutableStateOf(false) }
+    var showGuardianConfirm by remember { mutableStateOf(false) }
+    var guardianApplyBusy by remember { mutableStateOf(false) }
+    val guardianPolicyManager = remember(context) { GuardianPolicyManager(context) }
+    val guardianManaged = remember(context) { guardianPolicyManager.isGuardianManaged }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
     val groupLimit = 8
 
@@ -228,6 +233,33 @@ fun AppsScreen(
                 Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(if (isCapabilityAuditLoading) "Reviewing installed apps…" else "Review app permissions & capabilities")
+            }
+
+            if (guardianManaged) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Guardian device protection active", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Android confirms this phone is managed. Apply suspension and uninstall protection to apps you have marked as protected.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { showGuardianConfirm = true },
+                            enabled = !guardianApplyBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (guardianApplyBusy) "Applying guardian controls…" else "Apply to protected apps") }
+                    }
+                }
+            } else {
+                Text(
+                    "Guardian device-owner protection is not active. Strong uninstall protection requires guardian-led Android device provisioning.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -490,6 +522,11 @@ fun AppsScreen(
                                 }
                                 coroutineScope.launch {
                                     repository.setAppManaged(app.packageName, app.appName, isManaged)
+                                    if (!isManaged && guardianManaged) {
+                                        withContext(Dispatchers.IO) {
+                                            guardianPolicyManager.removeRestrictions(app.packageName)
+                                        }
+                                    }
                                 }
                             },
                             onOpenSchedule = {
@@ -500,6 +537,44 @@ fun AppsScreen(
                 }
             }
         }
+    }
+
+    if (showGuardianConfirm) {
+        val targets = installedApps.filter { it.isManaged && !it.isSystemCritical }
+        AlertDialog(
+            onDismissRequest = { if (!guardianApplyBusy) showGuardianConfirm = false },
+            title = { Text("Apply guardian restrictions?") },
+            text = {
+                Text(
+                    "Android will suspend ${targets.size} apps and block their uninstall where the system permits it. Essential system apps are excluded. A guardian can remove these restrictions from this app."
+                )
+            },
+            confirmButton = {
+                Button(
+                    enabled = !guardianApplyBusy && targets.isNotEmpty(),
+                    onClick = {
+                        guardianApplyBusy = true
+                        coroutineScope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                guardianPolicyManager.applyRestrictions(targets.map { it.packageName }.toSet())
+                            }
+                            guardianApplyBusy = false
+                            showGuardianConfirm = false
+                            android.widget.Toast.makeText(
+                                context,
+                                "Suspended: ${result.suspended.size}. Uninstall protected: ${result.uninstallBlocked.size}. Needs review: ${result.failures.size}.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                ) { Text("Apply restrictions") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showGuardianConfirm = false }, enabled = !guardianApplyBusy) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showCapabilityAudit) {
