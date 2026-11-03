@@ -70,10 +70,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.InstalledAppInfo
+import com.example.security.AppCapabilityScanner
+import com.example.security.AppCapabilityReport
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -90,6 +94,9 @@ fun AppsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var showCapabilityAudit by remember { mutableStateOf(false) }
+    var capabilityReports by remember { mutableStateOf<List<AppCapabilityReport>>(emptyList()) }
+    var isCapabilityAuditLoading by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
     val groupLimit = 8
 
@@ -201,6 +208,26 @@ fun AppsScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {
+                    isCapabilityAuditLoading = true
+                    showCapabilityAudit = true
+                    coroutineScope.launch {
+                        capabilityReports = withContext(Dispatchers.IO) {
+                            AppCapabilityScanner(context).scanInstalledApps()
+                        }
+                        isCapabilityAuditLoading = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isCapabilityAuditLoading
+            ) {
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isCapabilityAuditLoading) "Reviewing installed apps…" else "Review app permissions & capabilities")
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -475,6 +502,14 @@ fun AppsScreen(
         }
     }
 
+    if (showCapabilityAudit) {
+        AppCapabilityAuditDialog(
+            reports = capabilityReports,
+            loading = isCapabilityAuditLoading,
+            onDismiss = { showCapabilityAudit = false }
+        )
+    }
+
     if (showGroupDialog) {
         AppGroupDialog(
             apps = installedApps.filter { !it.isSystemCritical },
@@ -498,6 +533,79 @@ fun AppsScreen(
             }
         )
     }
+}
+
+@Composable
+private fun AppCapabilityAuditDialog(
+    reports: List<AppCapabilityReport>,
+    loading: Boolean,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Installed app capability review") },
+        text = {
+            when {
+                loading -> Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+                reports.isEmpty() -> Text("Android did not return an app inventory.")
+                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${reports.size} visible installed apps. Permission requests are signals, not proof of harmful behavior.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().height(420.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(reports, key = { it.packageName }) { report ->
+                            var expanded by remember(report.packageName) { mutableStateOf(false) }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(report.label, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${report.grantedPermissions.size} granted of ${report.requestedPermissionCount} declared permissions",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "Components: ${report.declaredActivityCount} activities · ${report.declaredServiceCount} services · ${report.declaredReceiverCount} receivers · ${report.declaredProviderCount} providers",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (report.signals.isNotEmpty()) {
+                                        Text(report.signals.joinToString(" • "), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (expanded) {
+                                        Spacer(Modifier.height(6.dp))
+                                        Text("Package: ${report.packageName}", style = MaterialTheme.typography.labelSmall)
+                                        Text("All declared permissions:", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            report.requestedPermissions.joinToString("\n").ifBlank { "None declared" },
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Text(
+                                            "Granted at install/runtime: " + report.grantedPermissions.joinToString(", ").ifBlank { "None" },
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    } else {
+                                        Text("Tap to inspect permission details", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onDismiss) { Text("Close") } }
+    )
 }
 
 @Composable
