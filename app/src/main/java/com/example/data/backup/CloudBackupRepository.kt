@@ -12,6 +12,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -36,7 +37,7 @@ class CloudBackupRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
-    suspend fun createOrUpdateBackup(recoveryPhrase: CharArray): Result<Unit> = runCatching {
+    suspend fun createOrUpdateBackup(recoveryPhrase: CharArray): Result<Unit> = runCancellableCatching {
         requireRecoveryPhrase(recoveryPhrase)
         val uid = requireNotNull(auth.currentUser?.uid) {
             "Sign in before creating a cloud backup."
@@ -63,7 +64,7 @@ class CloudBackupRepository(
             ).awaitResult()
     }
 
-    suspend fun restoreBackup(recoveryPhrase: CharArray): Result<Unit> = runCatching {
+    suspend fun restoreBackup(recoveryPhrase: CharArray): Result<Unit> = runCancellableCatching {
         requireRecoveryPhrase(recoveryPhrase)
         val uid = requireNotNull(auth.currentUser?.uid) {
             "Sign in with the same account used for the backup."
@@ -82,8 +83,11 @@ class CloudBackupRepository(
         val clear = withContext(Dispatchers.Default) {
             BackupCryptography.decrypt(encrypted, recoveryPhrase)
         }
-        withContext(Dispatchers.IO) { restoreSnapshot(String(clear, Charsets.UTF_8)) }
-        clear.fill(0)
+        try {
+            withContext(Dispatchers.IO) { restoreSnapshot(String(clear, Charsets.UTF_8)) }
+        } finally {
+            clear.fill(0)
+        }
     }
 
     private suspend fun createSnapshot(): String {
@@ -266,7 +270,11 @@ private object BackupCryptography {
         return try {
             val bytes = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
                 .generateSecret(spec).encoded
-            SecretKeySpec(bytes, "AES")
+            try {
+                SecretKeySpec(bytes, "AES")
+            } finally {
+                bytes.fill(0)
+            }
         } finally {
             spec.clearPassword()
         }
@@ -285,4 +293,14 @@ private suspend fun <T> Task<T>.awaitResult(): T =
                 )
             }
         }
+    }
+
+
+private suspend fun <T> runCancellableCatching(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
     }
