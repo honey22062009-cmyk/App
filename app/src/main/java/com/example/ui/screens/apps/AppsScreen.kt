@@ -818,10 +818,31 @@ fun AppItemCard(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
+                Text(
+                    text = when {
+                        !app.isManaged -> "Not protected"
+                        app.periodCount == 0 -> "Blocked all the time · no allowed window"
+                        app.periodCount == 1 -> "1 configured schedule window · tap to edit"
+                        else -> "${app.periodCount} configured schedule windows · tap to edit"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (app.isManaged && app.periodCount == 0) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 2
+                )
             }
 
             if (!app.isSystemCritical) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelected() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary
+                    )
+                )
                 Switch(
                     checked = app.isManaged,
                     onCheckedChange = { onToggleManaged(it) },
