@@ -21,6 +21,9 @@ interface BlockEventDao {
     @Insert
     suspend fun insert(event: BlockEventEntity)
 
+    @Insert
+    suspend fun insertAll(events: List<BlockEventEntity>)
+
     @Query("DELETE FROM block_events WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
 
