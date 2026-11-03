@@ -12,6 +12,12 @@ import com.example.BuildConfig
 import com.example.data.preferences.SettingsPreferences
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.android.gms.tasks.Task
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 data class GoogleAccountProfile(
     val id: String,
@@ -61,11 +67,18 @@ class GoogleAuthManager(
                 credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
             ) {
                 val google = GoogleIdTokenCredential.createFrom(credential.data)
+                val firebaseCredential = GoogleAuthProvider.getCredential(google.idToken, null)
+                val authResult = FirebaseAuth.getInstance()
+                    .signInWithCredential(firebaseCredential)
+                    .awaitAuthResult()
+                val firebaseUser = requireNotNull(authResult.user) {
+                    "Firebase did not return an authenticated account."
+                }
                 val profile = GoogleAccountProfile(
-                    id = google.id,
-                    email = google.id,
-                    displayName = google.displayName,
-                    photoUri = google.profilePictureUri?.toString()
+                    id = firebaseUser.uid,
+                    email = firebaseUser.email ?: google.id,
+                    displayName = firebaseUser.displayName ?: google.displayName,
+                    photoUri = firebaseUser.photoUrl?.toString() ?: google.profilePictureUri?.toString()
                 )
                 settings.saveSignedInAccount(
                     id = profile.id,
@@ -104,6 +117,7 @@ class GoogleAuthManager(
 
     suspend fun signOut() {
         try {
+            FirebaseAuth.getInstance().signOut()
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
         } finally {
             settings.signOutKeepRememberedAccount()
@@ -114,3 +128,17 @@ class GoogleAuthManager(
         settings.forgetRememberedAccount()
     }
 }
+
+private suspend fun <T> Task<T>.awaitAuthResult(): T =
+    suspendCancellableCoroutine { continuation ->
+        addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                @Suppress("UNCHECKED_CAST")
+                continuation.resume(task.result as T)
+            } else {
+                continuation.resumeWithException(
+                    task.exception ?: IllegalStateException("Firebase sign-in failed.")
+                )
+            }
+        }
+    }
