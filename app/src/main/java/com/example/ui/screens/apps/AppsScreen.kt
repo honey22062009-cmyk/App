@@ -822,8 +822,8 @@ fun AppItemCard(
                     text = when {
                         !app.isManaged -> "Not protected"
                         app.periodCount == 0 -> "Blocked all the time · no allowed window"
-                        app.periodCount == 1 -> "1 configured schedule window · tap to edit"
-                        else -> "${app.periodCount} configured schedule windows · tap to edit"
+                        app.periodCount == 1 -> "1 enabled allowed window · tap to edit"
+                        else -> "${app.periodCount} enabled allowed windows · tap to edit"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (app.isManaged && app.periodCount == 0) {
