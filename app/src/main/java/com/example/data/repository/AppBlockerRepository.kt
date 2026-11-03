@@ -123,14 +123,16 @@ class AppBlockerRepository(
             }
 
             val isManaged = managedApps[pkg]?.isManaged ?: false
-            val periods = allPeriods[pkg] ?: emptyList()
+            val enabledPeriodCount = (allPeriods[pkg] ?: emptyList()).count {
+                it.isEnabled && !it.isZeroLengthMidnightWindow
+            }
 
             result.add(
                 InstalledAppInfo(
                     packageName = pkg,
                     appName = appLabel,
                     isManaged = isManaged,
-                    periodCount = periods.size,
+                    periodCount = enabledPeriodCount,
                     isSystemCritical = isCritical
                 )
             )
