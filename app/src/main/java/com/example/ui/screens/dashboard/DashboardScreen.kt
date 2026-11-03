@@ -616,7 +616,7 @@ private fun ProtectionStatusCard(
 ) {
     val hasNoAllowedWindows = activeManagedApps > 0 && scheduleStatusLoaded &&
         !scheduleStatusError && nextTransition == null
-    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0 || hasNoAllowedWindows
+    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0 || hasNoAllowedWindows || scheduleStatusError
     val actionLabel = when {
         !health.coreReady -> "Fix setup"
         activeManagedApps == 0 -> "Choose apps"
