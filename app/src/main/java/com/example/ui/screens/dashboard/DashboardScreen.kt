@@ -62,6 +62,7 @@ import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
 import kotlinx.coroutines.delay
@@ -133,6 +134,11 @@ fun DashboardScreen(
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
+    val allSchedules by repository.allPeriodsFlow.collectAsState(initial = emptyList())
+    val activeManagedPackages = remember(managedApps) {
+        managedApps.filter { it.isManaged }.map { it.packageName }.toSet()
+    }
+    var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
@@ -155,6 +161,22 @@ fun DashboardScreen(
 
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
+    }
+
+    // Keep Home's next boundary in sync with schedule edits and actual clock transitions.
+    LaunchedEffect(activeManagedPackages, allSchedules) {
+        while (true) {
+            val upcoming = repository.findNextGlobalTransition()
+            nextTransition = upcoming
+            if (upcoming == null) break
+            val boundaryMillis = upcoming.transitionDateTime
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli()
+            val waitMillis = (boundaryMillis - System.currentTimeMillis() + 1_000L)
+                .coerceAtLeast(1_000L)
+            delay(waitMillis)
+        }
     }
 
     LaunchedEffect(initialTrackerAction) {
@@ -301,11 +323,14 @@ fun DashboardScreen(
                             health = health,
                             activeManagedApps = managedApps.count { it.isManaged },
                             totalBlocks = totalBlocks,
+                            nextTransition = nextTransition,
+                            protectionEnabled = isProtectionEnabled,
                             onToggle = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
                             onOpenSetup = onNavigateToPermissions,
-                            onOpenApps = onNavigateToApps
+                            onOpenApps = onNavigateToApps,
+                            onOpenSchedules = onNavigateToSchedules
                         )
                     }
         }
@@ -565,20 +590,27 @@ private fun ProtectionStatusCard(
     health: ProtectionHealthSnapshot,
     activeManagedApps: Int,
     totalBlocks: Int,
+    nextTransition: NextTransitionInfo?,
+    protectionEnabled: Boolean,
     onToggle: (Boolean) -> Unit,
     onOpenSetup: () -> Unit,
-    onOpenApps: () -> Unit
+    onOpenApps: () -> Unit,
+    onOpenSchedules: () -> Unit
 ) {
-    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0
+    val hasNoAllowedWindows = activeManagedApps > 0 && nextTransition == null
+    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0 || hasNoAllowedWindows
     val actionLabel = when {
         !health.coreReady -> "Fix setup"
         activeManagedApps == 0 -> "Choose apps"
+        hasNoAllowedWindows -> "Add allowed window"
+        nextTransition != null -> "View schedule"
         health.recommendedIssues.isNotEmpty() -> "Improve reliability"
         else -> null
     }
     val action = when {
         !health.coreReady -> onOpenSetup
         activeManagedApps == 0 -> onOpenApps
+        hasNoAllowedWindows || nextTransition != null -> onOpenSchedules
         health.recommendedIssues.isNotEmpty() -> onOpenSetup
         else -> null
     }
@@ -586,15 +618,29 @@ private fun ProtectionStatusCard(
         !enabled -> "App blocking is paused"
         !health.coreReady -> "Finish protection setup"
         activeManagedApps == 0 -> "Choose apps to protect"
+        hasNoAllowedWindows -> "Apps are blocked all the time"
         else -> "App blocking is active"
     }
     val detail = when {
         !enabled -> "Turn protection on to enforce your schedules."
         !health.coreReady -> health.coreIssues.firstOrNull() ?: "Open setup to restore required access."
         activeManagedApps == 0 -> "No apps are selected yet. Add the apps you want Strict Blocker to protect."
+        hasNoAllowedWindows -> "No enabled allowed windows are configured. Protected apps stay blocked until you add one."
         health.recommendedIssues.isNotEmpty() ->
-            "$activeManagedApps apps protected · ${health.recommendedIssues.size} optional reliability settings can be improved."
+            "$activeManagedApps apps protected · $totalBlocks blocks recorded · ${health.recommendedIssues.size} optional reliability settings can be improved."
         else -> "$activeManagedApps apps protected · $totalBlocks blocks recorded"
+    }
+    val scheduleDetail = when {
+        !protectionEnabled -> "Schedule enforcement is paused."
+        hasNoAllowedWindows -> null
+        nextTransition == null -> null
+        else -> {
+            val time = nextTransition.transitionDateTime
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("EEE · h:mm a", Locale.getDefault()))
+            val change = if (nextTransition.isOpening) "becomes allowed" else "will be blocked"
+            "Next: ${nextTransition.appName} $change · $time"
+        }
     }
 
     GlassCard(
@@ -619,6 +665,14 @@ private fun ProtectionStatusCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (scheduleDetail != null) {
+                    Text(
+                        scheduleDetail,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
                 if (actionLabel != null && action != null) {
                     TextButton(
                         onClick = action,
