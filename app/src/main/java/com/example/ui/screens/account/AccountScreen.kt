@@ -60,7 +60,7 @@ import com.example.data.backup.CloudBackupRepository
 import com.example.data.db.AppDatabase
 import com.example.security.GuardianPolicyManager
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
