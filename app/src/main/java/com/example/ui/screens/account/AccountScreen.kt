@@ -58,7 +58,9 @@ import com.example.auth.GoogleAuthManager
 import com.example.data.preferences.SettingsPreferences
 import com.example.data.backup.CloudBackupRepository
 import com.example.data.db.AppDatabase
+import com.example.core.system.AlarmScheduler
 import com.example.security.GuardianPolicyManager
+import com.example.service.BlockerMonitoringService
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -273,10 +275,13 @@ fun AccountDialog(
                                             backupBusy = true
                                             scope.launch {
                                                 val phrase = recoveryPhrase.toCharArray()
-                                                val result = backupRepository.createOrUpdateBackup(phrase)
-                                                phrase.fill(0.toChar())
-                                                backupBusy = false
-                                                recoveryPhrase = ""
+                                                val result = try {
+                                                    backupRepository.createOrUpdateBackup(phrase)
+                                                } finally {
+                                                    phrase.fill(0.toChar())
+                                                    backupBusy = false
+                                                    recoveryPhrase = ""
+                                                }
                                                 snackbar.showSnackbar(
                                                     result.fold(
                                                         onSuccess = { "Encrypted backup saved." },
@@ -293,30 +298,40 @@ fun AccountDialog(
                                             backupBusy = true
                                             scope.launch {
                                                 val phrase = recoveryPhrase.toCharArray()
-                                                val result = backupRepository.restoreBackup(phrase)
-                                                phrase.fill(0.toChar())
-                                                backupBusy = false
-                                                recoveryPhrase = ""
+                                                val result = try {
+                                                    backupRepository.restoreBackup(phrase)
+                                                } finally {
+                                                    phrase.fill(0.toChar())
+                                                    backupBusy = false
+                                                    recoveryPhrase = ""
+                                                }
                                                 if (result.isSuccess) {
+                                                    // Rebuild the next boundary alarm after schedule rows are replaced.
+                                                    AlarmScheduler.scheduleNextTransition(context)
+                                                    if (settings.isProtectionEnabledFlow.first()) {
+                                                        BlockerMonitoringService.start(context)
+                                                    }
                                                     val managed = AppDatabase.getInstance(context).managedAppDao()
                                                         .getAllManagedAppsFlow().first()
                                                         .filter { it.isManaged }
                                                         .map { it.packageName }
                                                         .toSet()
                                                     val guardian = GuardianPolicyManager(context).applyRestrictions(managed)
-                                                    snackbar.showSnackbar(
-                                                        if (guardian.isDeviceOwner) {
-                                                            "Backup restored. Guardian restrictions re-applied."
-                                                        } else {
-                                                            "Backup restored. Guardian device-owner protection is not active on this device."
-                                                        }
-                                                    )
+                                                    val message = when {
+                                                        !guardian.isDeviceOwner ->
+                                                            "Backup restored and schedules refreshed. Guardian device-owner protection is not active on this device."
+                                                        guardian.failures.isNotEmpty() ->
+                                                            "Backup restored and schedules refreshed. Review guardian restrictions for ${guardian.failures.size} apps."
+                                                        else ->
+                                                            "Backup restored. Schedules refreshed and guardian restrictions reapplied to ${guardian.suspended.size} apps."
+                                                    }
+                                                    snackbar.showSnackbar(message)
                                                 } else {
                                                     snackbar.showSnackbar(result.exceptionOrNull()?.message ?: "Restore failed.")
                                                 }
                                             }
                                         },
-                                        enabled = !backupBusy && recoveryPhrase.length >= 12,
+                                        enabled = !backupBusy && recoveryPhrase.length >= 16,
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Restore") }
                                 }
