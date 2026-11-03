@@ -1,9 +1,30 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This build has no Firestore-backed product features. Keep all collections
-    // closed until a future feature has a separately reviewed data model and rules.
+    // The client stores only end-to-end encrypted backup ciphertext here.
+    // A signed-in account can access only its own single backup record.
+    match /users/{uid}/backups/{backupId} {
+      function owner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      function validBackup() {
+        return backupId == 'current'
+          && request.resource.data.keys().hasOnly([
+            'schemaVersion', 'cipher', 'kdf', 'salt', 'nonce', 'ciphertext', 'updatedAt'
+          ])
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.cipher == 'AES-256-GCM'
+          && request.resource.data.kdf == 'PBKDF2-HMAC-SHA256-310000'
+          && request.resource.data.salt is string
+          && request.resource.data.nonce is string
+          && request.resource.data.ciphertext is string
+          && request.resource.data.ciphertext.size() < 900000
+          && request.resource.data.updatedAt == request.time;
+      }
+      allow read: if owner() && backupId == 'current';
+      allow create, update: if owner() && validBackup();
+      allow delete: if owner() && backupId == 'current';
+    }
     match /{document=**} {
       allow read, write: if false;
     }
