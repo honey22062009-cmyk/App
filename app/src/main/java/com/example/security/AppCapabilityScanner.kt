@@ -38,7 +38,7 @@ class AppCapabilityScanner(context: Context) {
         val permissionFlags = info.requestedPermissionsFlags ?: IntArray(0)
         val granted = requestedList.filterIndexed { index, _ ->
             index < permissionFlags.size &&
-                (permissionFlags[index] and PackageManager.REQUESTED_PERMISSION_GRANTED) != 0
+                (permissionFlags[index] and PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0
         }
         val signals = buildList {
             if (requested.any { it in LOCATION_PERMISSIONS }) add("Location access requested")
