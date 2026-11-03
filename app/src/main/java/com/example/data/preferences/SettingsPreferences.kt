@@ -800,6 +800,68 @@ class SettingsPreferences(private val context: Context) {
         )
     }
 
+
+    /**
+     * Returns only restorable app configuration. Private profile fields, personal trackers,
+     * account credentials, device-local URIs, and one-time unlock state remain on-device.
+     */
+    suspend fun exportCloudSafePreferences(): Map<String, Any> {
+        val excluded = setOf(
+            "user_name", "user_age", "user_gender",
+            "account_signed_in", "account_id", "account_email",
+            "account_display_name", "account_photo_uri",
+            "adult_unlock_not_before", "adult_unlock_verified",
+            "blocker_photo_uri"
+        )
+        return context.dataStore.data.first().asMap().entries
+            .filterNot { (key, _) ->
+                key.name in excluded ||
+                    key.name.startsWith("tracker_") ||
+                    key.name.startsWith("fap_") ||
+                    key.name in setOf(
+                        "last_fap_at", "previous_fap_streak_days", "best_fap_streak_days",
+                        "daily_check_ins", "sleep_entries", "seen_tracker_milestones"
+                    )
+            }
+            .associate { (key, value) ->
+                key.name to if (value is Set<*>) value.filterIsInstance<String>().toList() else value
+            }
+    }
+
+    /** Restores only the non-sensitive preference values represented in a cloud backup. */
+    suspend fun restoreCloudSafePreferences(values: Map<String, Any>) {
+        val excluded = setOf(
+            "user_name", "user_age", "user_gender",
+            "account_signed_in", "account_id", "account_email",
+            "account_display_name", "account_photo_uri",
+            "adult_unlock_not_before", "adult_unlock_verified",
+            "blocker_photo_uri"
+        )
+        context.dataStore.edit { preferences ->
+            values.forEach { (name, value) ->
+                if (
+                    name in excluded || name.startsWith("tracker_") ||
+                    name.startsWith("fap_") ||
+                    name in setOf(
+                        "last_fap_at", "previous_fap_streak_days", "best_fap_streak_days",
+                        "daily_check_ins", "sleep_entries", "seen_tracker_milestones"
+                    )
+                ) return@forEach
+                when (value) {
+                    is Boolean -> preferences[booleanPreferencesKey(name)] = value
+                    is Int -> preferences[intPreferencesKey(name)] = value
+                    is Long -> preferences[longPreferencesKey(name)] = value
+                    is Double -> preferences[longPreferencesKey(name)] = value.toLong()
+                    is String -> preferences[stringPreferencesKey(name)] = value.take(4096)
+                    is List<*> -> {
+                        val strings = value.filterIsInstance<String>().take(500).toSet()
+                        preferences[stringSetPreferencesKey(name)] = strings
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Clears all persisted preferences when the user explicitly requests a full local-data wipe.
      * All settings flows have safe defaults when their keys are absent.
