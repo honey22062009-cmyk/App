@@ -246,8 +246,8 @@ object ScheduleEvaluator {
     }
 
     /**
-     * Finds the next start or end boundary for any enabled period.
-     * A transition is opening at the period start and closing at its end.
+     * Finds the next boundary where the combined schedule changes the app's access state.
+     * Overlapping or adjacent windows that keep the app allowed do not create false transitions.
      */
     data class ScheduleTransition(
         val dateTime: LocalDateTime,
