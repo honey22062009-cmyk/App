@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Strict Blocker</string>
+    <string name="guardian_admin_description">Allows a guardian who provisions this device as managed to suspend selected applications and block their uninstall. This authority is not active on ordinary installs.</string>
     <string name="accessibility_service_description">Detects foreground app names for your blocking schedules. With your consent, reads visible browser address and search fields to interrupt restricted domains or explicit searches. Passwords and other editable fields are excluded. Inspected browser text stays in memory on this device; only generic block counts are saved.</string>
     
     <!-- Navigation -->
