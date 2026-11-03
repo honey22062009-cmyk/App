@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import com.example.core.system.SafetyWhitelist
 
 /**
  * Guardian-only package controls. These APIs work only after a guardian has provisioned
@@ -31,7 +32,7 @@ class GuardianPolicyManager(context: Context) {
         val targets = packageNames.asSequence()
             .map(String::trim)
             .filter(String::isNotEmpty)
-            .filterNot { it == appContext.packageName }
+            .filterNot { it == appContext.packageName || SafetyWhitelist.isSystemCritical(appContext, it) }
             .distinct()
             .toList()
         if (targets.isEmpty()) {
