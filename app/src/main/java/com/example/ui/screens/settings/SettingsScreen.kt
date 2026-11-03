@@ -82,12 +82,10 @@ fun SettingsScreen(
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
     onNavigateToAdultProtection: () -> Unit = {},
-    onNavigateToPaywall: () -> Unit = {},
     onNavigateToBlockerCustomization: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
-    onReplayTour: () -> Unit = {},
-    onNavigateToOwnerConsole: () -> Unit = {}
+    onReplayTour: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -201,11 +199,9 @@ fun SettingsScreen(
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
                                 onNavigateToAdultProtection = onNavigateToAdultProtection,
-                                onNavigateToPaywall = onNavigateToPaywall,
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
-                                onNavigateToOwnerConsole = onNavigateToOwnerConsole,
                                 onReduceMotionChange = { enabled ->
                                     scope.launch { repository.settings.setReduceMotion(enabled) }
                                 },
@@ -316,11 +312,9 @@ fun SettingsScreen(
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
                                 onNavigateToAdultProtection = onNavigateToAdultProtection,
-                                onNavigateToPaywall = onNavigateToPaywall,
                                 onNavigateToBlockerCustomization = onNavigateToBlockerCustomization,
                                 onNavigateToAccount = onNavigateToAccount,
                                 onNavigateToInsights = onNavigateToInsights,
-                                onNavigateToOwnerConsole = onNavigateToOwnerConsole,
                                 onReduceMotionChange = { enabled ->
                                     scope.launch { repository.settings.setReduceMotion(enabled) }
                                 },
@@ -419,11 +413,9 @@ private fun SettingsSectionContent(
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
     onNavigateToAdultProtection: () -> Unit,
-    onNavigateToPaywall: () -> Unit,
     onNavigateToBlockerCustomization: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToInsights: () -> Unit,
-    onNavigateToOwnerConsole: () -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onShowPackageOnBlockerChange: (Boolean) -> Unit,
     onHistoryRetentionChange: (Int) -> Unit,
@@ -606,11 +598,6 @@ private fun SettingsSectionContent(
             Spacer(Modifier.height(12.dp))
             SettingsLinkRow("Replay the quick tour", "Three short tips for recording, browsing and your companion", onReplayTour)
             Spacer(modifier = Modifier.height(14.dp))
-            SettingsLinkRow(
-                title = "Owner payment console",
-                subtitle = "Review pending UPI payments and approve Pro manually",
-                onClick = onNavigateToOwnerConsole
-            )
         }
     }
 }

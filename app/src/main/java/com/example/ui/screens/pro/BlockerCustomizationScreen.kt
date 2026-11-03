@@ -46,12 +46,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun BlockerCustomizationScreen(
     settings: SettingsPreferences,
-    onUpgrade: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
     val style by settings.blockerStyleFlow.collectAsState(initial = "classic")
     val photoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
     val savedMessage by settings.blockerMessageFlow.collectAsState(
@@ -96,31 +94,7 @@ fun BlockerCustomizationScreen(
             )
         }
 
-        if (!isPro) {
-            item {
-                AppSurface(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Icon(Icons.Default.Lock, contentDescription = null)
-                        Spacer(Modifier.height(10.dp))
-                        Text("Premium customization", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Custom photos and animated blocker themes are included with Pro.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        Button(onClick = onUpgrade) {
-                            Icon(Icons.Default.Star, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("View Pro")
-                        }
-                    }
-                }
-            }
-        } else {
+
             item {
                 AppSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -238,7 +212,7 @@ fun BlockerCustomizationScreen(
                     }
                 }
             }
-        }
+        
 
         item {
             FilledTonalButton(

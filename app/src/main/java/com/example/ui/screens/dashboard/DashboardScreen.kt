@@ -130,7 +130,6 @@ fun DashboardScreen(
     val companionSound by repository.settings.companionSoundFlow.collectAsState(initial = false)
     val companionName by repository.settings.characterNameFlow.collectAsState(initial = "")
     val selectedCharacterId by repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova")
-    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
@@ -156,7 +155,6 @@ fun DashboardScreen(
 
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
-        repository.settings.refreshExpiredProEntitlement()
     }
 
     LaunchedEffect(initialTrackerAction) {
@@ -315,7 +313,7 @@ fun DashboardScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
+            modifier = Modifier.widthIn(max = 1320.dp).fillMaxSize().align(Alignment.TopCenter).testTag("dashboard_list"),
             contentPadding = PaddingValues(
                 start = if (tablet) 22.dp else 12.dp,
                 end = if (tablet) 22.dp else 12.dp,
@@ -332,10 +330,10 @@ fun DashboardScreen(
                         Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A softer landing.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(if (isPro) " Pro active" else " Explore Pro") }
+                    TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(" Explore Pro") }
                 }
                 if (progressOnly) TextButton(onClick = {
-                    if (isPro) showCustomization = true else onOpenPro()
+                    showCustomization = true
                 }) { Text("Customize progress") }
             }
             if (!progressOnly && !tourSeen) item(key = "quick_tour") {

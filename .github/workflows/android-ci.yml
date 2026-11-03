@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: ["main", "fix/build-errors", "ui/polish-v1-3"]
+    branches: ["main", "fix/build-errors", "ui/polish-v1-3", "enhance/**"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "ui/polish-v1-3"]
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +35,7 @@ jobs:
             printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
           else
             printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
-            echo "::warning::Google Sign-In is not configured yet. Firebase manual payments still build and work."
+            echo "::warning::Google Sign-In is not configured yet. Core offline features remain available."
           fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js

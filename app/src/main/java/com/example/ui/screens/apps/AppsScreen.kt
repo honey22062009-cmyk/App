@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -79,10 +80,10 @@ import java.util.Locale
 @Composable
 fun AppsScreen(
     repository: AppBlockerRepository,
-    onConfigureScheduleForApp: (String) -> Unit,
-    onNavigateToPaywall: () -> Unit = {}
+    onConfigureScheduleForApp: (String) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Managed", "Unmanaged"
     var installedApps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
@@ -90,8 +91,7 @@ fun AppsScreen(
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
-    val isPro by repository.settings.isProEntitledFlow.collectAsState(initial = false)
-    val groupLimit = if (isPro) 8 else 1
+    val groupLimit = 8
 
     val selectedPackages = remember { mutableStateListOf<String>() }
 
@@ -162,21 +162,14 @@ fun AppsScreen(
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        if (groups.size >= groupLimit) {
-                            if (!isPro) onNavigateToPaywall()
-                        } else {
-                            showGroupDialog = true
-                        }
-                    },
-                    enabled = groups.size < groupLimit || !isPro
+                    onClick = { showGroupDialog = true },
+                    enabled = groups.size < groupLimit
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         when {
                             groups.size < groupLimit -> "New group"
-                            !isPro -> "Unlock groups"
                             else -> "Group limit reached"
                         }
                     )
@@ -186,7 +179,7 @@ fun AppsScreen(
             if (groups.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "${groups.size}/$groupLimit groups" + if (!isPro) " • Pro unlocks up to 8" else "",
+                    text = "${groups.size}/$groupLimit groups",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -499,7 +492,7 @@ fun AppsScreen(
                         refreshApps()
                     } else {
                         showGroupDialog = false
-                        onNavigateToPaywall()
+                        android.widget.Toast.makeText(context, "Could not save this group. Check its name and try again.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             }

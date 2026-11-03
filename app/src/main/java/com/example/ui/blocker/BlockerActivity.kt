@@ -110,7 +110,7 @@ class BlockerActivity : ComponentActivity() {
         val settings = SettingsPreferences(applicationContext)
 
         setContent {
-            val isPro by settings.isProEntitledFlow.collectAsState(initial = false)
+            val isPro by settings.areAllFeaturesUnlockedFlow.collectAsState(initial = true)
             val blockerStyle by settings.blockerStyleFlow.collectAsState(initial = "classic")
             val blockerPhotoUri by settings.blockerPhotoUriFlow.collectAsState(initial = "")
             val blockerMessage by settings.blockerMessageFlow.collectAsState(

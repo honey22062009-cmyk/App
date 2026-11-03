@@ -11,10 +11,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.combine
-import com.example.payments.OwnerAccess
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -75,11 +74,7 @@ class SettingsPreferences(private val context: Context) {
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
 
-        // Pro / premium blocker customization
-        val PRO_ENTITLED = booleanPreferencesKey("pro_entitled")
-        val PRO_EXPIRES_AT = longPreferencesKey("pro_expires_at")
-        val PRO_PAYMENT_REQUEST_ID = stringPreferencesKey("pro_payment_request_id")
-        val LAST_PAYMENT_REQUEST_ID = stringPreferencesKey("last_payment_request_id")
+        // User-selectable blocker customization
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
         val BLOCKER_PHOTO_URI = stringPreferencesKey("blocker_photo_uri")
         val BLOCKER_MESSAGE = stringPreferencesKey("blocker_message")
@@ -282,25 +277,16 @@ class SettingsPreferences(private val context: Context) {
         }
     }
 
+    // All former premium features are available without payment; Pro is a future-features destination.
+    val areAllFeaturesUnlockedFlow: Flow<Boolean> = flowOf(true)
+
     val seenMilestonesFlow: Flow<Set<Int>> = context.dataStore.data.map { preferences ->
         (preferences[PreferencesKeys.SEEN_MILESTONES] ?: emptySet())
             .mapNotNull { it.toIntOrNull() }
             .toSet()
     }
 
-    val isProEntitledFlow: Flow<Boolean> = combine(context.dataStore.data, OwnerAccess.hasAccess) { preferences, owner ->
-        val entitled = preferences[PreferencesKeys.PRO_ENTITLED] ?: false
-        val expiresAt = preferences[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
-        owner || (entitled && (expiresAt == 0L || expiresAt > System.currentTimeMillis()))
-    }
 
-    val proExpiresAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
-    }
-
-    val lastPaymentRequestIdFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] ?: ""
-    }
 
     val blockerStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.BLOCKER_STYLE] ?: "classic"
@@ -682,44 +668,6 @@ class SettingsPreferences(private val context: Context) {
             preferences.remove(PreferencesKeys.DAILY_CHECK_INS)
             preferences.remove(PreferencesKeys.SLEEP_ENTRIES)
             preferences.remove(PreferencesKeys.SEEN_MILESTONES)
-        }
-    }
-
-    suspend fun setProEntitled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.PRO_ENTITLED] = enabled
-            if (!enabled) {
-                preferences.remove(PreferencesKeys.PRO_EXPIRES_AT)
-                preferences.remove(PreferencesKeys.PRO_PAYMENT_REQUEST_ID)
-                if (!OwnerAccess.hasAccess.value) {
-                    preferences[PreferencesKeys.BLOCKER_STYLE] = "classic"
-                    preferences.remove(PreferencesKeys.BLOCKER_PHOTO_URI)
-                }
-            }
-        }
-    }
-
-    suspend fun setLastPaymentRequestId(requestId: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] = requestId.trim()
-        }
-    }
-
-    suspend fun setManualProEntitlement(requestId: String, expiresAtMillis: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.PRO_ENTITLED] = true
-            preferences[PreferencesKeys.PRO_EXPIRES_AT] = expiresAtMillis
-            preferences[PreferencesKeys.PRO_PAYMENT_REQUEST_ID] = requestId
-            preferences[PreferencesKeys.LAST_PAYMENT_REQUEST_ID] = requestId
-        }
-    }
-
-    suspend fun refreshExpiredProEntitlement() {
-        val snapshot = context.dataStore.data.first()
-        val entitled = snapshot[PreferencesKeys.PRO_ENTITLED] ?: false
-        val expiresAt = snapshot[PreferencesKeys.PRO_EXPIRES_AT] ?: 0L
-        if (entitled && expiresAt > 0L && expiresAt <= System.currentTimeMillis()) {
-            setProEntitled(false)
         }
     }
 

@@ -122,7 +122,18 @@ class ReliabilityUiTest {
         compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Wave"))
         compose.onNodeWithText("Wave").performClick()
         compose.onNodeWithText("Feed").performScrollTo().performClick()
-        compose.onNodeWithText("Crunch, crunch. Thank you!").performScrollTo().assertIsDisplayed()
+        val snackResponses = listOf(
+            "Crunch, crunch. Thank you!",
+            "A tiny snack for a tiny assistant.",
+            "Mmm. Back to being your study-side companion."
+        )
+        compose.waitUntil(5_000) {
+            snackResponses.any { compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() }
+        }
+        val snackResponse = snackResponses.first {
+            compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(snackResponse).performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("3D companion. Drag to rotate, pinch to zoom, tap to pet.").performScrollTo()
         capture("08-bunny")
         compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Record today"))
@@ -172,7 +183,7 @@ class ReliabilityUiTest {
         compose.activityRule.scenario.recreate()
         waitFor("Hi, Honey")
         compose.onNodeWithText("Pro").performClick()
-        waitFor("Meet Strict Blocker Pro")
+        waitFor("A space for what's next.")
         compose.onNodeWithTag("glass_dock").assertIsDisplayed()
         capture("10-pro")
         compose.onNodeWithText("Settings").performClick()

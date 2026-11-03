@@ -31,6 +31,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -115,6 +116,7 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
     var key by remember { mutableStateOf(0) }
     var caption by remember { mutableStateOf("A little company for your day.") }
     var audioStatus by remember { mutableStateOf("") }
+    var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val audio = remember(context) { CompanionAudio(context) { audioStatus = it } }
@@ -124,20 +126,32 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
         onDispose { lifecycle.removeObserver(observer); audio.close() }
     }
     LaunchedEffect(soundEnabled) { if (!soundEnabled) audio.stop() }
-    fun act(action: String) {
-        reaction = action; key++
-        caption = when (action) {
-            "wave" -> "Hey, I'm right here."
-            "jump" -> "One little hop at a time!"
-            "spin" -> "A fresh perspective. Wheee!"
-            "dance" -> "Tiny victory dance!"
-            "snack" -> "Crunch, crunch. Thank you!"
-            "rest" -> "Breathe in… and slowly out."
-            "talk" -> "You don't need a perfect day. Just your next small step."
-            else -> "That feels nice. You’ve got this."
+
+    // Small unscripted moments keep the companion feeling present without nagging.
+    // Automatic reactions are silent; speech only follows an intentional user action.
+    LaunchedEffect(reduceMotion, characterId) {
+        if (reduceMotion) return@LaunchedEffect
+        while (true) {
+            delay((7_500L..12_500L).random())
+            val now = SystemClock.uptimeMillis()
+            if (now - lastInteractionAt >= 6_500L) {
+                val cue = CompanionBehavior.nextIdleCue()
+                reaction = cue.action
+                key++
+                caption = cue.line
+                lastInteractionAt = now
+            }
         }
+    }
+
+    fun act(action: String) {
+        lastInteractionAt = SystemClock.uptimeMillis()
+        reaction = action
+        key++
+        caption = CompanionBehavior.dialogue(action)
         if (soundEnabled) {
-            if (action == "talk") audio.say(caption) else audio.effect(action)
+            if (action != "talk") audio.effect(action)
+            audio.say(caption)
         }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -415,8 +429,11 @@ private class CompanionRenderer(private val state: CompanionState) {
                 float diffuse = max(dot(n, l), 0.0);
                 float rim = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 3.0);
                 vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
-                float specular = pow(max(dot(n, h), 0.0), 28.0) * 0.075;
-                gl_FragColor = vec4(uColor * (0.44 + 0.56 * diffuse) + specular + rim * 0.055, 1.0);
+                // A subtle surface variation softens the plastic shine.
+                float grain = sin(vPosition.x * 31.0 + sin(vPosition.y * 19.0)) *
+                              sin(vPosition.z * 27.0 + vPosition.y * 13.0) * 0.012;
+                float specular = pow(max(dot(n, h), 0.0), 24.0) * 0.045;
+                gl_FragColor = vec4(uColor * (0.48 + 0.52 * diffuse + grain) + specular + rim * 0.045, 1.0);
             }
         """.trimIndent())
         GLES20.glAttachShader(program, vertex); GLES20.glAttachShader(program, fragment)
@@ -446,7 +463,14 @@ private class CompanionRenderer(private val state: CompanionState) {
         Matrix.setLookAtM(view, 0, 0f, .4f, zoom, 0f, .20f, 0f, 0f, 1f, 0f)
         val time = SystemClock.uptimeMillis() / 1000f
         val elapsed = ((SystemClock.uptimeMillis() - reactionAt) / 1000f).coerceAtLeast(0f)
-        val duration = when (reaction) { "rest" -> 8f; "dance" -> 3.6f; "snack", "talk" -> 3f; else -> 2f }
+        val duration = when (reaction) {
+            "rest" -> 8f
+            "dance" -> 3.6f
+            "snack", "talk" -> 3f
+            "stretch" -> 2.8f
+            "curious", "ear_twitch", "look_around" -> 2.2f
+            else -> 2f
+        }
         val acting = !reducedMotion && elapsed < duration
         val phase = (elapsed / duration).coerceIn(0f, 1f)
         val pulse = sin(phase * PI.toFloat()).coerceAtLeast(0f)
@@ -454,7 +478,9 @@ private class CompanionRenderer(private val state: CompanionState) {
             reducedMotion -> 0f
             acting && reaction == "jump" -> abs(sin(phase * PI.toFloat() * 2)) * .52f
             acting && reaction == "dance" -> abs(sin(elapsed * 10f)) * .10f * pulse
-            else -> sin(time * 2f) * .022f
+            acting && reaction == "stretch" -> sin(phase * PI.toFloat()) * .07f
+            acting && reaction == "curious" -> sin(phase * PI.toFloat()) * .035f
+            else -> sin(time * 1.7f) * .018f
         }
         val spin = if (acting && reaction == "spin") 360f * phase.let { it * it * (3f - 2f * it) } else 0f
         Matrix.setIdentityM(base, 0)
@@ -462,8 +488,11 @@ private class CompanionRenderer(private val state: CompanionState) {
         draw(sphere, 0f, -.93f, -.06f, .47f - bounce * .18f, .025f, .29f - bounce * .10f, 0xdccbdc)
         Matrix.translateM(base, 0, if (acting && reaction == "dance") sin(elapsed * 5f) * .14f * pulse else 0f, bounce - .06f, 0f)
         Matrix.rotateM(base, 0, pitch + if (acting && reaction == "snack") sin(elapsed * 12f) * 3f else 0f, 1f, 0f, 0f)
-        Matrix.rotateM(base, 0, yaw + spin, 0f, 1f, 0f)
-        if (acting && reaction in setOf("pet", "dance")) Matrix.rotateM(base, 0, sin(elapsed * 7f) * 7f * pulse, 0f, 0f, 1f)
+        val curiousTurn = if (acting && reaction in setOf("curious", "look_around")) sin(phase * PI.toFloat()) * 15f else 0f
+        Matrix.rotateM(base, 0, yaw + spin + curiousTurn, 0f, 1f, 0f)
+        val idleSway = if (!reducedMotion && !acting) sin(time * .72f) * 1.5f else 0f
+        val reactionTilt = if (acting && reaction in setOf("pet", "dance", "curious")) sin(elapsed * 5.5f) * 5f * pulse else 0f
+        Matrix.rotateM(base, 0, idleSway + reactionTilt, 0f, 0f, 1f)
         val breathe = if (acting && reaction == "rest") sin(elapsed * PI.toFloat() / 4f) * .045f else 0f
         Matrix.scaleM(base, 0, 1f + breathe, 1f + breathe * .5f, 1f + breathe)
         val coat = when (character) {
@@ -508,9 +537,16 @@ private class CompanionRenderer(private val state: CompanionState) {
             acting && reaction == "wave" -> sin(elapsed * 15f) * 22f * pulse + 125f * pulse
             acting && reaction == "dance" -> (sin(elapsed * 10f) * 35f + 50f) * pulse
             acting && reaction == "snack" -> 65f * pulse
+            acting && reaction == "stretch" -> -92f * pulse
+            acting && reaction == "curious" -> -48f * pulse
             else -> 12f
         }
-        arm(-1f, if (acting && reaction == "snack") -65f * pulse else -12f)
+        val leftArm = when {
+            acting && reaction == "snack" -> -65f * pulse
+            acting && reaction == "stretch" -> 92f * pulse
+            else -> -12f
+        }
+        arm(-1f, leftArm)
         arm(1f, wave)
         if (acting && reaction == "snack") {
             draw(cone, .05f, .20f, .48f, .11f, .30f, .10f, 0xf09a68, 150f)
@@ -521,7 +557,12 @@ private class CompanionRenderer(private val state: CompanionState) {
             ball(-.48f, 1.0f, -.04f, .23f, .24f, .16f, if (character == "kai") dark else coat)
             ball(.48f, 1.0f, -.04f, .23f, .24f, .16f, if (character == "kai") dark else coat)
         } else if (character == "luna") {
-            val earMotion = if (acting && reaction in setOf("pet", "jump", "dance")) sin(elapsed * 10f) * 12f * pulse else 0f
+            val earMotion = when {
+                acting && reaction in setOf("pet", "jump", "dance") -> sin(elapsed * 10f) * 12f * pulse
+                acting && reaction == "ear_twitch" -> sin(elapsed * 18f) * 20f * pulse
+                !reducedMotion && !acting && time % 13f > 11.8f -> sin((time % 13f - 11.8f) * PI.toFloat() / 1.2f) * 5f
+                else -> 0f
+            }
             for (side in listOf(-1f, 1f)) {
                 val saved = base.copyOf()
                 Matrix.translateM(base, 0, side * .28f, .87f, -.02f)
@@ -538,7 +579,9 @@ private class CompanionRenderer(private val state: CompanionState) {
         }
         ball(-.23f, .40f, .41f, .26f, .23f, .10f, cream)
         ball(.23f, .40f, .41f, .26f, .23f, .10f, cream)
-        val blink = (!reducedMotion && time % 4.7f > 4.52f) || ((acting || reducedMotion) && reaction in setOf("pet", "rest"))
+        val blinkCycle = time % 6.4f
+        val blink = (!reducedMotion && (blinkCycle > 6.18f || (time % 17.2f in 11.1f..11.28f))) ||
+            ((acting || reducedMotion) && reaction in setOf("pet", "rest", "curious", "look_around"))
         if (character == "kai" || character == "sol") {
             ball(-.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
             ball(.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
