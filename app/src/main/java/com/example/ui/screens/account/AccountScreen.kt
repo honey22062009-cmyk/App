@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -85,6 +86,7 @@ fun AccountDialog(
     }
     var recoveryPhrase by remember { mutableStateOf("") }
     var backupBusy by remember { mutableStateOf(false) }
+    var showRestoreConfirmation by remember { mutableStateOf(false) }
 
     val signedIn by settings.isAccountSignedInFlow.collectAsState(initial = false)
     val email by settings.accountEmailFlow.collectAsState(initial = "")
@@ -271,25 +273,7 @@ fun AccountDialog(
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
-                                        onClick = {
-                                            backupBusy = true
-                                            scope.launch {
-                                                val phrase = recoveryPhrase.toCharArray()
-                                                val result = try {
-                                                    backupRepository.createOrUpdateBackup(phrase)
-                                                } finally {
-                                                    phrase.fill(0.toChar())
-                                                    backupBusy = false
-                                                    recoveryPhrase = ""
-                                                }
-                                                snackbar.showSnackbar(
-                                                    result.fold(
-                                                        onSuccess = { "Encrypted backup saved." },
-                                                        onFailure = { it.message ?: "Backup failed." }
-                                                    )
-                                                )
-                                            }
-                                        },
+                                        onClick = { showRestoreConfirmation = true },
                                         enabled = !backupBusy && recoveryPhrase.length >= 16,
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Back up") }
@@ -376,6 +360,67 @@ fun AccountDialog(
             }
         }
     }
+
+    if (showRestoreConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirmation = false },
+            title = { Text("Replace this device's protection setup?") },
+            text = {
+                Text(
+                    "Restore replaces the current app selections, schedules, settings and recent protection history with the encrypted backup. Your local profile and private tracker records are not included. This cannot be undone from this screen."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestoreConfirmation = false
+                        backupBusy = true
+                        scope.launch {
+                            val phrase = recoveryPhrase.toCharArray()
+                            val result = try {
+                                backupRepository.restoreBackup(phrase)
+                            } finally {
+                                phrase.fill(0.toChar())
+                                backupBusy = false
+                                recoveryPhrase = ""
+                            }
+                            if (result.isSuccess) {
+                                // Rebuild the next boundary alarm after schedule rows are replaced.
+                                AlarmScheduler.scheduleNextTransition(context)
+                                if (settings.isProtectionEnabledFlow.first()) {
+                                    BlockerMonitoringService.start(context)
+                                }
+                                val managed = AppDatabase.getInstance(context).managedAppDao()
+                                    .getAllManagedAppsFlow().first()
+                                    .filter { it.isManaged }
+                                    .map { it.packageName }
+                                    .toSet()
+                                val guardian = GuardianPolicyManager(context).applyRestrictions(managed)
+                                val message = when {
+                                    !guardian.isDeviceOwner ->
+                                        "Backup restored and schedules refreshed. Guardian device-owner protection is not active on this device."
+                                    guardian.failures.isNotEmpty() ->
+                                        "Backup restored and schedules refreshed. Review guardian restrictions for ${guardian.failures.size} apps."
+                                    else ->
+                                        "Backup restored. Schedules refreshed and guardian restrictions reapplied to ${guardian.suspended.size} apps."
+                                }
+                                snackbar.showSnackbar(message)
+                            } else {
+                                snackbar.showSnackbar(result.exceptionOrNull()?.message ?: "Restore failed.")
+                            }
+                        }
+                    },
+                    enabled = !backupBusy && recoveryPhrase.length >= 16
+                ) { Text("Replace local setup") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRestoreConfirmation = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
 }
 
 @Composable
