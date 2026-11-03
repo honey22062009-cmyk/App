@@ -5,8 +5,11 @@
     <!-- Firebase / Firestore connectivity -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Broad app inventory is core to user-facing app management; Play declaration may be required. -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- The app's core user-facing feature is installed-app protection and permission auditing.
+         Keep this declaration only for that purpose; Google Play approval/declaration may be required. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <!-- Permissions required for strict, reliable app blocking -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
