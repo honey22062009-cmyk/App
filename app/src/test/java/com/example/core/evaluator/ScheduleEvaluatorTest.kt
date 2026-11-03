@@ -424,4 +424,25 @@ class ScheduleEvaluatorTest {
         assertEquals(null, ScheduleEvaluator.findNextAllowedTime(listOf(emptyWindow), now))
         assertEquals(null, ScheduleEvaluator.findNextTransition(listOf(emptyWindow), now))
     }
+
+    @Test
+    fun findNextTransition_ignoresDisabledAllowedWindows() {
+        val disabledWindow = SchedulePeriod(
+            id = 70,
+            appPackage = samplePkg,
+            dayOfWeek = DayOfWeek.MONDAY,
+            startHour = 18,
+            startMinute = 0,
+            endHour = 19,
+            endMinute = 0,
+            isEnabled = false
+        )
+        val now = LocalDate.of(2026, 10, 19).atTime(17, 0)
+
+        val transition = ScheduleEvaluator.findNextTransition(listOf(disabledWindow), now)
+
+        assertEquals(null, transition)
+        assertTrue(ScheduleEvaluator.evaluate(listOf(disabledWindow), now).isBlocked)
+    }
+
 }
