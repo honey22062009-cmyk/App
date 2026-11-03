@@ -31,7 +31,13 @@ class AppCapabilityScanner(context: Context) {
         val appInfo = info.applicationInfo ?: return null
         val label = runCatching { packageManager.getApplicationLabel(appInfo).toString() }
             .getOrDefault(info.packageName)
-        val requested = info.requestedPermissions.orEmpty().toSet()
+        val requestedList = info.requestedPermissions.orEmpty().toList()
+        val requested = requestedList.toSet()
+        val permissionFlags = info.requestedPermissionsFlags ?: IntArray(0)
+        val granted = requestedList.filterIndexed { index, _ ->
+            index < permissionFlags.size &&
+                (permissionFlags[index] and PackageManager.REQUESTED_PERMISSION_GRANTED) != 0
+        }
         val signals = buildList {
             if (requested.any { it in LOCATION_PERMISSIONS }) add("Location access requested")
             if (requested.any { it in CONTACT_PERMISSIONS }) add("Contacts access requested")
@@ -49,6 +55,12 @@ class AppCapabilityScanner(context: Context) {
             label = label,
             isSystemApp = isSystem,
             requestedPermissionCount = requested.size,
+            requestedPermissions = requestedList.sorted(),
+            grantedPermissions = granted.sorted(),
+            declaredActivityCount = info.activities?.size ?: 0,
+            declaredServiceCount = info.services?.size ?: 0,
+            declaredReceiverCount = info.receivers?.size ?: 0,
+            declaredProviderCount = info.providers?.size ?: 0,
             signals = signals
         )
     }
@@ -71,5 +83,11 @@ data class AppCapabilityReport(
     val label: String,
     val isSystemApp: Boolean,
     val requestedPermissionCount: Int,
+    val requestedPermissions: List<String>,
+    val grantedPermissions: List<String>,
+    val declaredActivityCount: Int,
+    val declaredServiceCount: Int,
+    val declaredReceiverCount: Int,
+    val declaredProviderCount: Int,
     val signals: List<String>
 )
