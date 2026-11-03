@@ -14,11 +14,13 @@ class AppCapabilityScanner(context: Context) {
     private val packageManager = appContext.packageManager
 
     fun scanInstalledApps(): List<AppCapabilityReport> {
+        val queryFlags = PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or
+            PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or PackageManager.GET_PROVIDERS
         val packages = if (Build.VERSION.SDK_INT >= 33) {
-            packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
+            packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(queryFlags.toLong()))
         } else {
             @Suppress("DEPRECATION")
-            packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
+            packageManager.getInstalledPackages(queryFlags)
         }
         return packages.asSequence()
             .filterNot { it.packageName == appContext.packageName }
