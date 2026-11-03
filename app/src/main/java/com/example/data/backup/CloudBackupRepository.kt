@@ -12,6 +12,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,8 +41,10 @@ class CloudBackupRepository(
         val uid = requireNotNull(auth.currentUser?.uid) {
             "Sign in before creating a cloud backup."
         }
-        val payload = createSnapshot()
-        val encrypted = BackupCryptography.encrypt(payload.toByteArray(Charsets.UTF_8), recoveryPhrase)
+        val payload = withContext(Dispatchers.IO) { createSnapshot() }
+        val encrypted = withContext(Dispatchers.Default) {
+            BackupCryptography.encrypt(payload.toByteArray(Charsets.UTF_8), recoveryPhrase)
+        }
         require(encrypted.ciphertext.length < MAX_CIPHERTEXT_CHARS) {
             "Backup is too large for one secure cloud record."
         }
@@ -75,8 +79,11 @@ class CloudBackupRepository(
             nonce = requireNotNull(document.getString("nonce")),
             ciphertext = requireNotNull(document.getString("ciphertext"))
         )
-        val clear = BackupCryptography.decrypt(encrypted, recoveryPhrase)
-        restoreSnapshot(String(clear, Charsets.UTF_8))
+        val clear = withContext(Dispatchers.Default) {
+            BackupCryptography.decrypt(encrypted, recoveryPhrase)
+        }
+        withContext(Dispatchers.IO) { restoreSnapshot(String(clear, Charsets.UTF_8)) }
+        clear.fill(0)
     }
 
     private suspend fun createSnapshot(): String {
@@ -212,7 +219,7 @@ class CloudBackupRepository(
     }
 
     private fun requireRecoveryPhrase(value: CharArray) {
-        require(value.size >= 12) { "Use a recovery phrase with at least 12 characters." }
+        require(value.size >= 16) { "Use a recovery phrase with at least 16 characters." }
     }
 
     companion object {
