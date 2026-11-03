@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -37,6 +38,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +55,14 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.auth.GoogleAuthManager
 import com.example.data.preferences.SettingsPreferences
+import com.example.data.backup.CloudBackupRepository
+import com.example.data.db.AppDatabase
+import com.example.security.GuardianPolicyManager
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun AccountDialog(
@@ -66,6 +77,11 @@ fun AccountDialog(
     }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val backupRepository = remember(context, settings) {
+        CloudBackupRepository(AppDatabase.getInstance(context.applicationContext), settings)
+    }
+    var recoveryPhrase by remember { mutableStateOf("") }
+    var backupBusy by remember { mutableStateOf(false) }
 
     val signedIn by settings.isAccountSignedInFlow.collectAsState(initial = false)
     val email by settings.accountEmailFlow.collectAsState(initial = "")
@@ -109,7 +125,7 @@ fun AccountDialog(
                                 if (firstRun) {
                                     "Connect your account now, or skip and finish setup first."
                                 } else {
-                                    "Use your Google account for identity and future sync features."
+                                    "Use your Google account to securely back up and restore your protection setup."
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color(0xFFB8C0D4)
@@ -223,11 +239,94 @@ fun AccountDialog(
                         }
                     }
 
-                    Text(
-                        "Your account identity stays on this device. Purchases are handled by Google Play.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF9AA6C0)
-                    )
+                    if (signedIn) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF1A1F29),
+                            contentColor = Color(0xFFF4F6FC)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text("Encrypted cloud backup", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "Backs up app settings, schedules, managed-app selections and recent protection history. A recovery phrase encrypts the backup on this device and is never uploaded.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFB8C0D4)
+                                )
+                                OutlinedTextField(
+                                    value = recoveryPhrase,
+                                    onValueChange = { recoveryPhrase = it.take(128) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Guardian recovery phrase") },
+                                    placeholder = { Text("At least 12 characters") },
+                                    singleLine = true,
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            backupBusy = true
+                                            scope.launch {
+                                                val result = backupRepository.createOrUpdateBackup(recoveryPhrase.toCharArray())
+                                                backupBusy = false
+                                                recoveryPhrase = ""
+                                                snackbar.showSnackbar(
+                                                    result.fold(
+                                                        onSuccess = { "Encrypted backup saved." },
+                                                        onFailure = { it.message ?: "Backup failed." }
+                                                    )
+                                                )
+                                            }
+                                        },
+                                        enabled = !backupBusy && recoveryPhrase.length >= 12,
+                                        modifier = Modifier.weight(1f)
+                                    ) { Text("Back up") }
+                                    OutlinedButton(
+                                        onClick = {
+                                            backupBusy = true
+                                            scope.launch {
+                                                val result = backupRepository.restoreBackup(recoveryPhrase.toCharArray())
+                                                backupBusy = false
+                                                recoveryPhrase = ""
+                                                if (result.isSuccess) {
+                                                    val managed = AppDatabase.getInstance(context).managedAppDao()
+                                                        .getAllManagedAppsFlow().first()
+                                                        .filter { it.isManaged }
+                                                        .map { it.packageName }
+                                                        .toSet()
+                                                    val guardian = GuardianPolicyManager(context).applyRestrictions(managed)
+                                                    snackbar.showSnackbar(
+                                                        if (guardian.isDeviceOwner) {
+                                                            "Backup restored. Guardian restrictions re-applied."
+                                                        } else {
+                                                            "Backup restored. Guardian device-owner protection is not active on this device."
+                                                        }
+                                                    )
+                                                } else {
+                                                    snackbar.showSnackbar(result.exceptionOrNull()?.message ?: "Restore failed.")
+                                                }
+                                            }
+                                        },
+                                        enabled = !backupBusy && recoveryPhrase.length >= 12,
+                                        modifier = Modifier.weight(1f)
+                                    ) { Text("Restore") }
+                                }
+                                if (backupBusy) {
+                                    Text("Working securely…", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Connect an account to enable encrypted backup and restore. Your recovery phrase is never stored by the app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF9AA6C0)
+                        )
+                    }
 
                     if (!signedIn && email.isNotBlank()) {
                         OutlinedButton(
