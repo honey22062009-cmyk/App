@@ -262,7 +262,7 @@ fun AccountDialog(
                                     onValueChange = { recoveryPhrase = it.take(128) },
                                     modifier = Modifier.fillMaxWidth(),
                                     label = { Text("Guardian recovery phrase") },
-                                    placeholder = { Text("At least 12 characters") },
+                                    placeholder = { Text("At least 16 characters") },
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
@@ -272,7 +272,9 @@ fun AccountDialog(
                                         onClick = {
                                             backupBusy = true
                                             scope.launch {
-                                                val result = backupRepository.createOrUpdateBackup(recoveryPhrase.toCharArray())
+                                                val phrase = recoveryPhrase.toCharArray()
+                                                val result = backupRepository.createOrUpdateBackup(phrase)
+                                                phrase.fill(0.toChar())
                                                 backupBusy = false
                                                 recoveryPhrase = ""
                                                 snackbar.showSnackbar(
@@ -283,14 +285,16 @@ fun AccountDialog(
                                                 )
                                             }
                                         },
-                                        enabled = !backupBusy && recoveryPhrase.length >= 12,
+                                        enabled = !backupBusy && recoveryPhrase.length >= 16,
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Back up") }
                                     OutlinedButton(
                                         onClick = {
                                             backupBusy = true
                                             scope.launch {
-                                                val result = backupRepository.restoreBackup(recoveryPhrase.toCharArray())
+                                                val phrase = recoveryPhrase.toCharArray()
+                                                val result = backupRepository.restoreBackup(phrase)
+                                                phrase.fill(0.toChar())
                                                 backupBusy = false
                                                 recoveryPhrase = ""
                                                 if (result.isSuccess) {
