@@ -65,6 +65,7 @@ import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -139,6 +140,8 @@ fun DashboardScreen(
         managedApps.filter { it.isManaged }.map { it.packageName }.toSet()
     }
     var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
+    var scheduleStatusLoaded by remember { mutableStateOf(false) }
+    var scheduleStatusError by remember { mutableStateOf(false) }
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
@@ -165,9 +168,21 @@ fun DashboardScreen(
 
     // Keep Home's next boundary in sync with schedule edits and actual clock transitions.
     LaunchedEffect(activeManagedPackages, allSchedules) {
+        scheduleStatusLoaded = false
+        scheduleStatusError = false
         while (true) {
-            val upcoming = repository.findNextGlobalTransition()
+            val upcoming = try {
+                repository.findNextGlobalTransition()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                scheduleStatusError = true
+                scheduleStatusLoaded = true
+                nextTransition = null
+                break
+            }
             nextTransition = upcoming
+            scheduleStatusLoaded = true
             if (upcoming == null) break
             val boundaryMillis = upcoming.transitionDateTime
                 .atZone(zone)
@@ -324,7 +339,8 @@ fun DashboardScreen(
                             activeManagedApps = managedApps.count { it.isManaged },
                             totalBlocks = totalBlocks,
                             nextTransition = nextTransition,
-                            protectionEnabled = isProtectionEnabled,
+                            scheduleStatusLoaded = scheduleStatusLoaded,
+                            scheduleStatusError = scheduleStatusError,
                             onToggle = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
@@ -591,17 +607,20 @@ private fun ProtectionStatusCard(
     activeManagedApps: Int,
     totalBlocks: Int,
     nextTransition: NextTransitionInfo?,
-    protectionEnabled: Boolean,
+    scheduleStatusLoaded: Boolean,
+    scheduleStatusError: Boolean,
     onToggle: (Boolean) -> Unit,
     onOpenSetup: () -> Unit,
     onOpenApps: () -> Unit,
     onOpenSchedules: () -> Unit
 ) {
-    val hasNoAllowedWindows = activeManagedApps > 0 && nextTransition == null
+    val hasNoAllowedWindows = activeManagedApps > 0 && scheduleStatusLoaded &&
+        !scheduleStatusError && nextTransition == null
     val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0 || hasNoAllowedWindows
     val actionLabel = when {
         !health.coreReady -> "Fix setup"
         activeManagedApps == 0 -> "Choose apps"
+        scheduleStatusError -> "Check schedules"
         hasNoAllowedWindows -> "Add allowed window"
         nextTransition != null -> "View schedule"
         health.recommendedIssues.isNotEmpty() -> "Improve reliability"
@@ -610,7 +629,7 @@ private fun ProtectionStatusCard(
     val action = when {
         !health.coreReady -> onOpenSetup
         activeManagedApps == 0 -> onOpenApps
-        hasNoAllowedWindows || nextTransition != null -> onOpenSchedules
+        scheduleStatusError || hasNoAllowedWindows || nextTransition != null -> onOpenSchedules
         health.recommendedIssues.isNotEmpty() -> onOpenSetup
         else -> null
     }
@@ -618,6 +637,7 @@ private fun ProtectionStatusCard(
         !enabled -> "App blocking is paused"
         !health.coreReady -> "Finish protection setup"
         activeManagedApps == 0 -> "Choose apps to protect"
+        scheduleStatusError -> "Schedule status unavailable"
         hasNoAllowedWindows -> "Apps are blocked all the time"
         else -> "App blocking is active"
     }
@@ -625,13 +645,16 @@ private fun ProtectionStatusCard(
         !enabled -> "Turn protection on to enforce your schedules."
         !health.coreReady -> health.coreIssues.firstOrNull() ?: "Open setup to restore required access."
         activeManagedApps == 0 -> "No apps are selected yet. Add the apps you want Strict Blocker to protect."
+        scheduleStatusError -> "Could not read the next schedule change. Open Schedules to review your allowed windows."
         hasNoAllowedWindows -> "No enabled allowed windows are configured. Protected apps stay blocked until you add one."
+        !scheduleStatusLoaded -> "Checking the next app access change…"
         health.recommendedIssues.isNotEmpty() ->
             "$activeManagedApps apps protected · $totalBlocks blocks recorded · ${health.recommendedIssues.size} optional reliability settings can be improved."
         else -> "$activeManagedApps apps protected · $totalBlocks blocks recorded"
     }
     val scheduleDetail = when {
-        !protectionEnabled -> "Schedule enforcement is paused."
+        !enabled -> "Schedule enforcement is paused."
+        scheduleStatusError || !scheduleStatusLoaded -> null
         hasNoAllowedWindows -> null
         nextTransition == null -> null
         else -> {
