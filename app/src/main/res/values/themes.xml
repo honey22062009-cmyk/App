@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/launch_background</item>
+    </style>
+
+    <!-- Pre-Android 12 fallback; Android 12+ uses the system splash screen attributes. -->
+    <style name="Theme.StrictBlocker.Starting" parent="Theme.MyApplication">
+        <item name="android:windowBackground">@drawable/splash_window_background</item>
+    </style>
 
     <style name="Theme.StrictBlocker.Overlay" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">#0D1117</item>
