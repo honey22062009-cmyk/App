@@ -1,6 +1,10 @@
 package com.example.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +18,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -77,9 +84,27 @@ fun GlassCard(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(2
     val inner: @Composable () -> Unit = {
         if (reflection != null) Box(Modifier.background(reflection)) { content() } else content()
     }
-    if (onClick != null) Surface(onClick = onClick, modifier = modifier, shape = shape, color = base,
-        contentColor = MaterialTheme.colorScheme.onSurface, border = border, tonalElevation = 0.dp,
-        shadowElevation = elevation, content = { inner() })
+    if (onClick != null) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val pressed by interactionSource.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (pressed) 0.985f else 1f,
+            animationSpec = tween(durationMillis = 110),
+            label = "glass_card_press"
+        )
+        Surface(
+            onClick = onClick,
+            modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+            interactionSource = interactionSource,
+            shape = shape,
+            color = base,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = border,
+            tonalElevation = 0.dp,
+            shadowElevation = elevation,
+            content = { inner() }
+        )
+    }
     else Surface(modifier = modifier, shape = shape, color = base, contentColor = MaterialTheme.colorScheme.onSurface,
         border = border, tonalElevation = 0.dp, shadowElevation = elevation, content = { inner() })
 }
