@@ -55,7 +55,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.StrictBlocker.Starting">
+        android:theme="@style/Theme.MyApplication">
 
         <!-- Guardian-authorized device management. This receiver only gains policy authority when
              a guardian provisions this app as Device Owner during managed-device setup. -->
@@ -79,7 +79,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.MyApplication">
+            android:theme="@style/Theme.StrictBlocker.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
