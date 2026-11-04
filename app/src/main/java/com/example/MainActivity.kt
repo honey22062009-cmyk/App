@@ -1,7 +1,9 @@
 package com.example
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -11,6 +13,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -38,6 +43,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,7 +70,6 @@ import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
-import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -75,12 +80,18 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TARGET_PACKAGE = "extra_target_package"
     }
 
+    // Hold the Android 12+ system splash until saved app state is ready.
+    private val startupComplete = AtomicBoolean(false)
+
     // Compose observes this state, so a new intent sent to an existing Activity
     // updates the requested destination instead of being silently ignored.
     private var targetPackage by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setKeepOnScreenCondition { !startupComplete.get() }
+        }
         enableEdgeToEdge()
 
         targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
@@ -102,7 +113,9 @@ class MainActivity : ComponentActivity() {
             StrictBlockerTheme(darkTheme = isDark) {
                 MainAppContent(
                     repository = repository,
-                    initialTargetPackage = targetPackage
+                    initialTargetPackage = targetPackage,
+                    onStartupComplete = { startupComplete.set(true) },
+                    onExit = { finish() }
                 )
             }
         }
@@ -122,51 +135,86 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppContent(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?
+    initialTargetPackage: String?,
+    onStartupComplete: () -> Unit,
+    onExit: () -> Unit
 ) {
-    var isSplashVisible by remember { mutableStateOf(true) }
+    var onboardingCompleted by remember(repository) { mutableStateOf<Boolean?>(null) }
 
-    if (isSplashVisible) {
-        SplashScreen(
-            onSplashComplete = { isSplashVisible = false }
-        )
-    } else {
-        MainAppScaffold(
-            repository = repository,
-            initialTargetPackage = initialTargetPackage
-        )
+    // Resolve local preferences before releasing the native Android launch screen.
+    LaunchedEffect(repository) {
+        onboardingCompleted = runCatching {
+            repository.settings.isOnboardingCompletedFlow.first()
+        }.getOrDefault(false)
+        onStartupComplete()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        onboardingCompleted?.let { completed ->
+            androidx.compose.animation.AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(260)) +
+                    slideInVertically(animationSpec = tween(260)) { height -> height / 28 } +
+                    scaleIn(tween(260), initialScale = 0.985f),
+                label = "app_content_entrance"
+            ) {
+                MainAppScaffold(
+                    repository = repository,
+                    initialTargetPackage = initialTargetPackage,
+                    onboardingCompleted = completed,
+                    onExit = onExit
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun MainAppScaffold(
     repository: AppBlockerRepository,
-    initialTargetPackage: String?
+    initialTargetPackage: String?,
+    onboardingCompleted: Boolean,
+    onExit: () -> Unit
 ) {
-    var currentScreen by remember {
+    var currentScreen by remember(initialTargetPackage, onboardingCompleted) {
         mutableStateOf<Screen>(
-            if (!initialTargetPackage.isNullOrEmpty()) Screen.Schedules else Screen.Permissions
+            when {
+                !initialTargetPackage.isNullOrEmpty() -> Screen.Schedules
+                onboardingCompleted -> Screen.Dashboard
+                else -> Screen.Permissions
+            }
         )
     }
 
-    var selectedSchedulePackage by remember {
+    var selectedSchedulePackage by remember(initialTargetPackage) {
         mutableStateOf(initialTargetPackage)
     }
-    var isInitialRouteResolved by remember { mutableStateOf(false) }
+    var isInitialRouteResolved by remember { mutableStateOf(true) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
-    // Resolve persisted onboarding before exposing navigation. A schedule deep link
-    // remains the highest-priority destination.
-    LaunchedEffect(repository, initialTargetPackage) {
-        val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
-        if (!initialTargetPackage.isNullOrEmpty()) {
-            selectedSchedulePackage = initialTargetPackage
-            currentScreen = Screen.Schedules
-        } else if (onboardingCompleted) {
-            currentScreen = Screen.Dashboard
-        } else {
-            currentScreen = Screen.Permissions
-        }
-        isInitialRouteResolved = true
+    // A back press from the dashboard uses a deliberate app-exit confirmation.
+    BackHandler(enabled = currentScreen == Screen.Dashboard) {
+        showExitDialog = true
+    }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Leave Strict Blocker?") },
+            text = { Text("Your schedules and settings stay saved on this device.") },
+            confirmButton = {
+                TextButton(onClick = onExit) { Text("Exit app") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) { Text("Stay") }
+            },
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 
     // On first launch, Back should leave the permission guide rather than silently
@@ -204,7 +252,7 @@ fun MainAppScaffold(
             ) {
                 NavigationRail(
                     modifier = Modifier.testTag("tablet_navigation_rail"),
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                     header = {
                         Icon(
                             imageVector = Icons.Default.Shield,
@@ -251,8 +299,12 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(260)) +
+                                slideInVertically(animationSpec = tween(260)) { height -> height / 18 } +
+                                scaleIn(tween(260), initialScale = 0.985f)) togetherWith
+                                (fadeOut(tween(170)) +
+                                slideOutVertically(animationSpec = tween(170)) { height -> -height / 24 } +
+                                scaleOut(tween(170), targetScale = 0.992f))
                         },
                         label = "tablet_screen_transition"
                     ) { targetScreen ->
@@ -276,8 +328,8 @@ fun MainAppScaffold(
                 bottomBar = {
                     NavigationBar(
                         modifier = Modifier.testTag("phone_bottom_navigation"),
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 3.dp
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                        tonalElevation = 0.dp
                     ) {
                         Screen.navItems.forEach { screen ->
                             val isSelected = currentScreen.route == screen.route
@@ -319,8 +371,12 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(260)) +
+                                slideInVertically(animationSpec = tween(260)) { height -> height / 18 } +
+                                scaleIn(tween(260), initialScale = 0.985f)) togetherWith
+                                (fadeOut(tween(170)) +
+                                slideOutVertically(animationSpec = tween(170)) { height -> -height / 24 } +
+                                scaleOut(tween(170), targetScale = 0.992f))
                         },
                         label = "phone_screen_transition"
                     ) { targetScreen ->
