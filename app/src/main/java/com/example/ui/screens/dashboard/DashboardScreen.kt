@@ -1,5 +1,9 @@
 package com.example.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Apps
@@ -43,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -117,13 +123,12 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val horizontalPadding = if (maxWidth >= 720.dp) LayoutSpacing.xl else LayoutSpacing.md
-        // Use the extra landscape space instead of forcing tablet content into a narrow
-        // phone-like column. Keep a cap so very large displays remain easy to scan.
-        val contentWidth = when {
-            maxWidth >= 1280.dp -> 1180.dp
-            maxWidth >= 1000.dp -> maxWidth - 72.dp
-            maxWidth >= 720.dp -> maxWidth - 40.dp
-            else -> maxWidth
+        // Calculate width after the list padding so cards fit the real viewport.
+        val availableContentWidth = (maxWidth - horizontalPadding * 2).coerceAtLeast(0.dp)
+        val contentWidth = if (maxWidth >= 720.dp) {
+            availableContentWidth.coerceAtMost(1180.dp)
+        } else {
+            availableContentWidth
         }
 
         LazyColumn(
@@ -135,19 +140,96 @@ fun DashboardScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text(
-                        text = "Strict Blocker",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Manage app access, schedules and protection",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(tween(380)) +
+                        slideInVertically(animationSpec = tween(380)) { height -> height / 10 },
+                    label = "dashboard_hero_entrance"
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(contentWidth)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                )
+                            )
+                            .padding(22.dp)
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(RoundedCornerShape(15.dp))
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(25.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "STRICT BLOCKER",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "Your focus space",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(22.dp))
+                            Text(
+                                text = "More focus.\nLess noise.",
+                                style = MaterialTheme.typography.displayMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.height(7.dp))
+                            Text(
+                                text = "Manage app access, routines and protection from one calm place.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                            )
+                            Spacer(Modifier.height(18.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isProtectionEnabled && permissionsHealthy) {
+                                        Icons.Default.CheckCircle
+                                    } else {
+                                        Icons.Default.Warning
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(7.dp))
+                                Text(
+                                    text = when {
+                                        !isProtectionEnabled -> "Protection is paused"
+                                        !permissionsHealthy -> "Setup needs attention"
+                                        else -> "Protection is ready"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -432,9 +514,15 @@ private fun QuickAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val tileColor = when (label) {
+        "Apps" -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f)
+        "Schedules" -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.58f)
+        else -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.54f)
+    }
     AppSurface(
         modifier = modifier.heightIn(min = 76.dp),
-        backgroundColor = MaterialTheme.colorScheme.surface,
+        backgroundColor = tileColor,
+        borderColor = tileColor.copy(alpha = 0.9f),
         onClick = onClick
     ) {
         Column(
