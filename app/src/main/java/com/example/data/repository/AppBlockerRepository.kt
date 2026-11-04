@@ -123,8 +123,9 @@ class AppBlockerRepository(
             }
 
             val isManaged = managedApps[pkg]?.isManaged ?: false
-            val enabledPeriodCount = (allPeriods[pkg] ?: emptyList()).count {
-                it.isEnabled && !it.isZeroLengthMidnightWindow
+            val enabledPeriodCount = (allPeriods[pkg] ?: emptyList()).count { entity ->
+                val period = entity.toDomain()
+                period.isEnabled && !period.isZeroLengthMidnightWindow
             }
 
             result.add(
