@@ -522,7 +522,7 @@ private fun QuickAction(
     AppSurface(
         modifier = modifier.heightIn(min = 76.dp),
         backgroundColor = tileColor,
-        borderColor = tileColor.copy(alpha = 0.9f),
+        borderColor = tileColor.copy(alpha = 0.24f),
         onClick = onClick
     ) {
         Column(
