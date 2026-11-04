@@ -1,13 +1,13 @@
 package com.example
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -88,10 +88,9 @@ class MainActivity : ComponentActivity() {
     private var targetPackage by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            splashScreen.setKeepOnScreenCondition { !startupComplete.get() }
-        }
+        splashScreen.setKeepOnScreenCondition { !startupComplete.get() }
         enableEdgeToEdge()
 
         targetPackage = intent?.getStringExtra(EXTRA_TARGET_PACKAGE)
