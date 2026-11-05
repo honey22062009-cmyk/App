@@ -393,6 +393,8 @@ private class CompanionRenderer(private val state: CompanionState) {
     private lateinit var sphere: Mesh
     private lateinit var cone: Mesh
     private lateinit var bunnyBody: Mesh
+    private lateinit var bunnyEar: Mesh
+    private lateinit var bunnyInnerEar: Mesh
     private val projection = FloatArray(16)
     private val view = FloatArray(16)
     private val base = FloatArray(16)
@@ -426,14 +428,22 @@ private class CompanionRenderer(private val state: CompanionState) {
             void main() {
                 vec3 n = normalize(vNormal);
                 vec3 l = normalize(vec3(-3.0, 5.0, 6.0) - vPosition);
-                float diffuse = max(dot(n, l), 0.0);
-                float rim = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 3.0);
-                vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
-                // A subtle surface variation softens the plastic shine.
-                float grain = sin(vPosition.x * 31.0 + sin(vPosition.y * 19.0)) *
-                              sin(vPosition.z * 27.0 + vPosition.y * 13.0) * 0.012;
-                float specular = pow(max(dot(n, h), 0.0), 24.0) * 0.045;
-                gl_FragColor = vec4(uColor * (0.48 + 0.52 * diffuse + grain) + specular + rim * 0.045, 1.0);
+                vec3 v = normalize(vec3(0.0, 0.4, 5.0) - vPosition);
+                vec3 h = normalize(l + v);
+                float diffuse = max((dot(n, l) + 0.24) / 1.24, 0.0);
+                float rim = pow(1.0 - max(dot(n, v), 0.0), 2.6);
+                // Directional micro-strands and broad mottling soften the synthetic finish.
+                float fibreA = sin((vPosition.y + sin(vPosition.x * 29.0) * 0.012) * 142.0);
+                float fibreB = sin((vPosition.z + sin(vPosition.y * 17.0) * 0.009) * 104.0);
+                float mottling = sin(vPosition.x * 21.0 + vPosition.y * 13.0) *
+                                 sin(vPosition.z * 19.0 - vPosition.y * 11.0);
+                float fur = fibreA * 0.010 + fibreB * 0.007 + mottling * 0.015;
+                float subsurface = pow(max(dot(-n, l), 0.0), 2.0) * 0.045;
+                float specular = pow(max(dot(n, h), 0.0), 42.0) * 0.018;
+                vec3 coat = uColor * (0.57 + 0.43 * diffuse + fur);
+                coat += uColor * vec3(1.0, 0.72, 0.72) * subsurface;
+                coat += vec3(1.0) * specular + vec3(0.035, 0.025, 0.03) * rim;
+                gl_FragColor = vec4(coat, 1.0);
             }
         """.trimIndent())
         GLES20.glAttachShader(program, vertex); GLES20.glAttachShader(program, fragment)
@@ -446,6 +456,8 @@ private class CompanionRenderer(private val state: CompanionState) {
         sphere = Mesh(CompanionGeometry.sphere())
         cone = Mesh(CompanionGeometry.cone())
         bunnyBody = Mesh(CompanionGeometry.bunnyBody())
+        bunnyEar = Mesh(CompanionGeometry.bunnyEar())
+        bunnyInnerEar = Mesh(CompanionGeometry.bunnyEar(inner = true))
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
     }
 
@@ -467,8 +479,8 @@ private class CompanionRenderer(private val state: CompanionState) {
             "rest" -> 8f
             "dance" -> 3.6f
             "snack", "talk" -> 3f
-            "stretch" -> 2.8f
-            "curious", "ear_twitch", "look_around" -> 2.2f
+            "stretch", "cheer" -> 2.8f
+            "curious", "ear_twitch", "look_around", "listen", "think", "tail_wag" -> 2.5f
             else -> 2f
         }
         val acting = !reducedMotion && elapsed < duration
@@ -479,6 +491,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             acting && reaction == "jump" -> abs(sin(phase * PI.toFloat() * 2)) * .52f
             acting && reaction == "dance" -> abs(sin(elapsed * 10f)) * .10f * pulse
             acting && reaction == "stretch" -> sin(phase * PI.toFloat()) * .07f
+            acting && reaction == "cheer" -> abs(sin(phase * PI.toFloat() * 2f)) * .18f
             acting && reaction == "curious" -> sin(phase * PI.toFloat()) * .035f
             else -> sin(time * 1.7f) * .018f
         }
@@ -489,9 +502,10 @@ private class CompanionRenderer(private val state: CompanionState) {
         Matrix.translateM(base, 0, if (acting && reaction == "dance") sin(elapsed * 5f) * .14f * pulse else 0f, bounce - .06f, 0f)
         Matrix.rotateM(base, 0, pitch + if (acting && reaction == "snack") sin(elapsed * 12f) * 3f else 0f, 1f, 0f, 0f)
         val curiousTurn = if (acting && reaction in setOf("curious", "look_around")) sin(phase * PI.toFloat()) * 15f else 0f
-        Matrix.rotateM(base, 0, yaw + spin + curiousTurn, 0f, 1f, 0f)
+        val idleLook = if (!reducedMotion && !acting) sin(time * .37f) * 2.8f else 0f
+        Matrix.rotateM(base, 0, yaw + spin + curiousTurn + idleLook, 0f, 1f, 0f)
         val idleSway = if (!reducedMotion && !acting) sin(time * .72f) * 1.5f else 0f
-        val reactionTilt = if (acting && reaction in setOf("pet", "dance", "curious")) sin(elapsed * 5.5f) * 5f * pulse else 0f
+        val reactionTilt = if (acting && reaction in setOf("pet", "dance", "curious", "listen", "think")) sin(elapsed * 5.5f) * 5f * pulse else 0f
         Matrix.rotateM(base, 0, idleSway + reactionTilt, 0f, 0f, 1f)
         val breathe = if (acting && reaction == "rest") sin(elapsed * PI.toFloat() / 4f) * .045f else 0f
         Matrix.scaleM(base, 0, 1f + breathe, 1f + breathe * .5f, 1f + breathe)
@@ -504,14 +518,23 @@ private class CompanionRenderer(private val state: CompanionState) {
         fun ball(x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, color: Int, rz: Float = 0f) =
             draw(sphere, x, y, z, sx, sy, sz, color, rz)
         if (character == "luna") {
-            // One continuous surface joins torso, neck and head; no floating head or ball joints.
+            // Luna's head, tapered neck and seated torso share one continuous mesh.
             draw(bunnyBody, 0f, 0f, 0f, 1f, 1f, 1f, coat)
-            ball(0f, -.30f, .285f, .29f, .32f, .055f, 0xfff9f0)
-            ball(-.25f, -.78f, .14f, .25f, .20f, .34f, coat)
-            ball(.25f, -.78f, .14f, .25f, .20f, .34f, coat)
-            ball(-.25f, -.76f, .43f, .12f, .065f, .024f, 0xe6a0b6)
-            ball(.25f, -.76f, .43f, .12f, .065f, .024f, 0xe6a0b6)
-            ball(0f, -.46f, -.40f, .23f, .23f, .23f, 0xfffaf3)
+            // Soft chest fur and rounded haunches follow the body's silhouette.
+            ball(0f, -.29f, .285f, .235f, .31f, .055f, 0xfff9f3)
+            ball(-.20f, -.68f, .13f, .20f, .22f, .24f, coat)
+            ball(.20f, -.68f, .13f, .20f, .22f, .24f, coat)
+            // Forefeet with individual toe marks and soft pink pads.
+            ball(-.19f, -.86f, .32f, .17f, .105f, .25f, coat)
+            ball(.19f, -.86f, .32f, .17f, .105f, .25f, coat)
+            ball(-.19f, -.89f, .515f, .105f, .025f, .075f, 0xe9aabd)
+            ball(.19f, -.89f, .515f, .105f, .025f, .075f, 0xe9aabd)
+            for (toe in -1..1) {
+                ball(-.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
+                ball(.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
+            }
+            val tailWag = if (!reducedMotion) sin(time * 3.1f) * 8f else 0f
+            ball(0f, -.55f, -.39f, .13f, .14f, .13f, 0xfffaf5, tailWag)
         } else {
             ball(0f, -.23f, -.05f, .48f, .61f, .36f, coat)
             // Neck overlaps the torso and head all the way around.
@@ -558,17 +581,18 @@ private class CompanionRenderer(private val state: CompanionState) {
             ball(.48f, 1.0f, -.04f, .23f, .24f, .16f, if (character == "kai") dark else coat)
         } else if (character == "luna") {
             val earMotion = when {
-                acting && reaction in setOf("pet", "jump", "dance") -> sin(elapsed * 10f) * 12f * pulse
-                acting && reaction == "ear_twitch" -> sin(elapsed * 18f) * 20f * pulse
-                !reducedMotion && !acting && time % 13f > 11.8f -> sin((time % 13f - 11.8f) * PI.toFloat() / 1.2f) * 5f
+                acting && reaction in setOf("pet", "jump", "dance", "cheer") -> sin(elapsed * 10f) * 15f * pulse
+                acting && reaction == "ear_twitch" -> sin(elapsed * 18f) * 24f * pulse
+                acting && reaction == "listen" -> sin(elapsed * 7f) * 5f * pulse
+                !reducedMotion && !acting && time % 10.5f > 9.2f -> sin((time % 10.5f - 9.2f) * PI.toFloat() / 1.3f) * 7f
                 else -> 0f
             }
             for (side in listOf(-1f, 1f)) {
                 val saved = base.copyOf()
-                Matrix.translateM(base, 0, side * .28f, .87f, -.02f)
-                Matrix.rotateM(base, 0, side * (10f + earMotion), 0f, 0f, 1f)
-                ball(0f, .35f, 0f, .17f, .54f, .13f, coat)
-                ball(0f, .38f, .105f, .092f, .36f, .035f, 0xf0b4c8)
+                Matrix.translateM(base, 0, side * .19f, 1.02f, -.015f)
+                Matrix.rotateM(base, 0, side * (7f + earMotion), 0f, 0f, 1f)
+                draw(bunnyEar, 0f, .34f, 0f, 1f, .52f, 1f, coat)
+                draw(bunnyInnerEar, 0f, .35f, 0f, 1f, .49f, 1f, 0xf0b4c8)
                 System.arraycopy(saved, 0, base, 0, 16)
             }
         } else {
@@ -577,25 +601,56 @@ private class CompanionRenderer(private val state: CompanionState) {
             draw(cone, -.43f, .98f, .14f, .13f, .24f, .06f, cream, 15f)
             draw(cone, .43f, .98f, .14f, .13f, .24f, .06f, cream, -15f)
         }
-        ball(-.23f, .40f, .41f, .26f, .23f, .10f, cream)
-        ball(.23f, .40f, .41f, .26f, .23f, .10f, cream)
         val blinkCycle = time % 6.4f
         val blink = (!reducedMotion && (blinkCycle > 6.18f || (time % 17.2f in 11.1f..11.28f))) ||
-            ((acting || reducedMotion) && reaction in setOf("pet", "rest", "curious", "look_around"))
-        if (character == "kai" || character == "sol") {
-            ball(-.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
-            ball(.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
+            ((acting || reducedMotion) && reaction in setOf("pet", "rest", "curious", "look_around", "listen"))
+        if (character == "luna") {
+            // Layered eyes with sclera, iris, pupil and natural catchlights.
+            ball(-.17f, .635f, .354f, .092f, if (blink) .012f else .116f, .054f, 0xfffaf5)
+            ball(.17f, .635f, .354f, .092f, if (blink) .012f else .116f, .054f, 0xfffaf5)
+            ball(-.17f, .635f, .397f, .060f, if (blink) .009f else .082f, .035f, 0x795440)
+            ball(.17f, .635f, .397f, .060f, if (blink) .009f else .082f, .035f, 0x795440)
+            ball(-.17f, .632f, .424f, .033f, if (blink) .006f else .060f, .020f, dark)
+            ball(.17f, .632f, .424f, .033f, if (blink) .006f else .060f, .020f, dark)
+            if (!blink) {
+                ball(-.187f, .675f, .443f, .019f, .024f, .010f, 0xffffff)
+                ball(.153f, .675f, .443f, .019f, .024f, .010f, 0xffffff)
+                ball(-.145f, .603f, .444f, .008f, .010f, .006f, 0xffd6df)
+                ball(.195f, .603f, .444f, .008f, .010f, .006f, 0xffd6df)
+            }
+            // Split muzzle, small nose, smile, whiskers and blush.
+            ball(-.058f, .405f, .415f, .105f, .078f, .072f, 0xfffaf4)
+            ball(.058f, .405f, .415f, .105f, .078f, .072f, 0xfffaf4)
+            ball(0f, .447f, .475f, .042f, .030f, .026f, 0xd48ba7)
+            ball(0f, .355f, .474f, .012f, .037f, .009f, 0x70515c)
+            ball(-.025f, .326f, .468f, .034f, .010f, .008f, 0x70515c, -12f)
+            ball(.025f, .326f, .468f, .034f, .010f, .008f, 0x70515c, 12f)
+            ball(-.315f, .407f, .410f, .155f, .008f, .006f, 0xc5b2b0, 13f)
+            ball(-.325f, .385f, .405f, .160f, .007f, .006f, 0xc5b2b0, -3f)
+            ball(-.305f, .365f, .400f, .145f, .007f, .006f, 0xc5b2b0, -18f)
+            ball(.315f, .407f, .410f, .155f, .008f, .006f, 0xc5b2b0, -13f)
+            ball(.325f, .385f, .405f, .160f, .007f, .006f, 0xc5b2b0, 3f)
+            ball(.305f, .365f, .400f, .145f, .007f, .006f, 0xc5b2b0, 18f)
+            ball(-.31f, .425f, .401f, .039f, .019f, .010f, 0xf0c2ce)
+            ball(.31f, .425f, .401f, .039f, .019f, .010f, 0xf0c2ce)
+        } else {
+            ball(-.23f, .40f, .41f, .26f, .23f, .10f, cream)
+            ball(.23f, .40f, .41f, .26f, .23f, .10f, cream)
+            if (character == "kai" || character == "sol") {
+                ball(-.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
+                ball(.25f, .65f, .41f, .21f, .24f, .075f, if (character == "kai") dark else cream)
+            }
+            ball(-.23f, .66f, .481f, .074f, if (blink) .014f else .10f, .04f, dark)
+            ball(.23f, .66f, .481f, .074f, if (blink) .014f else .10f, .04f, dark)
+            if (!blink) {
+                ball(-.25f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
+                ball(.21f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
+            }
+            ball(0f, .43f, .535f, .075f, .055f, .045f, dark)
+            ball(0f, .30f, .485f, .075f, if (acting && reaction in setOf("talk", "snack")) .025f + abs(sin(elapsed * 15f)) * .033f else .025f, .019f, dark)
+            ball(-.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
+            ball(.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
         }
-        ball(-.23f, .66f, .481f, .074f, if (blink) .014f else .10f, .04f, dark)
-        ball(.23f, .66f, .481f, .074f, if (blink) .014f else .10f, .04f, dark)
-        if (!blink) {
-            ball(-.25f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
-            ball(.21f, .70f, .518f, .024f, .030f, .012f, 0xffffff)
-        }
-        ball(0f, .43f, .535f, .075f, .055f, .045f, if (character == "luna") 0xc57c99 else dark)
-        ball(0f, .30f, .485f, .075f, if (acting && reaction in setOf("talk", "snack")) .025f + abs(sin(elapsed * 15f)) * .033f else .025f, .019f, dark)
-        ball(-.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
-        ball(.40f, .43f, .449f, .085f, .044f, .014f, 0xd99081)
         // Rose heart charm, embedded in the tummy rather than floating in front.
         ball(-.04f, -.12f, .364f, .065f, .075f, .023f, 0xd48cb3, 30f)
         ball(.04f, -.12f, .364f, .065f, .075f, .023f, 0xd48cb3, -30f)
@@ -650,12 +705,15 @@ internal object CompanionGeometry {
 
     /** Closed, smooth lathed body: torso and head share vertices and normals at the neck. */
     fun bunnyBody(rows: Int = 64, columns: Int = 48): FloatArray {
+        // A seated rabbit profile: haunches, shoulders, tapered neck and head.
+        // This is a single lofted surface, not a stack of separate body spheres.
         val profile = listOf(
-            floatArrayOf(-.90f, 0f, 0f), floatArrayOf(-.76f, .30f, .27f),
-            floatArrayOf(-.40f, .46f, .35f), floatArrayOf(-.12f, .43f, .33f),
-            floatArrayOf(.12f, .31f, .29f), floatArrayOf(.27f, .40f, .35f),
-            floatArrayOf(.54f, .61f, .46f), floatArrayOf(.82f, .52f, .40f),
-            floatArrayOf(1.01f, .28f, .23f), floatArrayOf(1.09f, 0f, 0f))
+            floatArrayOf(-.92f, 0f, 0f), floatArrayOf(-.78f, .25f, .25f),
+            floatArrayOf(-.58f, .36f, .32f), floatArrayOf(-.34f, .41f, .35f),
+            floatArrayOf(-.10f, .35f, .30f), floatArrayOf(.08f, .28f, .25f),
+            floatArrayOf(.24f, .29f, .26f), floatArrayOf(.40f, .33f, .30f),
+            floatArrayOf(.60f, .46f, .39f), floatArrayOf(.78f, .43f, .37f),
+            floatArrayOf(.94f, .25f, .22f), floatArrayOf(1.02f, 0f, 0f))
         fun radius(y: Float, component: Int): Float {
             val index = (0 until profile.lastIndex).firstOrNull { y <= profile[it + 1][0] } ?: (profile.lastIndex - 1)
             val a = profile[index]; val b = profile[index + 1]
@@ -669,12 +727,12 @@ internal object CompanionGeometry {
         }
         val out = ArrayList<Float>(rows * columns * 36)
         fun vertex(row: Int, col: Int) {
-            val y = -.90f + 1.99f * row / rows
+            val y = -.92f + 1.94f * row / rows
             val angle = 2 * PI.toFloat() * col / columns
             val c = cos(angle); val sn = sin(angle)
             val rx = radius(y, 1); val rz = radius(y, 2)
-            val drx = (radius((y + .001f).coerceAtMost(1.09f), 1) - radius((y - .001f).coerceAtLeast(-.90f), 1)) / .002f
-            val drz = (radius((y + .001f).coerceAtMost(1.09f), 2) - radius((y - .001f).coerceAtLeast(-.90f), 2)) / .002f
+            val drx = (radius((y + .001f).coerceAtMost(1.02f), 1) - radius((y - .001f).coerceAtLeast(-.92f), 1)) / .002f
+            val drz = (radius((y + .001f).coerceAtMost(1.02f), 2) - radius((y - .001f).coerceAtLeast(-.92f), 2)) / .002f
             val nx = rz * c; val nz = rx * sn
             val ny = -(rz * drx * c * c + rx * drz * sn * sn)
             val length = sqrt(nx*nx + ny*ny + nz*nz)
@@ -685,6 +743,34 @@ internal object CompanionGeometry {
         for (r in 0 until rows) for (c in 0 until columns) {
             vertex(r,c); vertex(r+1,c); vertex(r,c+1)
             vertex(r,c+1); vertex(r+1,c); vertex(r+1,c+1)
+        }
+        return out.toFloatArray()
+    }
+
+    /** Rounded tapered rabbit ear loft. Inner ear is a thinner inset shell. */
+    fun bunnyEar(inner: Boolean = false, rows: Int = 36, columns: Int = 24): FloatArray {
+        val out = ArrayList<Float>(rows * columns * 36)
+        fun vertex(row: Int, col: Int) {
+            val along = row.toFloat() / rows
+            val y = -1f + 2f * along
+            val envelope = sin(PI.toFloat() * along).coerceAtLeast(0f).pow(.72f)
+            val widthScale = if (inner) .62f else 1f
+            val depthScale = if (inner) .24f else 1f
+            val width = (.31f * envelope * (1f - .16f * along) + .012f) * widthScale
+            val depth = (.095f * envelope + .008f) * depthScale
+            val angle = 2f * PI.toFloat() * col / columns
+            val ca = cos(angle); val sa = sin(angle)
+            val x = width * ca + sin(along * PI.toFloat()) * .025f
+            val z = depth * sa + if (inner) .105f else 0f
+            val nx = ca * .48f
+            val ny = if (along < .5f) .12f else -.10f
+            val nz = sa * .86f + if (inner) .10f else 0f
+            val length = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(.0001f)
+            out.addAll(listOf(x, y, z, nx / length, ny / length, nz / length))
+        }
+        for (row in 0 until rows) for (col in 0 until columns) {
+            vertex(row, col); vertex(row + 1, col); vertex(row, col + 1)
+            vertex(row, col + 1); vertex(row + 1, col); vertex(row + 1, col + 1)
         }
         return out.toFloatArray()
     }
