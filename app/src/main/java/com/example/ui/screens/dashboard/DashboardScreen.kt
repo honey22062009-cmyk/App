@@ -421,7 +421,7 @@ fun DashboardScreen(
                         }
                         TextButton(onClick = onOpenPro) {
                             Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
-                            Text(" Pro")
+                            Text(" Explore Pro")
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
