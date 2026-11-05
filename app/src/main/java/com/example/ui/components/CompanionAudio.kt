@@ -11,7 +11,7 @@ import java.util.Locale
 
 /** Original bundled effects and an installed offline voice. Never records a microphone. */
 internal class CompanionAudio(private val context: Context, private val onStatus: (String) -> Unit) {
-    private val sounds = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(
+    private val sounds = SoundPool.Builder().setMaxStreams(3).setAudioAttributes(
         AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
     private val ids = listOf(R.raw.buddy_chirp, R.raw.buddy_hop, R.raw.buddy_munch, R.raw.buddy_chime).map { sounds.load(context, it, 1) }
     private val loaded = mutableSetOf<Int>()
@@ -28,7 +28,7 @@ internal class CompanionAudio(private val context: Context, private val onStatus
         val id = ids[index]
         if (id in loaded) {
             streams.forEach(sounds::stop); streams.clear()
-            streams.add(sounds.play(id, .55f, .55f, 1, 0, 1f))
+            streams.add(sounds.play(id, .42f, .42f, 1, 0, 1f))
         }
     }
     fun say(text: String) {
@@ -56,21 +56,30 @@ internal class CompanionAudio(private val context: Context, private val onStatus
             } else {
                 emptyList()
             }
-            val language = Locale.getDefault().language
-            val voice = offlineVoices
-                .filter { it.locale.language == language }
+            // The companion speaks English by default. Prefer a fully installed,
+            // on-device Indian-English voice, then other English voices. No network voice
+            // is ever selected, so speech continues to work offline.
+            val englishVoices = offlineVoices.filter { it.locale.language == "en" }
+            val voice = englishVoices.maxWithOrNull(
+                compareByDescending<Voice> {
+                    when (it.locale.country.uppercase(Locale.ROOT)) {
+                        "IN" -> 3
+                        "GB", "US", "AU", "CA" -> 2
+                        else -> 1
+                    }
+                }.thenByDescending { it.quality }
+                    .thenBy { it.latency }
+            ) ?: offlineVoices
+                .filter { it.locale.language == Locale.getDefault().language }
                 .maxByOrNull { it.quality }
-                ?: offlineVoices
-                    .filter { it.locale.language == "en" }
-                    .maxByOrNull { it.quality }
                 ?: offlineVoices.maxByOrNull { it.quality }
 
             if (engine != null && voice != null) {
                 engine.voice = voice
                 engine.setLanguage(voice.locale)
-                // Slightly softer pitch and measured pacing sound less like a system alert.
-                engine.setPitch(1.08f)
-                engine.setSpeechRate(.94f)
+                // A warmer pitch and slightly slower pace make longer lines easier to follow.
+                engine.setPitch(1.12f)
+                engine.setSpeechRate(.90f)
                 engine.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
@@ -80,7 +89,7 @@ internal class CompanionAudio(private val context: Context, private val onStatus
                 ready = true
                 pendingSpeech?.let(::speakNow)
                 pendingSpeech = null
-                onStatus("Offline companion voice ready")
+                onStatus("Companion voice ready · ${voice.locale.displayName} · offline")
             } else {
                 pendingSpeech = null
                 onStatus("No offline voice is installed. Sound effects still work.")
