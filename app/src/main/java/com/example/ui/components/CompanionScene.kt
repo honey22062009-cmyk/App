@@ -255,7 +255,7 @@ fun InteractiveCompanion(
                     onClick = onRecordToday,
                     modifier = Modifier.weight(1f),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                ) { Text(if (checkInDone) "Edit check-in" else "Record today", maxLines = 1) }
+                ) { Text(if (checkInDone) "Edit check-in" else "Quick check-in", maxLines = 1) }
                 OutlinedButton(
                     onClick = onEditGoal,
                     modifier = Modifier.weight(1f),
