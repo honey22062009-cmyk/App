@@ -246,8 +246,8 @@ object ScheduleEvaluator {
     }
 
     /**
-     * Finds the next start or end boundary for any enabled period.
-     * A transition is opening at the period start and closing at its end.
+     * Finds the next boundary where the combined schedule changes the app's access state.
+     * Overlapping or adjacent windows that keep the app allowed do not create false transitions.
      */
     data class ScheduleTransition(
         val dateTime: LocalDateTime,
@@ -261,31 +261,36 @@ object ScheduleEvaluator {
         val enabledPeriods = periods.filter { it.isEnabled && !it.isZeroLengthMidnightWindow }
         if (enabledPeriods.isEmpty()) return null
 
-        var candidate: ScheduleTransition? = null
-
-        // Eight days covers the next weekly recurrence plus an overnight end boundary.
+        // Gather every possible boundary, then keep only boundaries where the combined
+        // allow/block result actually changes. This avoids false "blocked" transitions
+        // when another allowed window overlaps or starts exactly as one window ends.
+        val candidates = sortedSetOf<LocalDateTime>()
         for (dayOffset in -1L..8L) {
             val date = fromDateTime.toLocalDate().plusDays(dayOffset)
             for (period in enabledPeriods) {
                 if (period.dayOfWeek != date.dayOfWeek) continue
 
                 val opening = date.atTime(period.startTime)
-                if (opening.isAfter(fromDateTime) &&
-                    (candidate == null || opening.isBefore(candidate.dateTime))
-                ) {
-                    candidate = ScheduleTransition(opening, isOpening = true)
-                }
+                if (opening.isAfter(fromDateTime)) candidates += opening
 
                 val closingDate = if (period.crossesMidnight) date.plusDays(1) else date
                 val closing = closingDate.atTime(period.endTime)
-                if (closing.isAfter(fromDateTime) &&
-                    (candidate == null || closing.isBefore(candidate.dateTime))
-                ) {
-                    candidate = ScheduleTransition(closing, isOpening = false)
-                }
+                if (closing.isAfter(fromDateTime)) candidates += closing
             }
         }
 
-        return candidate
+        for (boundary in candidates) {
+            // Schedule precision is one minute, so the immediately preceding minute
+            // represents the state before this boundary.
+            val wasBlocked = evaluate(enabledPeriods, boundary.minusMinutes(1)).isBlocked
+            val isBlocked = evaluate(enabledPeriods, boundary).isBlocked
+            if (wasBlocked != isBlocked) {
+                return ScheduleTransition(
+                    dateTime = boundary,
+                    isOpening = wasBlocked && !isBlocked
+                )
+            }
+        }
+        return null
     }
 }

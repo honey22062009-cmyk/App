@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: ["main", "fix/build-errors", "ui/polish-v1-3", "enhance/**"]
+    branches: ["main", "fix/build-errors", "ui/polish-v1-3", "enhance/**", "feature/**"]
   pull_request:
-    branches: ["main", "ui/polish-v1-3"]
+    branches: ["main", "ui/polish-v1-3", "enhance/**"]
   workflow_dispatch:
 
 concurrency:

@@ -21,6 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
@@ -52,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -62,8 +67,10 @@ import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassVariant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -133,6 +140,13 @@ fun DashboardScreen(
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val managedApps by repository.managedAppsFlow.collectAsState(initial = emptyList())
     val totalBlocks by repository.totalBlocksCountFlow.collectAsState(initial = 0)
+    val allSchedules by repository.allPeriodsFlow.collectAsState(initial = emptyList())
+    val activeManagedPackages = remember(managedApps) {
+        managedApps.filter { it.isManaged }.map { it.packageName }.toSet()
+    }
+    var nextTransition by remember { mutableStateOf<NextTransitionInfo?>(null) }
+    var scheduleStatusLoaded by remember { mutableStateOf(false) }
+    var scheduleStatusError by remember { mutableStateOf(false) }
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var health by remember(context) { mutableStateOf(ProtectionHealth.snapshot(context)) }
@@ -155,6 +169,34 @@ fun DashboardScreen(
 
     LaunchedEffect(Unit) {
         repository.settings.ensureStreakTrackerStarted()
+    }
+
+    // Keep Home's next boundary in sync with schedule edits and actual clock transitions.
+    LaunchedEffect(activeManagedPackages, allSchedules) {
+        scheduleStatusLoaded = false
+        scheduleStatusError = false
+        while (true) {
+            val upcoming = try {
+                repository.findNextGlobalTransition()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                scheduleStatusError = true
+                scheduleStatusLoaded = true
+                nextTransition = null
+                break
+            }
+            nextTransition = upcoming
+            scheduleStatusLoaded = true
+            if (upcoming == null) break
+            val boundaryMillis = upcoming.transitionDateTime
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli()
+            val waitMillis = (boundaryMillis - System.currentTimeMillis() + 1_000L)
+                .coerceAtLeast(1_000L)
+            delay(waitMillis)
+        }
     }
 
     LaunchedEffect(initialTrackerAction) {
@@ -225,7 +267,15 @@ fun DashboardScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
     ) {
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
@@ -301,10 +351,15 @@ fun DashboardScreen(
                             health = health,
                             activeManagedApps = managedApps.count { it.isManaged },
                             totalBlocks = totalBlocks,
+                            nextTransition = nextTransition,
+                            scheduleStatusLoaded = scheduleStatusLoaded,
+                            scheduleStatusError = scheduleStatusError,
                             onToggle = { enabled ->
                                 scope.launch { repository.settings.setProtectionEnabled(enabled) }
                             },
-                            onOpenSetup = onNavigateToPermissions
+                            onOpenSetup = onNavigateToPermissions,
+                            onOpenApps = onNavigateToApps,
+                            onOpenSchedules = onNavigateToSchedules
                         )
                     }
         }
@@ -323,14 +378,68 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item(key = "header") {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (progressOnly) "Your progress" else if (userName.isBlank()) "Your day" else "Hi, ${userName.trim()}",
-                            style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                        Text(if (progressOnly) "History, patterns and milestones" else "A little focus. A softer landing.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(17.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Shield,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(25.dp)
+                                    )
+                                }
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    "STRICT BLOCKER",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    if (progressOnly) "YOUR JOURNEY" else "PERSONAL CONTROL CENTER",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        TextButton(onClick = onOpenPro) {
+                            Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
+                            Text(" Explore Pro")
+                        }
                     }
-                    TextButton(onClick = onOpenPro) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Text(" Explore Pro") }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            if (progressOnly) "Your progress"
+                            else if (userName.isBlank()) "Your day"
+                            else "Hi, ${userName.trim()}",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            if (progressOnly) "History, patterns and milestones"
+                            else today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())) +
+                                "  ·  A little more control, every day.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
                 if (progressOnly) TextButton(onClick = {
                     showCustomization = true
@@ -341,25 +450,98 @@ fun DashboardScreen(
                     onDone = { scope.launch { repository.settings.setQuickTourSeen(true) } })
             }
             if (!progressOnly && !wideHome) item(key = "today") {
-                TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today,
-                    reduceMotion, onRecord = { showQuickEntry = true })
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    DashboardSectionHeading(
+                        title = "TODAY AT A GLANCE",
+                        subtitle = "Your daily snapshot"
+                    )
+                    TodayOverviewCard(
+                        checkIns,
+                        todayCheckIn,
+                        todaySleep,
+                        today,
+                        reduceMotion,
+                        onRecord = { showQuickEntry = true }
+                    )
+                }
             }
 
             if (!progressOnly) item(key = "shortcuts") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onNavigateToApps, modifier = Modifier.weight(1f)) { Text("Block apps") }
-                    TextButton(onClick = onNavigateToSchedules, modifier = Modifier.weight(1f)) { Text("Schedules") }
-                    TextButton(onClick = onNavigateToAdultProtection, modifier = Modifier.weight(1f)) { Text("18+ protection") }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DashboardSectionHeading(
+                        title = "QUICK CONTROLS",
+                        subtitle = "The things you use most"
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DashboardActionTile(
+                            title = "Block apps",
+                            subtitle = "Choose what to pause",
+                            icon = Icons.Default.Apps,
+                            accent = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToApps
+                        )
+                        DashboardActionTile(
+                            title = "Schedules",
+                            subtitle = "Set allowed hours",
+                            icon = Icons.Default.CalendarMonth,
+                            accent = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToSchedules
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DashboardActionTile(
+                            title = "Content shield",
+                            subtitle = "Extra web protection",
+                            icon = Icons.Default.Security,
+                            accent = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToAdultProtection
+                        )
+                        DashboardActionTile(
+                            title = "System setup",
+                            subtitle = "Check permissions",
+                            icon = Icons.Default.Tune,
+                            accent = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToPermissions
+                        )
+                    }
                 }
             }
 
             if (wideHome) item(key = "home_focus_row") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
                     Box(Modifier.weight(.85f)) {
-                        TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today, reduceMotion, onRecord = { showQuickEntry = true })
+                        TodayOverviewCard(
+                            checkIns,
+                            todayCheckIn,
+                            todaySleep,
+                            today,
+                            reduceMotion,
+                            onRecord = { showQuickEntry = true }
+                        )
                     }
                     Box(Modifier.weight(1.65f)) { renderDashboardCard("hero") }
                 }
+            }
+
+            if (!progressOnly) item(key = "protection_heading") {
+                DashboardSectionHeading(
+                    title = "PROTECTION CENTER",
+                    subtitle = "A clear view of what's running"
+                )
             }
 
             if (tablet) {
@@ -559,53 +741,336 @@ fun DashboardScreen(
 }
 
 @Composable
+private fun DashboardSectionHeading(
+    title: String,
+    subtitle: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun DashboardActionTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    GlassCard(
+        modifier = modifier,
+        variant = GlassVariant.Standard,
+        shape = RoundedCornerShape(23.dp),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 13.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(15.dp),
+                color = accent.copy(alpha = .13f),
+                modifier = Modifier.size(42.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProtectionStatusCard(
     enabled: Boolean,
     health: ProtectionHealthSnapshot,
     activeManagedApps: Int,
     totalBlocks: Int,
+    nextTransition: NextTransitionInfo?,
+    scheduleStatusLoaded: Boolean,
+    scheduleStatusError: Boolean,
     onToggle: (Boolean) -> Unit,
-    onOpenSetup: () -> Unit
+    onOpenSetup: () -> Unit,
+    onOpenApps: () -> Unit,
+    onOpenSchedules: () -> Unit
 ) {
-    val needsAttention = !health.coreReady || health.reliabilityScore < 100
+    val hasNoAllowedWindows = activeManagedApps > 0 && scheduleStatusLoaded &&
+        !scheduleStatusError && nextTransition == null
+    val needsAttention = !enabled || !health.coreReady || activeManagedApps == 0 ||
+        hasNoAllowedWindows || scheduleStatusError
+    val actionLabel = when {
+        !health.coreReady -> "Fix setup"
+        activeManagedApps == 0 -> "Choose apps"
+        scheduleStatusError -> "Check schedules"
+        hasNoAllowedWindows -> "Add allowed window"
+        nextTransition != null -> "View schedule"
+        health.recommendedIssues.isNotEmpty() -> "Improve reliability"
+        else -> null
+    }
+    val action = when {
+        !health.coreReady -> onOpenSetup
+        activeManagedApps == 0 -> onOpenApps
+        scheduleStatusError || hasNoAllowedWindows || nextTransition != null -> onOpenSchedules
+        health.recommendedIssues.isNotEmpty() -> onOpenSetup
+        else -> null
+    }
+    val title = when {
+        !enabled -> "App blocking is paused"
+        !health.coreReady -> "Finish protection setup"
+        activeManagedApps == 0 -> "Choose apps to protect"
+        scheduleStatusError -> "Schedule status unavailable"
+        hasNoAllowedWindows -> "Apps are blocked all the time"
+        else -> "App blocking is active"
+    }
+    val detail = when {
+        !enabled -> "Turn protection on to enforce your schedules."
+        !health.coreReady -> health.coreIssues.firstOrNull() ?: "Open setup to restore required access."
+        activeManagedApps == 0 -> "No apps are selected yet. Add the apps you want Strict Blocker to protect."
+        scheduleStatusError -> "Could not read the next schedule change. Open Schedules to review your allowed windows."
+        hasNoAllowedWindows -> "No enabled allowed windows are configured. Protected apps stay blocked until you add one."
+        !scheduleStatusLoaded -> "Checking the next app access change…"
+        health.recommendedIssues.isNotEmpty() ->
+            "$activeManagedApps apps protected · $totalBlocks blocks recorded · ${health.recommendedIssues.size} optional reliability settings can be improved."
+        else -> "$activeManagedApps apps protected · $totalBlocks blocks recorded"
+    }
+    val scheduleDetail = when {
+        !enabled -> "Schedule enforcement is paused."
+        scheduleStatusError || !scheduleStatusLoaded -> null
+        hasNoAllowedWindows -> null
+        nextTransition == null -> null
+        else -> {
+            val time = nextTransition.transitionDateTime
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("EEE · h:mm a", Locale.getDefault()))
+            val change = if (nextTransition.isOpening) "becomes allowed" else "will be blocked"
+            "Next: ${nextTransition.appName} $change · $time"
+        }
+    }
+    val systemReady = enabled && health.coreReady && activeManagedApps > 0 &&
+        !hasNoAllowedWindows && !scheduleStatusError
+    val statusTint = if (systemReady) MaterialTheme.colorScheme.tertiary
+        else MaterialTheme.colorScheme.secondary
+    val statusText = if (systemReady) "PROTECTION ON" else "ACTION NEEDED"
+
     GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = needsAttention, onClick = onOpenSetup),
-        variant = if (needsAttention) GlassVariant.Warning else GlassVariant.Subtle,
-        shape = RoundedCornerShape(22.dp)
+        modifier = Modifier.fillMaxWidth().testTag("protection_center_card"),
+        variant = if (needsAttention) GlassVariant.Warning else GlassVariant.Accent,
+        shape = RoundedCornerShape(30.dp),
+        borderWidth = 1.dp
     ) {
-        Row(
-            modifier = Modifier.padding(15.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            statusTint.copy(alpha = .13f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = .08f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = .15f)
+                        )
+                    )
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
-            Icon(
-                if (needsAttention) Icons.Default.Warning else Icons.Default.Shield,
-                contentDescription = null,
-                tint = if (needsAttention) MaterialTheme.colorScheme.secondary else WarmMint
-            )
-            Spacer(Modifier.size(11.dp))
-            Column(Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    Text(
+                        "YOUR DEVICE",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50.dp),
+                        color = statusTint.copy(alpha = .14f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(7.dp)
+                                    .background(statusTint, CircleShape)
+                            )
+                            Text(
+                                statusText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = statusTint,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(23.dp),
+                    color = statusTint.copy(alpha = .13f),
+                    modifier = Modifier.size(66.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (needsAttention) Icons.Default.Warning else Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = statusTint,
+                            modifier = Modifier.size(35.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.size(12.dp))
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onToggle,
+                    modifier = Modifier.testTag("protection_toggle")
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
-                    when {
-                        !enabled -> "App blocking paused"
-                        !health.coreReady -> "Finish app blocking setup"
-                        health.reliabilityScore < 100 -> "App blocking · review reliability"
-                        else -> "App blocking ready"
-                    },
-                    fontWeight = FontWeight.SemiBold
+                    if (systemReady) "You're in control." else "Let's finish the setup.",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    if (needsAttention) {
-                        health.degradedReasons.firstOrNull() ?: "Review Android permissions."
-                    } else {
-                        "$activeManagedApps restricted apps · $totalBlocks blocks"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Switch(checked = enabled, onCheckedChange = onToggle)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ProtectionMetric(
+                    value = activeManagedApps.toString(),
+                    label = "APPS PROTECTED",
+                    modifier = Modifier.weight(1f)
+                )
+                ProtectionMetric(
+                    value = totalBlocks.toString(),
+                    label = "BLOCKS RECORDED",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (scheduleDetail != null) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = .62f)
+                ) {
+                    Text(
+                        scheduleDetail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 11.dp)
+                    )
+                }
+            }
+
+            if (actionLabel != null && action != null) {
+                Button(
+                    onClick = action,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(17.dp),
+                    contentPadding = PaddingValues(vertical = 13.dp)
+                ) {
+                    Text(actionLabel, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Text(
+                    "Your protection settings are up to date.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = statusTint,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProtectionMetric(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .68f)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

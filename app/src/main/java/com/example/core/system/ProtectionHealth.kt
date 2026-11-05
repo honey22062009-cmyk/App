@@ -24,14 +24,23 @@ data class ProtectionHealthSnapshot(
             return (checks.count { it } * 100) / checks.size
         }
 
-    val degradedReasons: List<String>
+    /** Required access that determines whether core blocking can operate. */
+    val coreIssues: List<String>
         get() = buildList {
             if (!accessibilityEnabled) add("Accessibility interception is disabled.")
             if (!usageAccessGranted) add("Usage Access fallback detection is unavailable.")
+        }
+
+    /** Optional Android settings that improve background reliability but do not block setup. */
+    val recommendedIssues: List<String>
+        get() = buildList {
             if (!batteryOptimizationIgnored) add("Android may restrict background monitoring.")
             if (!exactAlarmsAllowed) add("Schedule boundaries use an inexact fallback.")
             if (!notificationsAllowed) add("Protection service notifications may be hidden.")
         }
+
+    val degradedReasons: List<String>
+        get() = coreIssues + recommendedIssues
 }
 
 object ProtectionHealth {

@@ -70,10 +70,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.InstalledAppInfo
+import com.example.security.AppCapabilityScanner
+import com.example.security.AppCapabilityReport
+import com.example.security.GuardianPolicyManager
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.GlassCard
 import com.example.ui.components.InfoChip
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -90,6 +95,13 @@ fun AppsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var showCapabilityAudit by remember { mutableStateOf(false) }
+    var capabilityReports by remember { mutableStateOf<List<AppCapabilityReport>>(emptyList()) }
+    var isCapabilityAuditLoading by remember { mutableStateOf(false) }
+    var showGuardianConfirm by remember { mutableStateOf(false) }
+    var guardianApplyBusy by remember { mutableStateOf(false) }
+    val guardianPolicyManager = remember(context) { GuardianPolicyManager(context) }
+    val guardianManaged = remember(context) { guardianPolicyManager.isGuardianManaged }
     val groups by repository.appGroupsFlow.collectAsState(initial = emptyList())
     val groupLimit = 8
 
@@ -201,6 +213,53 @@ fun AppsScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {
+                    isCapabilityAuditLoading = true
+                    showCapabilityAudit = true
+                    coroutineScope.launch {
+                        capabilityReports = withContext(Dispatchers.IO) {
+                            AppCapabilityScanner(context).scanInstalledApps()
+                        }
+                        isCapabilityAuditLoading = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isCapabilityAuditLoading
+            ) {
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isCapabilityAuditLoading) "Reviewing installed apps…" else "Review app permissions & capabilities")
+            }
+
+            if (guardianManaged) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Guardian device protection active", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Android confirms this phone is managed. Apply suspension and uninstall protection to apps you have marked as protected.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { showGuardianConfirm = true },
+                            enabled = !guardianApplyBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (guardianApplyBusy) "Applying guardian controls…" else "Apply to protected apps") }
+                    }
+                }
+            } else {
+                Text(
+                    "Guardian device-owner protection is not active. Strong uninstall protection requires guardian-led Android device provisioning.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -330,14 +389,28 @@ fun AppsScreen(
                                 OutlinedButton(
                                     onClick = {
                                         coroutineScope.launch {
+                                            var guardianRemovalFailures = 0
                                             for (pkg in selectedPackages) {
                                                 val app = installedApps.firstOrNull { it.packageName == pkg }
                                                 if (app != null) {
                                                     repository.setAppManaged(pkg, app.appName, false)
+                                                    if (guardianManaged) {
+                                                        val result = withContext(Dispatchers.IO) {
+                                                            guardianPolicyManager.removeRestrictions(pkg)
+                                                        }
+                                                        if (result.isFailure) guardianRemovalFailures++
+                                                    }
                                                 }
                                             }
                                             selectedPackages.clear()
                                             refreshApps()
+                                            if (guardianRemovalFailures > 0) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Some apps are unprotected in Strict Blocker, but Android kept guardian restrictions on $guardianRemovalFailures apps. Review device-owner access.",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
                                         }
                                     },
                                     shape = RoundedCornerShape(8.dp)
@@ -463,6 +536,18 @@ fun AppsScreen(
                                 }
                                 coroutineScope.launch {
                                     repository.setAppManaged(app.packageName, app.appName, isManaged)
+                                    if (!isManaged && guardianManaged) {
+                                        val result = withContext(Dispatchers.IO) {
+                                            guardianPolicyManager.removeRestrictions(app.packageName)
+                                        }
+                                        if (result.isFailure) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "App unprotected locally, but Android did not remove every guardian restriction.",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
                                 }
                             },
                             onOpenSchedule = {
@@ -473,6 +558,52 @@ fun AppsScreen(
                 }
             }
         }
+    }
+
+    if (showGuardianConfirm) {
+        val targets = installedApps.filter { it.isManaged && !it.isSystemCritical }
+        AlertDialog(
+            onDismissRequest = { if (!guardianApplyBusy) showGuardianConfirm = false },
+            title = { Text("Apply guardian restrictions?") },
+            text = {
+                Text(
+                    "Android will suspend ${targets.size} apps and block their uninstall where the system permits it. Essential system apps are excluded. A guardian can remove these restrictions from this app."
+                )
+            },
+            confirmButton = {
+                Button(
+                    enabled = !guardianApplyBusy && targets.isNotEmpty(),
+                    onClick = {
+                        guardianApplyBusy = true
+                        coroutineScope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                guardianPolicyManager.applyRestrictions(targets.map { it.packageName }.toSet())
+                            }
+                            guardianApplyBusy = false
+                            showGuardianConfirm = false
+                            android.widget.Toast.makeText(
+                                context,
+                                "Suspended: ${result.suspended.size}. Uninstall protected: ${result.uninstallBlocked.size}. Needs review: ${result.failures.size}.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                ) { Text("Apply restrictions") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showGuardianConfirm = false }, enabled = !guardianApplyBusy) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showCapabilityAudit) {
+        AppCapabilityAuditDialog(
+            reports = capabilityReports,
+            loading = isCapabilityAuditLoading,
+            onDismiss = { showCapabilityAudit = false }
+        )
     }
 
     if (showGroupDialog) {
@@ -498,6 +629,79 @@ fun AppsScreen(
             }
         )
     }
+}
+
+@Composable
+private fun AppCapabilityAuditDialog(
+    reports: List<AppCapabilityReport>,
+    loading: Boolean,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Installed app capability review") },
+        text = {
+            when {
+                loading -> Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+                reports.isEmpty() -> Text("Android did not return an app inventory.")
+                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${reports.size} visible installed apps. Permission requests are signals, not proof of harmful behavior.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().height(420.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(reports, key = { it.packageName }) { report ->
+                            var expanded by remember(report.packageName) { mutableStateOf(false) }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(report.label, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${report.grantedPermissions.size} granted of ${report.requestedPermissionCount} declared permissions",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "Components: ${report.declaredActivityCount} activities · ${report.declaredServiceCount} services · ${report.declaredReceiverCount} receivers · ${report.declaredProviderCount} providers",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (report.signals.isNotEmpty()) {
+                                        Text(report.signals.joinToString(" • "), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (expanded) {
+                                        Spacer(Modifier.height(6.dp))
+                                        Text("Package: ${report.packageName}", style = MaterialTheme.typography.labelSmall)
+                                        Text("All declared permissions:", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            report.requestedPermissions.joinToString("\n").ifBlank { "None declared" },
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Text(
+                                            "Granted at install/runtime: " + report.grantedPermissions.joinToString(", ").ifBlank { "None" },
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    } else {
+                                        Text("Tap to inspect permission details", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onDismiss) { Text("Close") } }
+    )
 }
 
 @Composable
@@ -614,10 +818,31 @@ fun AppItemCard(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
+                Text(
+                    text = when {
+                        !app.isManaged -> "Not protected"
+                        app.periodCount == 0 -> "Blocked all the time · no allowed window"
+                        app.periodCount == 1 -> "1 enabled allowed window · tap to edit"
+                        else -> "${app.periodCount} enabled allowed windows · tap to edit"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (app.isManaged && app.periodCount == 0) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 2
+                )
             }
 
             if (!app.isSystemCritical) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelected() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary
+                    )
+                )
                 Switch(
                     checked = app.isManaged,
                     onCheckedChange = { onToggleManaged(it) },
