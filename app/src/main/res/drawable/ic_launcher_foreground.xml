@@ -1,5 +1,19 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFF5F8" android:pathData="M54,23L78,32V51C78,67 67,79 54,85C41,79 30,67 30,51V32Z" />
-    <path android:fillColor="#EBC8ED" android:pathData="M54,30L71,36V51C71,63 63,72 54,77Z" />
-    <path android:strokeColor="#93466F" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M42,53L51,62L67,44" />
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFF8FB" android:pathData="M54,10L85,22V48C85,68 71,83 54,94C37,83 23,68 23,48V22Z" />
+    <path android:fillColor="#F6DCE9" android:pathData="M54,17L78,27V48C78,64 67,77 54,85Z" />
+    <path android:fillColor="#E9A9C6" android:pathData="M38,44C33,25 33,16 39,15C45,14 48,28 49,44Z" />
+    <path android:fillColor="#E9A9C6" android:pathData="M58,44C60,27 66,16 72,19C78,22 72,35 65,48Z" />
+    <path android:fillColor="#FFF7F9" android:pathData="M38,52C38,39 46,32 55,32C65,32 73,40 73,52C73,66 63,75 54,75C45,75 37,65 38,52Z" />
+    <path android:fillColor="#F4C5D7" android:pathData="M42,59C46,55 50,57 54,60C58,57 63,55 67,59C64,67 59,72 54,72C49,72 44,67 42,59Z" />
+    <path android:fillColor="#634653" android:pathData="M47,49m-2.5,0a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0" />
+    <path android:fillColor="#634653" android:pathData="M62,49m-2.5,0a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0" />
+    <path android:fillColor="#C77A9C" android:pathData="M54,55L58,58L54,61L50,58Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#8E426B"
+        android:strokeWidth="1.8" android:strokeLineCap="round"
+        android:pathData="M54,61C52,64 50,64 48,63M54,61C56,64 58,64 60,63" />
 </vector>
