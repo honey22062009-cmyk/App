@@ -235,14 +235,32 @@ private class CompanionTextureView(context: Context) : TextureView(context), Tex
     fun requestRender() { worker?.requestFrame() }
 
     override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+        // TextureView may recreate its SurfaceTexture while the Activity stays resumed.
+        // A previous composition can have paused this view without a new lifecycle
+        // ON_RESUME event, so a newly available surface must explicitly wake rendering.
+        paused = false
         worker?.stopRendering()
-        worker = DrawThread(texture, width, height).apply { start() }
+        worker = DrawThread(texture, width, height).apply {
+            start()
+            requestFrame()
+        }
     }
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
-        worker?.resize(width, height)
+        val current = worker
+        if (current != null && current.isAlive) {
+            current.resize(width, height)
+        } else {
+            // Recover if the GL worker exited while TextureView kept the same surface.
+            paused = false
+            worker = DrawThread(texture, width, height).apply {
+                start()
+                requestFrame()
+            }
+        }
     }
     override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
     override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+        paused = true
         val current = worker
         worker = null
         current?.stopRendering()
