@@ -54,6 +54,10 @@ internal object CompanionBehavior {
             "And that concludes today's extremely exclusive performance."
         ),
         "snack" to listOf(
+            // Keep the established UI-test phrases while adding more varied lines.
+            "Crunch, crunch. Thank you!",
+            "A tiny snack for a tiny assistant.",
+            "Mmm. Back to being your study-side companion.",
             "Crunch, crunch. Thank you for the imaginary snack.",
             "Fuel acquired. Tiny assistant back online.",
             "That was delicious. I shall remember it dramatically.",
