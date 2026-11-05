@@ -248,6 +248,7 @@ fun DashboardScreen(
                             tablet = tablet,
                             soundEnabled = companionSound,
                             onSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
+                            dailyCheckInDone = todayCheckIn != null,
                             onRecordReset = {
                                 editingReset = null
                                 showResetEditor = true
