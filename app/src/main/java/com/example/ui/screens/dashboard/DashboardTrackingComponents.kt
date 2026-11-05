@@ -129,7 +129,8 @@ internal fun StreakHeroCard(
     goalDays: Int, reduceMotion: Boolean, tablet: Boolean,
     onRecordReset: () -> Unit, onEditGoal: () -> Unit,
     companionName: String = "", onRecordToday: () -> Unit = onRecordReset,
-    soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {}
+    soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {},
+    dailyCheckInDone: Boolean = false
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp)) {
         Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -154,14 +155,24 @@ internal fun StreakHeroCard(
                 if (maxWidth >= 500.dp) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                         Box(Modifier.weight(.7f)) { streakContent() }
-                        com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion, Modifier.weight(1.3f),
-                            soundEnabled = soundEnabled, onSoundChange = onSoundChange)
+                        com.example.ui.components.InteractiveCompanion(
+                            characterId, companionName, reduceMotion, Modifier.weight(1.3f),
+                            soundEnabled = soundEnabled, onSoundChange = onSoundChange,
+                            currentStreak = stats.currentDays, bestStreak = stats.bestDays,
+                            goalDays = goalDays, checkInDone = dailyCheckInDone,
+                            onRecordToday = onRecordToday, onEditGoal = onEditGoal
+                        )
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         streakContent()
-                        com.example.ui.components.InteractiveCompanion(characterId, companionName, reduceMotion, Modifier.fillMaxWidth(),
-                            soundEnabled = soundEnabled, onSoundChange = onSoundChange)
+                        com.example.ui.components.InteractiveCompanion(
+                            characterId, companionName, reduceMotion, Modifier.fillMaxWidth(),
+                            soundEnabled = soundEnabled, onSoundChange = onSoundChange,
+                            currentStreak = stats.currentDays, bestStreak = stats.bestDays,
+                            goalDays = goalDays, checkInDone = dailyCheckInDone,
+                            onRecordToday = onRecordToday, onEditGoal = onEditGoal
+                        )
                     }
                 }
             }
