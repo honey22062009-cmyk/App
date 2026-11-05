@@ -47,19 +47,19 @@ fun FloatingGlassDock(currentScreen: Screen, onSelect: (Screen) -> Unit, reduceM
                 }
             }
             .clip(shape)
-            .background(colors.surface.copy(alpha = .58f))
+            .background(colors.surface.copy(alpha = .48f))
             .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .85f),
                 colors.primary.copy(alpha = .17f), Color.White.copy(alpha = .46f)))), shape)) {
             BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
-                .background(Brush.linearGradient(listOf(Color.White.copy(alpha = .12f), colors.primaryContainer.copy(alpha = .12f), Color.Transparent)))
+                .background(Brush.linearGradient(listOf(Color.White.copy(alpha = .12f), colors.primaryContainer.copy(alpha = .20f), colors.secondaryContainer.copy(alpha = .10f), Color.Transparent)))
                 .padding(6.dp)) {
                 val cellWidth = maxWidth / items.size
                 val offset by animateDpAsState(cellWidth * (selectedIndex ?: 0),
                     animationSpec = if (reduceMotion) snap() else spring(dampingRatio = .78f, stiffness = 430f), label = "dock_slide")
                 if (selectedIndex != null) Box(
-                    Modifier.offset(x = offset).width(cellWidth).height(62.dp)
+                    Modifier.offset(x = offset).width(cellWidth).height(66.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(Brush.linearGradient(listOf(colors.primaryContainer.copy(alpha = .90f), colors.secondaryContainer.copy(alpha = .78f))))
+                        .background(Brush.linearGradient(listOf(colors.primaryContainer.copy(alpha = .96f), colors.secondaryContainer.copy(alpha = .84f))))
                         .drawWithCache {
                             val shine = Brush.verticalGradient(listOf(Color.White.copy(alpha = .48f), Color.Transparent))
                             onDrawBehind { drawRect(shine) }
@@ -69,11 +69,16 @@ fun FloatingGlassDock(currentScreen: Screen, onSelect: (Screen) -> Unit, reduceM
                     items.forEach { screen ->
                         val selected = currentScreen == screen
                         val tint by animateColorAsState(if (selected) colors.primary else colors.onSurfaceVariant, label = "dock_tint")
+                        val iconSize by animateDpAsState(
+                            if (selected) 25.dp else 21.dp,
+                            animationSpec = if (reduceMotion) snap() else spring(dampingRatio = .78f, stiffness = 520f),
+                            label = "dock_icon_size"
+                        )
                         Column(Modifier.weight(1f).heightIn(min = 62.dp).clip(RoundedCornerShape(24.dp))
                             .selectable(selected, role = Role.Tab) { if (!selected) onSelect(screen) }
                             .padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(if (selected) screen.selectedIcon else screen.unselectedIcon, null, tint = tint, modifier = Modifier.size(22.dp))
+                            Icon(if (selected) screen.selectedIcon else screen.unselectedIcon, null, tint = tint, modifier = Modifier.size(iconSize))
                             Text(screen.title, style = MaterialTheme.typography.labelMedium, maxLines = 1,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = tint)
                         }
