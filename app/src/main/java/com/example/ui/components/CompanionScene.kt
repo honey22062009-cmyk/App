@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -110,11 +111,26 @@ fun CompanionScene(
 }
 
 @Composable
-fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolean, modifier: Modifier = Modifier,
-    backgroundColor: Color? = null, soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {}) {
+fun InteractiveCompanion(
+    characterId: String,
+    name: String,
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color? = null,
+    soundEnabled: Boolean = false,
+    onSoundChange: (Boolean) -> Unit = {},
+    currentStreak: Int = 0,
+    bestStreak: Int = 0,
+    goalDays: Int = 0,
+    checkInDone: Boolean = false,
+    onRecordToday: () -> Unit = {},
+    onEditGoal: () -> Unit = {}
+) {
     var reaction by remember { mutableStateOf("idle") }
     var key by remember { mutableStateOf(0) }
-    var caption by remember { mutableStateOf("A little company for your day.") }
+    var caption by remember(characterId, currentStreak, bestStreak, goalDays, checkInDone) {
+        mutableStateOf(CompanionBehavior.dashboardNudge(currentStreak, bestStreak, goalDays, checkInDone))
+    }
     var audioStatus by remember { mutableStateOf("") }
     var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val context = LocalContext.current
@@ -127,8 +143,8 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
     }
     LaunchedEffect(soundEnabled) { if (!soundEnabled) audio.stop() }
 
-    // Small unscripted moments keep the companion feeling present without nagging.
-    // Automatic reactions are silent; speech only follows an intentional user action.
+    // The companion stays visibly present, but it never interrupts or speaks by itself.
+    // Quiet idle cues rotate between a glance, ear movement, stretch and short caption.
     LaunchedEffect(reduceMotion, characterId) {
         if (reduceMotion) return@LaunchedEffect
         while (true) {
@@ -154,35 +170,110 @@ fun InteractiveCompanion(characterId: String, name: String, reduceMotion: Boolea
             audio.say(caption)
         }
     }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.fillMaxWidth().background(
-            Brush.radialGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .7f), Color.Transparent)),
-            RoundedCornerShape(28.dp))) {
-            CompanionScene(characterId, Modifier.fillMaxWidth().height(260.dp), true, reduceMotion,
-                reaction, key, backgroundColor ?: Color.Transparent, onPet = { act("pet") })
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("YOUR COMPANION", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(name.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
+                    style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            }
+            Text(if (soundEnabled) "VOICE ON" else "OFFLINE",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-        listOf("wave" to "Wave", "jump" to "Jump", "spin" to "Spin", "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe")
-            .chunked(3).forEach { actions ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    actions.forEach { (id, label) ->
-                        FilledTonalButton(onClick = { act(id) }, modifier = Modifier.weight(1f),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 8.dp)) {
-                            Text(label, maxLines = 1)
-                        }
-                    }
+
+        Box(
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.radialGradient(
+                        listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .78f),
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .35f),
+                            Color.Transparent)
+                    ),
+                    RoundedCornerShape(28.dp)
+                )
+        ) {
+            CompanionScene(
+                characterId,
+                Modifier.fillMaxWidth().height(286.dp),
+                true,
+                reduceMotion,
+                reaction,
+                key,
+                backgroundColor ?: Color.Transparent,
+                onPet = { act("pet") }
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .54f),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("✦", color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium)
+                Text(caption, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+
+        Text("QUICK HELP", style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(
+                onClick = onRecordToday,
+                modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+            ) { Text(if (checkInDone) "Edit check-in" else "Record today", maxLines = 1) }
+            OutlinedButton(
+                onClick = onEditGoal,
+                modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+            ) { Text(if (goalDays > 0) "Review goal" else "Set a goal", maxLines = 1) }
+        }
+
+        Text("PLAY & RESET", style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        listOf(
+            "wave" to "Wave", "jump" to "Hop", "spin" to "Spin",
+            "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe",
+            "focus" to "Focus", "tip" to "Tip", "cheer" to "Cheer"
+        ).chunked(3).forEach { actions ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                actions.forEach { (id, label) ->
+                    FilledTonalButton(
+                        onClick = { act(id) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                    ) { Text(label, maxLines = 1) }
                 }
             }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { act("talk"); if (!soundEnabled) audioStatus = "Turn on sounds to hear the offline voice." }) { Text("Say something") }
-            TextButton(onClick = { onSoundChange(!soundEnabled); audioStatus = "" }) { Text(if (soundEnabled) "Sound on" else "Sound off") }
         }
-        if (audioStatus.isNotBlank()) Text(audioStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("${name.ifBlank { characterId.replaceFirstChar(Char::titlecase) }} · drag, pinch or tap to pet",
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            TextButton(onClick = {
+                act("talk")
+                if (!soundEnabled) audioStatus = "Turn on sound to hear the installed offline voice."
+            }) { Text("Say something") }
+            TextButton(onClick = { onSoundChange(!soundEnabled); audioStatus = "" }) {
+                Text(if (soundEnabled) "Mute voice" else "Enable voice")
+            }
+        }
+        if (audioStatus.isNotBlank()) {
+            Text(audioStatus, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Drag to look around · pinch to zoom · tap to pet",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-
 /** EGL_DEFAULT_DISPLAY is process-wide. One leaving scene must not terminate a sibling's context. */
 private object CompanionEglDisplay {
     private var display = EGL14.EGL_NO_DISPLAY
