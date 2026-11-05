@@ -1,4 +1,4 @@
-> Version 1.4.0: pastel themes, translucent sliding dock, visible Pro workspace, daily-entry receipts, a joined 3D bunny with optional sound, a quick tour and browser inspection without a VPN. See [the implementation and release notes](docs/EXPERIENCE-1.4.md).
+> Version 1.5.0: a redesigned bunny companion with tapered ears, a continuous seated body, richer fur lighting, facial details, smoother idle motion, expanded offline dialogue, an improved installed-voice preference, tracker quick actions and an in-app focus timer. The launcher and splash identity now use a new bunny-shield mark. See [the 1.5.0 experience notes](docs/EXPERIENCE-1.5.md).
 
 # Strict Blocker (Android)
 
