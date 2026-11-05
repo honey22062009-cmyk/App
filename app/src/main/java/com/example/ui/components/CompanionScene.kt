@@ -138,6 +138,7 @@ fun InteractiveCompanion(
     var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     var focusSeconds by rememberSaveable { mutableIntStateOf(25 * 60) }
     var focusRunning by rememberSaveable { mutableStateOf(false) }
+    var showMoreActions by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val audio = remember(context) { CompanionAudio(context) { audioStatus = it } }
@@ -273,8 +274,9 @@ fun InteractiveCompanion(
                     }
                     FilledTonalButton(onClick = {
                         if (focusSeconds == 0) focusSeconds = 25 * 60
-                        focusRunning = !focusRunning
-                        if (!focusRunning) act("focus")
+                        val starting = !focusRunning
+                        focusRunning = starting
+                        if (starting) act("focus")
                     }) {
                         Text(if (focusRunning) "Pause" else if (focusSeconds == 25 * 60) "Start 25 min" else "Resume")
                     }
@@ -295,11 +297,11 @@ fun InteractiveCompanion(
         Text("PLAY & RESET", style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-        listOf(
-            "wave" to "Wave", "jump" to "Hop", "spin" to "Spin",
-            "dance" to "Dance", "snack" to "Feed", "rest" to "Breathe",
-            "focus" to "Focus", "tip" to "Tip", "cheer" to "Cheer"
-        ).chunked(3).forEach { actions ->
+        val everydayActions = listOf(
+            "wave" to "Wave", "jump" to "Hop", "dance" to "Dance",
+            "snack" to "Feed", "rest" to "Breathe", "cheer" to "Cheer"
+        )
+        everydayActions.chunked(3).forEach { actions ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 actions.forEach { (id, label) ->
                     FilledTonalButton(
@@ -309,6 +311,24 @@ fun InteractiveCompanion(
                     ) { Text(label, maxLines = 1) }
                 }
             }
+        }
+        if (showMoreActions) {
+            listOf("spin" to "Spin", "focus" to "Focus", "tip" to "Tip",
+                "listen" to "Listen", "think" to "Think", "remind" to "Remind")
+                .chunked(3).forEach { actions ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        actions.forEach { (id, label) ->
+                            FilledTonalButton(
+                                onClick = { act(id) },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                            ) { Text(label, maxLines = 1) }
+                        }
+                    }
+                }
+        }
+        TextButton(onClick = { showMoreActions = !showMoreActions }) {
+            Text(if (showMoreActions) "Show fewer actions" else "More actions")
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
