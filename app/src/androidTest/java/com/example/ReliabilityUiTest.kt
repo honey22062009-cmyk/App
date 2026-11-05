@@ -125,7 +125,13 @@ class ReliabilityUiTest {
         val snackResponses = listOf(
             "Crunch, crunch. Thank you!",
             "A tiny snack for a tiny assistant.",
-            "Mmm. Back to being your study-side companion."
+            "Mmm. Back to being your study-side companion.",
+            "Crunch, crunch. Thank you for the imaginary snack.",
+            "Fuel acquired. Tiny assistant back online.",
+            "That was delicious. I shall remember it dramatically.",
+            "A snack break is a perfectly respectable pause.",
+            "Mmm. Even my whiskers approve.",
+            "Back to helping, with renewed bunny determination."
         )
         compose.waitUntil(5_000) {
             snackResponses.any { compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() }
