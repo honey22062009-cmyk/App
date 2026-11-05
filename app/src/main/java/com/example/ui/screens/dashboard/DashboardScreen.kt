@@ -267,7 +267,15 @@ fun DashboardScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
     ) {
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
