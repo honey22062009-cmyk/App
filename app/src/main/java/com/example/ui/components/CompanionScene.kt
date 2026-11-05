@@ -132,8 +132,11 @@ fun InteractiveCompanion(
 ) {
     var reaction by remember { mutableStateOf("idle") }
     var key by remember { mutableStateOf(0) }
-    var caption by remember(characterId, currentStreak, bestStreak, goalDays, checkInDone) {
-        mutableStateOf(CompanionBehavior.dashboardNudge(currentStreak, bestStreak, goalDays, checkInDone))
+    var caption by remember(characterId, currentStreak, bestStreak, goalDays, checkInDone, dashboardMode) {
+        mutableStateOf(
+            if (dashboardMode) CompanionBehavior.dashboardNudge(currentStreak, bestStreak, goalDays, checkInDone)
+            else CompanionBehavior.dialogue("wave")
+        )
     }
     var audioStatus by remember { mutableStateOf("") }
     var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
@@ -201,7 +204,7 @@ fun InteractiveCompanion(
                 Text(name.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
                     style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             }
-            Text(if (soundEnabled) "VOICE ON" else "OFFLINE",
+            Text(if (soundEnabled) "VOICE ON" else "VOICE OFF",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
