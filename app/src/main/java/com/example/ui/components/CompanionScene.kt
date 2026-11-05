@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilledTonalButton
@@ -33,6 +34,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -133,11 +136,18 @@ fun InteractiveCompanion(
     }
     var audioStatus by remember { mutableStateOf("") }
     var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
+    var focusSeconds by rememberSaveable { mutableIntStateOf(25 * 60) }
+    var focusRunning by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val audio = remember(context) { CompanionAudio(context) { audioStatus = it } }
     DisposableEffect(audio, lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) audio.stop() }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                audio.stop()
+                focusRunning = false
+            }
+        }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); audio.close() }
     }
@@ -169,6 +179,16 @@ fun InteractiveCompanion(
             if (action != "talk") audio.effect(action)
             audio.say(caption)
         }
+    }
+
+    LaunchedEffect(focusRunning) {
+        if (!focusRunning) return@LaunchedEffect
+        while (focusSeconds > 0) {
+            delay(1_000L)
+            focusSeconds = (focusSeconds - 1).coerceAtLeast(0)
+        }
+        focusRunning = false
+        act("celebrate")
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -235,6 +255,41 @@ fun InteractiveCompanion(
                 modifier = Modifier.weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp)
             ) { Text(if (goalDays > 0) "Review goal" else "Set a goal", maxLines = 1) }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .34f),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("FOCUS SESSION", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("%02d:%02d".format(focusSeconds / 60, focusSeconds % 60),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
+                    FilledTonalButton(onClick = {
+                        if (focusSeconds == 0) focusSeconds = 25 * 60
+                        focusRunning = !focusRunning
+                        if (!focusRunning) act("focus")
+                    }) {
+                        Text(if (focusRunning) "Pause" else if (focusSeconds == 25 * 60) "Start 25 min" else "Resume")
+                    }
+                    TextButton(onClick = {
+                        focusRunning = false
+                        focusSeconds = 25 * 60
+                    }) { Text("Reset") }
+                }
+                LinearProgressIndicator(
+                    progress = { focusSeconds / (25f * 60f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Runs only while this screen is open. Pauses when you leave the app.",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         Text("PLAY & RESET", style = MaterialTheme.typography.labelLarge,
