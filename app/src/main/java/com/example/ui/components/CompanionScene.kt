@@ -486,6 +486,7 @@ private class CompanionRenderer(private val state: CompanionState) {
     private lateinit var bunnyBody: Mesh
     private lateinit var bunnyEar: Mesh
     private lateinit var bunnyInnerEar: Mesh
+    private lateinit var softLimb: Mesh
     private val projection = FloatArray(16)
     private val view = FloatArray(16)
     private val base = FloatArray(16)
@@ -549,6 +550,7 @@ private class CompanionRenderer(private val state: CompanionState) {
         bunnyBody = Mesh(CompanionGeometry.bunnyBody())
         bunnyEar = Mesh(CompanionGeometry.bunnyEar())
         bunnyInnerEar = Mesh(CompanionGeometry.bunnyEar(inner = true))
+        softLimb = Mesh(CompanionGeometry.softLimb())
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
     }
 
@@ -624,7 +626,11 @@ private class CompanionRenderer(private val state: CompanionState) {
                 ball(-.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
                 ball(.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
             }
-            val tailWag = if (!reducedMotion) sin(time * 3.1f) * 8f else 0f
+            val tailWag = when {
+                reducedMotion -> 0f
+                acting && reaction == "tail_wag" -> sin(elapsed * 15f) * 30f * pulse
+                else -> sin(time * 3.1f) * 5f
+            }
             ball(0f, -.55f, -.39f, .13f, .14f, .13f, 0xfffaf5, tailWag)
         } else {
             ball(0f, -.23f, -.05f, .48f, .61f, .36f, coat)
@@ -642,8 +648,10 @@ private class CompanionRenderer(private val state: CompanionState) {
             val saved = base.copyOf()
             Matrix.translateM(base, 0, side * .40f, .01f, 0f)
             Matrix.rotateM(base, 0, angle, 0f, 0f, 1f)
-            ball(0f, -.17f, 0f, .18f, .30f, .20f, coat)
-            ball(0f, -.36f, .015f, .17f, .17f, .18f, coat)
+            // One tapered, gently curved mesh replaces the obvious two-ball arm joint.
+            draw(softLimb, 0f, -.17f, 0f, .18f, .34f, .19f, coat)
+            ball(0f, -.38f, .025f, .125f, .125f, .13f, coat)
+            ball(0f, -.395f, .145f, .070f, .035f, .018f, 0xe9aabd)
             System.arraycopy(saved, 0, base, 0, 16)
         }
         val wave = when {
@@ -834,6 +842,43 @@ internal object CompanionGeometry {
         for (r in 0 until rows) for (c in 0 until columns) {
             vertex(r,c); vertex(r+1,c); vertex(r,c+1)
             vertex(r,c+1); vertex(r+1,c); vertex(r+1,c+1)
+        }
+        return out.toFloatArray()
+    }
+
+    /** Tapered, softly curved capsule mesh used for continuous shoulder-to-wrist limbs. */
+    fun softLimb(rows: Int = 32, columns: Int = 24): FloatArray {
+        val out = ArrayList<Float>(rows * columns * 36)
+        fun radius(t: Float): Float {
+            val profile = listOf(
+                0f to .015f, .08f to .055f, .25f to .105f,
+                .52f to .135f, .76f to .125f, .93f to .075f, 1f to .012f
+            )
+            val index = (0 until profile.lastIndex).firstOrNull { t <= profile[it + 1].first } ?: profile.lastIndex - 1
+            val a = profile[index]; val b = profile[index + 1]
+            val f = ((t - a.first) / (b.first - a.first)).coerceIn(0f, 1f)
+            val smooth = f * f * (3f - 2f * f)
+            return a.second + (b.second - a.second) * smooth
+        }
+        fun vertex(row: Int, col: Int) {
+            val t = row.toFloat() / rows
+            val y = 1f - 2f * t
+            val r = radius(t)
+            val angle = 2f * PI.toFloat() * col / columns
+            val ca = cos(angle); val sa = sin(angle)
+            val curve = sin(t * PI.toFloat()) * .045f
+            val x = curve + r * ca
+            val z = r * .88f * sa
+            val dx = .045f * PI.toFloat() * cos(t * PI.toFloat())
+            val nx = ca
+            val ny = dx * ca
+            val nz = sa / .88f
+            val length = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(.0001f)
+            out.addAll(listOf(x, y, z, nx / length, ny / length, nz / length))
+        }
+        for (row in 0 until rows) for (col in 0 until columns) {
+            vertex(row, col); vertex(row + 1, col); vertex(row, col + 1)
+            vertex(row, col + 1); vertex(row + 1, col); vertex(row + 1, col + 1)
         }
         return out.toFloatArray()
     }
