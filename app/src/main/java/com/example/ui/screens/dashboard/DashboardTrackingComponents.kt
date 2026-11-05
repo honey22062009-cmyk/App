@@ -160,7 +160,8 @@ internal fun StreakHeroCard(
                             soundEnabled = soundEnabled, onSoundChange = onSoundChange,
                             currentStreak = stats.currentDays, bestStreak = stats.bestDays,
                             goalDays = goalDays, checkInDone = dailyCheckInDone,
-                            onRecordToday = onRecordToday, onEditGoal = onEditGoal
+                            onRecordToday = onRecordToday, onEditGoal = onEditGoal,
+                            dashboardMode = true
                         )
                     }
                 } else {
@@ -171,7 +172,8 @@ internal fun StreakHeroCard(
                             soundEnabled = soundEnabled, onSoundChange = onSoundChange,
                             currentStreak = stats.currentDays, bestStreak = stats.bestDays,
                             goalDays = goalDays, checkInDone = dailyCheckInDone,
-                            onRecordToday = onRecordToday, onEditGoal = onEditGoal
+                            onRecordToday = onRecordToday, onEditGoal = onEditGoal,
+                            dashboardMode = true
                         )
                     }
                 }
