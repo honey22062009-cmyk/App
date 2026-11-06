@@ -59,6 +59,7 @@ import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.CompanionBehavior
 import com.example.ui.components.CompanionScene
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.Instant
 import java.time.LocalDate
