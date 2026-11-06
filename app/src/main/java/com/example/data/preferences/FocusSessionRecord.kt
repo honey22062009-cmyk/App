@@ -63,7 +63,7 @@ data class FocusSessionRecord(
                 else -> return null
             }
             val activity = String(
-                Base64.decode(parts[5], Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING),
+                Base64.getUrlDecoder().decode(parts[5]),
                 StandardCharsets.UTF_8
             ).trim().take(32).ifBlank { "Study" }
             FocusSessionRecord(id, startedAt, planned, actual, activity, completed && actual >= planned)
