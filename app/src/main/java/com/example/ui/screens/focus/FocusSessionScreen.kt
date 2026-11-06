@@ -106,7 +106,7 @@ fun FocusSessionScreen(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE && isRunning) {
+            if (event == Lifecycle.Event.ON_STOP && isRunning) {
                 isRunning = false
                 companionCaption = "Paused while you were away. Resume when you're ready."
                 reaction = "listen"
@@ -119,7 +119,7 @@ fun FocusSessionScreen(
 
     fun persistSession(completed: Boolean, leaveScreen: Boolean) {
         isRunning = false
-        if (hasStarted && !saved && elapsedSeconds > 0) {
+        if (hasStarted && !saved) {
             saved = true
             val record = FocusSessionRecord.create(
                 startedAtMillis = sessionStartedAt,
