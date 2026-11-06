@@ -768,14 +768,14 @@ private class CompanionRenderer(private val state: CompanionState) {
             reducedMotion && reaction == "wave" -> 125f
             acting && reaction in setOf("wave", "paw_wave") -> sin(elapsed * 15f) * 22f * pulse + 125f * pulse
             acting && reaction == "dance" -> (sin(elapsed * 10f) * 35f + 50f) * pulse
-            acting && reaction == "snack" -> 65f * pulse
+            acting && reaction == "snack" -> 12f
             acting && reaction == "stretch" -> -92f * pulse
             acting && reaction == "curious" -> -48f * pulse
             !reducedMotion && !acting -> sin(time * 1.65f) * 3f
             else -> 12f
         }
         val leftArm = when {
-            acting && reaction == "snack" -> -65f * pulse
+            acting && reaction == "snack" -> 135f * pulse
             acting && reaction == "stretch" -> 92f * pulse
             else -> -12f
         }
@@ -783,8 +783,10 @@ private class CompanionRenderer(private val state: CompanionState) {
         arm(-1f, leftArm + idleArm)
         arm(1f, wave - idleArm)
         if (acting && reaction == "snack") {
-            draw(cone, .05f, .20f, .48f, .11f, .30f, .10f, 0xf09a68, 150f)
-            ball(.10f, .40f, .47f, .13f, .08f, .08f, 0xb9a1dd)
+            // Keep the carrot small and close to the raised paw, near the muzzle.
+            draw(cone, -.12f, .35f, .52f, .055f, .15f, .05f, 0xf09a68, 0f)
+            ball(-.12f, .49f, .52f, .045f, .025f, .028f, 0x89b782)
+            ball(-.025f, .34f, .51f, .035f, .03f, .025f, 0xd9b7e8)
         }
         // Species: fox, bear, cat, panda, rabbit and owl. Each has actual 3D ears/features.
         if (character == "milo" || character == "kai") {
