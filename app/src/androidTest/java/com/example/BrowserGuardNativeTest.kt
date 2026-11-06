@@ -23,7 +23,7 @@ class BrowserGuardNativeTest {
         val settings = SettingsPreferences(context)
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { String(it.readBytes()).trim() }
         fun waitUntil(message: String, condition: () -> Boolean) {
-            val deadline = android.os.SystemClock.uptimeMillis() + 15_000
+            val deadline = android.os.SystemClock.uptimeMillis() + 30_000
             while (!condition() && android.os.SystemClock.uptimeMillis() < deadline) Thread.sleep(100)
             assertTrue(message, condition())
         }

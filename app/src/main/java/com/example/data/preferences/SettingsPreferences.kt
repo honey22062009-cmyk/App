@@ -73,6 +73,7 @@ class SettingsPreferences(private val context: Context) {
         val DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
+        val FOCUS_SESSION_RECORDS = stringSetPreferencesKey("focus_session_records_v1")
 
         // User-selectable blocker customization
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
@@ -191,6 +192,12 @@ class SettingsPreferences(private val context: Context) {
 
     val appGroupsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.APP_GROUPS] ?: emptySet()
+    }
+
+    val focusSessionsFlow: Flow<List<FocusSessionRecord>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] ?: emptySet())
+            .mapNotNull(FocusSessionRecord::decode)
+            .sortedByDescending { it.startedAtMillis }
     }
 
     val trackerStartedAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -484,6 +491,36 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setAppGroups(groups: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_GROUPS] = groups
+        }
+    }
+
+    suspend fun saveFocusSession(record: FocusSessionRecord) {
+        context.dataStore.edit { preferences ->
+            val sessions = (preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] ?: emptySet())
+                .mapNotNull(FocusSessionRecord::decode)
+                .filterNot { it.id == record.id }
+                .toMutableList()
+            sessions += record
+            preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] = sessions
+                .sortedByDescending { it.startedAtMillis }
+                .take(1000)
+                .map(FocusSessionRecord::encode)
+                .toSet()
+        }
+    }
+
+    suspend fun deleteFocusSession(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] =
+                (preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] ?: emptySet())
+                    .filterNot { FocusSessionRecord.decode(it)?.id == id }
+                    .toSet()
+        }
+    }
+
+    suspend fun clearFocusSessionHistory() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(PreferencesKeys.FOCUS_SESSION_RECORDS)
         }
     }
 
@@ -791,6 +828,7 @@ class SettingsPreferences(private val context: Context) {
             "hero",
             "checkin",
             "graph",
+            "focus",
             "calendar",
             "milestones",
             "stats",

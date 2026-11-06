@@ -39,6 +39,27 @@ jobs:
           fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
+      - name: Configure optional retained Android signing key
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No retained Android signing key configured. The debug APK will use the runner debug key; it may not update an existing installation."
+          else
+            KEYSTORE_FILE="$RUNNER_TEMP/strict-blocker-update-key.jks"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+            chmod 600 "$KEYSTORE_FILE"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$ANDROID_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-upload}" >> "$GITHUB_ENV"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace --no-daemon
       - name: Build debug APK
@@ -54,11 +75,21 @@ jobs:
         run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
       - name: Build release bundle
         run: gradle :app:bundleRelease --stacktrace --no-daemon
-      - name: Upload unsigned release bundle
+      - name: Upload release bundle
         uses: actions/upload-artifact@v4
         with:
-          name: strict-blocker-unsigned-release-bundle
+          name: strict-blocker-release-bundle
           path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - name: Build retained-key release APK
+        if: steps.signing.outputs.configured == 'true'
+        run: gradle :app:assembleRelease --stacktrace --no-daemon
+      - name: Upload retained-key release APK
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-blocker-release-apk-retained-key
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Upload test and lint reports
         if: always()

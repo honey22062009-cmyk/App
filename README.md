@@ -1,8 +1,8 @@
-> Version 1.4.0: pastel themes, translucent sliding dock, visible Pro workspace, daily-entry receipts, a joined 3D bunny with optional sound, a quick tour and browser inspection without a VPN. See [the implementation and release notes](docs/EXPERIENCE-1.4.md).
+> Version 1.6.0: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 # Strict Blocker (Android)
 
-Current reliability/UI update: **1.3.1**. See [implementation changes, verification and device limits](docs/RELIABILITY-1.3.1.md).
+Current companion release target: **1.6.0**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 A production-grade, native Android application engineered for **strict scheduled application blocking** with non-root enforcement. Designed and optimized for phones and tablets, including the **Samsung Galaxy Tab A9+** running modern Samsung One UI and Android 13+.
 

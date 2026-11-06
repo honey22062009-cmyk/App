@@ -45,11 +45,27 @@ class ReliabilityUiTest {
         }
         fun bunnyPixels(image: Bitmap): Int {
             val bounds = checkNotNull(sceneBounds)
-            var ivory = 0; var eyes = 0
+            fun sample(x: Int, y: Int): Int = image.getPixel(
+                x.coerceIn(0, image.width - 1), y.coerceIn(0, image.height - 1)
+            )
+            // Normalize against scene corners so a system dim overlay does not
+            // make a visible native model appear to be a blank GL surface.
+            val cornerPeaks = listOf(
+                sample(bounds.left.toInt() + 8, bounds.top.toInt() + 8),
+                sample(bounds.right.toInt() - 8, bounds.top.toInt() + 8),
+                sample(bounds.left.toInt() + 8, bounds.bottom.toInt() - 8),
+                sample(bounds.right.toInt() - 8, bounds.bottom.toInt() - 8)
+            ).map { pixel -> maxOf((pixel shr 16) and 255, (pixel shr 8) and 255, pixel and 255) }
+            val backgroundPeak = cornerPeaks.sorted()[cornerPeaks.size / 2].coerceAtLeast(1)
+            val gain = (238f / backgroundPeak.toFloat()).coerceIn(1f, 3f)
+            var ivory = 0
+            var eyes = 0
             for (y in bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(image.height)) {
                 for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(image.width)) {
                     val pixel = image.getPixel(x, y)
-                    val r = (pixel shr 16) and 255; val g = (pixel shr 8) and 255; val b = pixel and 255
+                    val r = (((pixel shr 16) and 255) * gain).toInt().coerceAtMost(255)
+                    val g = (((pixel shr 8) and 255) * gain).toInt().coerceAtMost(255)
+                    val b = ((pixel and 255) * gain).toInt().coerceAtMost(255)
                     if (r in 150..255 && g in 120..245 && b in 100..240 && r-g in 5..40 && g-b in 1..30) ivory++
                     if (r in 30..90 && g in 20..80 && b in 30..100 && r > g) eyes++
                 }
@@ -125,7 +141,13 @@ class ReliabilityUiTest {
         val snackResponses = listOf(
             "Crunch, crunch. Thank you!",
             "A tiny snack for a tiny assistant.",
-            "Mmm. Back to being your study-side companion."
+            "Mmm. Back to being your study-side companion.",
+            "Crunch, crunch. Thank you for the imaginary snack.",
+            "Fuel acquired. Tiny assistant back online.",
+            "That was delicious. I shall remember it dramatically.",
+            "A snack break is a perfectly respectable pause.",
+            "Mmm. Even my whiskers approve.",
+            "Back to helping, with renewed bunny determination."
         )
         compose.waitUntil(5_000) {
             snackResponses.any { compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() }
@@ -172,6 +194,40 @@ class ReliabilityUiTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("settings_screen_root").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("settings_screen_root").assertIsDisplayed()
         capture("06-settings")
+    }
+
+    @Test fun focusRoomSavesItsOwnHistoryWithoutTouchingStreakTimeline() {
+        runBlocking {
+            settings.clearAllUserPreferences()
+            settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
+            settings.setQuickTourSeen(true)
+        }
+        compose.activityRule.scenario.recreate()
+        waitFor("Hi, Honey")
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("FOCUS ROOM"))
+        compose.onNodeWithText("Open").performClick()
+        waitFor("Make space to focus.")
+        compose.onNodeWithText("Start 25-minute session").performClick()
+        // End-session is visible only after the start action has taken effect.
+        // Advance Compose's test clock rather than sleeping the instrumentation thread.
+        waitFor("End session")
+        compose.mainClock.advanceTimeBy(2_500L)
+        compose.waitForIdle()
+        compose.onNodeWithText("End session").performClick()
+        waitFor("End this session?")
+        compose.onNodeWithText("Save and exit").performClick()
+        compose.waitUntil(10_000) { runBlocking { settings.focusSessionsFlow.first().size == 1 } }
+        val session = runBlocking { settings.focusSessionsFlow.first().single() }
+        assertFalse(session.completed)
+        assertEquals("Study", session.activity)
+        compose.onNodeWithText("Progress").performClick()
+        waitFor("Your progress")
+        compose.onNodeWithText("FOCUS SESSION HISTORY").performClick()
+        waitFor("Focus history")
+        compose.onNodeWithText("Ended early").assertIsDisplayed()
+        // Focus history is persisted independently and does not create a streak reset.
+        assertTrue(runBlocking { settings.trackerResetRecordsFlow.first().isEmpty() })
+        capture("14-focus-history")
     }
 
     @Test fun proIsInTheDockAndPastelAppearanceChoicesPersist() {

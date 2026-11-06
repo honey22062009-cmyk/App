@@ -53,6 +53,7 @@ import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.focus.FocusSessionScreen
 import com.example.ui.screens.insights.InsightsScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.OnboardingExperienceScreen
@@ -239,7 +240,7 @@ fun MainAppScaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                if (currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions &&
+                if (currentScreen != Screen.FocusSession && currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions &&
                     !dataEntryVisible && !keyboardVisible) {
                     FloatingGlassDock(
                         currentScreen = currentScreen,
@@ -331,7 +332,17 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onOpenPro = { onNavigateToScreen(Screen.Paywall) }
+                onOpenPro = { onNavigateToScreen(Screen.Paywall) },
+                onStartFocusSession = { onNavigateToScreen(Screen.FocusSession) }
+            )
+        }
+        Screen.FocusSession -> {
+            FocusSessionScreen(
+                settings = repository.settings,
+                characterId = repository.settings.selectedCharacterIdFlow.collectAsState(initial = "nova").value,
+                companionName = repository.settings.characterNameFlow.collectAsState(initial = "").value,
+                reduceMotion = repository.settings.reduceMotionFlow.collectAsState(initial = false).value,
+                onBack = { onNavigateToScreen(Screen.Dashboard) }
             )
         }
         Screen.Apps -> {
