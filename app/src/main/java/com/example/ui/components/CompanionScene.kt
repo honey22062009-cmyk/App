@@ -630,7 +630,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             "rest" -> 8f
             "dance" -> 3.6f
             "snack", "talk" -> 3f
-            "stretch", "cheer" -> 2.8f
+            "stretch", "cheer", "happy_hop", "paw_wave", "wiggle", "look_up" -> 2.8f
             "curious", "ear_twitch", "look_around", "listen", "think", "tail_wag" -> 2.5f
             else -> 2f
         }
@@ -695,20 +695,26 @@ private class CompanionRenderer(private val state: CompanionState) {
                 acting && reaction == "tail_wag" -> sin(elapsed * 15f) * 30f * pulse
                 else -> sin(time * 3.1f) * 5f
             }
-            ball(0f, -.55f, -.39f, .13f, .14f, .13f, 0xfffaf5, tailWag)
+            ball(-.35f, -.57f, -.02f, .15f, .15f, .14f, 0xfffaf5, tailWag)
         } else {
             // Distinct proportions keep the fox, bear, cat, panda and owl from sharing
             // one interchangeable stack of spheres.
-            val body = when (character) {
-                "milo" -> floatArrayOf(.55f, .64f, .41f, .64f, .57f, .47f) // round bear
-                "aria" -> floatArrayOf(.43f, .62f, .31f, .58f, .52f, .43f) // sleek cat
-                "kai" -> floatArrayOf(.53f, .61f, .40f, .62f, .56f, .47f) // stocky panda
-                "sol" -> floatArrayOf(.49f, .67f, .39f, .59f, .62f, .46f) // tall owl
-                else -> floatArrayOf(.45f, .65f, .34f, .61f, .55f, .44f) // fox
+            val torsoWidth: Float
+            val torsoHeight: Float
+            val torsoDepth: Float
+            val headWidth: Float
+            val headHeight: Float
+            val headDepth: Float
+            when (character) {
+                "milo" -> { torsoWidth = .55f; torsoHeight = .64f; torsoDepth = .41f; headWidth = .64f; headHeight = .57f; headDepth = .47f }
+                "aria" -> { torsoWidth = .43f; torsoHeight = .62f; torsoDepth = .31f; headWidth = .58f; headHeight = .52f; headDepth = .43f }
+                "kai" -> { torsoWidth = .53f; torsoHeight = .61f; torsoDepth = .40f; headWidth = .62f; headHeight = .56f; headDepth = .47f }
+                "sol" -> { torsoWidth = .49f; torsoHeight = .67f; torsoDepth = .39f; headWidth = .59f; headHeight = .62f; headDepth = .46f }
+                else -> { torsoWidth = .45f; torsoHeight = .65f; torsoDepth = .34f; headWidth = .61f; headHeight = .55f; headDepth = .44f }
             }
-            ball(0f, -.23f, -.05f, body[0], body[1], body[2], coat)
-            ball(0f, .18f, .0f, body[0] * .70f, .29f, body[2] * .83f, coat)
-            ball(0f, -.25f, .28f, body[0] * .64f, .39f, .11f, if (character == "kai") cream else cream)
+            ball(0f, -.23f, -.05f, torsoWidth, torsoHeight, torsoDepth, coat)
+            ball(0f, .18f, .0f, torsoWidth * .70f, .29f, torsoDepth * .83f, coat)
+            ball(0f, -.25f, .28f, torsoWidth * .64f, .39f, .11f, cream)
             ball(-.25f, -.77f, .16f, .22f, .19f, .29f, limbCoat)
             ball(.25f, -.77f, .16f, .22f, .19f, .29f, limbCoat)
             ball(-.24f, -.87f, .36f, .16f, .07f, .19f, limbCoat)
@@ -719,11 +725,11 @@ private class CompanionRenderer(private val state: CompanionState) {
                 ball(.23f, .65f, .405f, .15f, .18f, .045f, limbCoat, 18f)
             }
             if (character != "sol") {
-                ball(0f, .57f, .03f, body[3], body[4], body[5], coat)
+                ball(0f, .57f, .03f, headWidth, headHeight, headDepth, coat)
             } else {
                 // Owl head is intentionally larger and sits lower into the chest.
-                ball(0f, .61f, .03f, body[3], body[4], body[5], coat)
-                draw(cone, 0f, .33f, .49f, .12f, .16f, .10f, 0xe29b53, 180f)
+                ball(0f, .61f, .03f, headWidth, headHeight, headDepth, coat)
+                draw(cone, 0f, .53f, .49f, .12f, .16f, .10f, 0xe29b53, 180f)
                 for (side in listOf(-1f, 1f)) {
                     ball(side * .30f, -.12f, .28f, .13f, .22f, .06f, 0xe2b96e, side * 18f)
                 }
@@ -732,13 +738,13 @@ private class CompanionRenderer(private val state: CompanionState) {
             val tailSwing = if (reducedMotion) 0f else
                 sin(time * 3.1f) * 7f + if (acting && reaction in setOf("tail_wag", "wiggle")) sin(elapsed * 14f) * 26f * pulse else 0f
             when (character) {
-                "milo" -> ball(0f, -.51f, -.39f, .13f, .13f, .13f, coat, tailSwing)
-                "aria" -> ball(-.39f, -.38f, -.39f, .10f, .29f, .11f, coat, -24f + tailSwing)
-                "kai" -> ball(0f, -.55f, -.39f, .12f, .12f, .12f, cream, tailSwing)
-                "sol" -> ball(0f, -.56f, -.34f, .20f, .18f, .10f, 0xe1b75e, tailSwing)
+                "milo" -> ball(-.43f, -.52f, .02f, .16f, .15f, .15f, coat, tailSwing)
+                "aria" -> ball(-.43f, -.37f, .06f, .11f, .29f, .12f, coat, -24f + tailSwing)
+                "kai" -> ball(.43f, -.55f, .03f, .13f, .13f, .13f, cream, tailSwing)
+                "sol" -> ball(.35f, -.56f, .07f, .20f, .18f, .10f, 0xe1b75e, tailSwing)
                 else -> {
-                    ball(-.25f, -.48f, -.43f, .23f, .25f, .30f, coat, -24f + tailSwing)
-                    ball(-.31f, -.63f, -.66f, .14f, .15f, .17f, cream, -24f + tailSwing)
+                    ball(-.48f, -.48f, .03f, .24f, .25f, .29f, coat, -24f + tailSwing)
+                    ball(-.56f, -.63f, .24f, .14f, .15f, .17f, cream, -24f + tailSwing)
                 }
             }
         }
@@ -750,7 +756,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             // Broader shoulder-to-wrist mesh, with an overlapping shoulder socket,
             // a distinct palm and small toe-like finger pads.
             ball(0f, -.015f, .0f, .135f, .145f, .145f, limbCoat)
-            draw(softLimb, 0f, -.18f, 0f, .27f, .36f, .245f, limbCoat)
+            draw(softLimb, 0f, -.18f, 0f, .38f, .36f, .32f, limbCoat)
             ball(0f, -.39f, .045f, .145f, .135f, .14f, limbCoat)
             ball(0f, -.405f, .158f, .078f, .040f, .020f, 0xe9aabd)
             for (finger in -1..1) {
