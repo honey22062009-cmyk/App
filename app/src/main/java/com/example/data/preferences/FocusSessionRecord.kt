@@ -1,6 +1,6 @@
 package com.example.data.preferences
 
-import android.util.Base64
+import java.util.Base64
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -17,10 +17,7 @@ data class FocusSessionRecord(
     val completed: Boolean
 ) {
     fun encode(): String {
-        val safeActivity = Base64.encodeToString(
-            activity.toByteArray(StandardCharsets.UTF_8),
-            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
-        )
+        val safeActivity = Base64.getUrlEncoder().withoutPadding().encodeToString(activity.toByteArray(StandardCharsets.UTF_8))
         return listOf(
             id,
             startedAtMillis.toString(),
