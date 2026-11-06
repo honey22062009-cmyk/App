@@ -10,7 +10,7 @@ import org.junit.Test
 class CompanionBehaviorTest {
     @Test
     fun automaticIdleCuesAreAvailableAndHaveDialogue() {
-        val expected = setOf("curious", "ear_twitch", "stretch", "look_around", "rest", "tail_wag", "listen", "think")
+        val expected = setOf("curious", "ear_twitch", "stretch", "look_around", "rest", "tail_wag", "listen", "think", "happy_hop", "paw_wave", "wiggle", "look_up")
         assertEquals(expected, CompanionBehavior.idleActionIds)
 
         repeat(100) { index ->
@@ -25,7 +25,7 @@ class CompanionBehaviorTest {
         val actions = listOf(
             "wave", "jump", "spin", "dance", "snack", "rest", "talk", "pet",
             "curious", "ear_twitch", "look_around", "stretch", "cheer", "listen",
-            "think", "focus", "tip", "checkin", "goal", "progress", "celebrate", "remind"
+            "think", "happy_hop", "paw_wave", "wiggle", "look_up", "focus", "tip", "checkin", "goal", "progress", "celebrate", "remind"
         )
         actions.forEach { action ->
             val options = CompanionBehavior.dialogueOptions(action)
