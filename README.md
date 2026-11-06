@@ -2,7 +2,7 @@
 
 # Strict Blocker (Android)
 
-Current reliability/UI update: **1.3.1**. See [implementation changes, verification and device limits](docs/RELIABILITY-1.3.1.md).
+Current companion release target: **1.6.0**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 A production-grade, native Android application engineered for **strict scheduled application blocking** with non-root enforcement. Designed and optimized for phones and tablets, including the **Samsung Galaxy Tab A9+** running modern Samsung One UI and Android 13+.
 
