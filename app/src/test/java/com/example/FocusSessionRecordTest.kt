@@ -14,12 +14,14 @@ class FocusSessionRecordTest {
             startedAtMillis = 1_800_000_000_000L,
             plannedSeconds = 45 * 60,
             actualSeconds = 45 * 60,
-            activity = "  Biology   revision  ",
+            activity = "  Revision  ",
+            taskName = "  Biology   revision  ",
             completed = true
         )
         val decoded = FocusSessionRecord.decode(original.encode())
         assertEquals(original, decoded)
-        assertEquals("Biology revision", decoded?.activity)
+        assertEquals("Revision", decoded?.activity)
+        assertEquals("Biology revision", decoded?.taskName)
         assertTrue(decoded?.completed == true)
     }
 
@@ -34,6 +36,7 @@ class FocusSessionRecordTest {
         )
         assertEquals(1L, record.startedAtMillis)
         assertEquals("Study", record.activity)
+        assertEquals("", record.taskName)
         assertFalse(record.completed)
         assertEquals(12 * 60, FocusSessionRecord.decode(record.encode())?.actualSeconds)
     }
