@@ -128,6 +128,7 @@ fun InteractiveCompanion(
     checkInDone: Boolean = false,
     onRecordToday: () -> Unit = {},
     onEditGoal: () -> Unit = {},
+    onStartFocusSession: () -> Unit = {},
     dashboardMode: Boolean = false
 ) {
     var reaction by remember { mutableStateOf("idle") }
@@ -140,8 +141,6 @@ fun InteractiveCompanion(
     }
     var audioStatus by remember { mutableStateOf("") }
     var lastInteractionAt by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    var focusSeconds by rememberSaveable { mutableIntStateOf(25 * 60) }
-    var focusRunning by rememberSaveable { mutableStateOf(false) }
     var showMoreActions by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -150,7 +149,6 @@ fun InteractiveCompanion(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 audio.stop()
-                focusRunning = false
             }
         }
         lifecycle.addObserver(observer)
@@ -184,16 +182,6 @@ fun InteractiveCompanion(
             if (action != "talk") audio.effect(action)
             audio.say(caption)
         }
-    }
-
-    LaunchedEffect(focusRunning) {
-        if (!focusRunning) return@LaunchedEffect
-        while (focusSeconds > 0) {
-            delay(1_000L)
-            focusSeconds = (focusSeconds - 1).coerceAtLeast(0)
-        }
-        focusRunning = false
-        act("celebrate")
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -268,34 +256,23 @@ fun InteractiveCompanion(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .34f),
                 shape = RoundedCornerShape(20.dp)
             ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("FOCUS SESSION", style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                            Text("%02d:%02d".format(focusSeconds / 60, focusSeconds % 60),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                        }
-                        FilledTonalButton(onClick = {
-                            if (focusSeconds == 0) focusSeconds = 25 * 60
-                            val starting = !focusRunning
-                            focusRunning = starting
-                            if (starting) act("focus")
-                        }) {
-                            Text(if (focusRunning) "Pause" else if (focusSeconds == 25 * 60) "Start 25 min" else "Resume")
-                        }
-                        TextButton(onClick = {
-                            focusRunning = false
-                            focusSeconds = 25 * 60
-                        }) { Text("Reset") }
+                Row(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("FOCUS ROOM", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("Choose a duration and study with your companion in a dedicated animated space.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    LinearProgressIndicator(
-                        progress = { focusSeconds / (25f * 60f) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text("Runs only while this screen is open. Pauses when you leave the app.",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FilledTonalButton(onClick = {
+                        act("focus")
+                        onStartFocusSession()
+                    }) { Text("Open") }
                 }
             }
     
