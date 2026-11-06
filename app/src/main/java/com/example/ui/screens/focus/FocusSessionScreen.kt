@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -93,6 +95,8 @@ fun FocusSessionScreen(
     var reaction by remember { mutableStateOf("focus") }
     var reactionKey by remember { mutableIntStateOf(1) }
     var companionCaption by remember { mutableStateOf("Pick a duration. I'll keep the study corner cosy.") }
+
+    BackHandler(enabled = hasStarted && !saved) { showEndConfirmation = true }
 
     val plannedSeconds = selectedMinutes * 60
     val remainingSeconds = (plannedSeconds - elapsedSeconds).coerceAtLeast(0)
@@ -284,7 +288,7 @@ fun FocusSessionScreen(
                     )
                     Text("WHAT ARE YOU WORKING ON?", style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         focusActivities.forEach { option ->
                             FilterChip(
                                 selected = activity == option,
@@ -487,7 +491,7 @@ fun FocusSessionHistoryDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     listOf("All", "Completed", "Ended early").forEach { option ->
                         FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option) })
                     }
