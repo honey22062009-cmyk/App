@@ -692,7 +692,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             }
             val tailWag = when {
                 reducedMotion -> 0f
-                acting && reaction == "tail_wag" -> sin(elapsed * 15f) * 30f * pulse
+                acting && reaction in setOf("tail_wag", "wiggle") -> sin(elapsed * 15f) * 30f * pulse
                 else -> sin(time * 3.1f) * 5f
             }
             ball(-.35f, -.57f, -.02f, .15f, .15f, .14f, 0xfffaf5, tailWag)
