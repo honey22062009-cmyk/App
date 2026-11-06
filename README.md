@@ -1,4 +1,4 @@
-> Version 1.5.0: a redesigned bunny companion with tapered ears, a continuous seated body, richer fur lighting, facial details, smoother idle motion, expanded offline dialogue, an improved installed-voice preference, tracker quick actions and an in-app focus timer. The launcher and splash identity now use a new bunny-shield mark. See [the 1.5.0 experience notes](docs/EXPERIENCE-1.5.md).
+> Version 1.6.0: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 # Strict Blocker (Android)
 
