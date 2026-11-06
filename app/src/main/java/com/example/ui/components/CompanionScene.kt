@@ -630,7 +630,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             "rest" -> 8f
             "dance" -> 3.6f
             "snack", "talk" -> 3f
-            "stretch", "cheer", "happy_hop", "paw_wave", "wiggle", "look_up" -> 2.8f
+            "stretch", "cheer", "celebrate", "happy_hop", "paw_wave", "wiggle", "look_up" -> 2.8f
             "curious", "ear_twitch", "look_around", "listen", "think", "tail_wag" -> 2.5f
             else -> 2f
         }
@@ -642,7 +642,7 @@ private class CompanionRenderer(private val state: CompanionState) {
             acting && reaction in setOf("jump", "happy_hop") -> abs(sin(phase * PI.toFloat() * 2)) * .52f
             acting && reaction == "dance" -> abs(sin(elapsed * 10f)) * .10f * pulse
             acting && reaction == "stretch" -> sin(phase * PI.toFloat()) * .07f
-            acting && reaction == "cheer" -> abs(sin(phase * PI.toFloat() * 2f)) * .18f
+            acting && reaction in setOf("cheer", "celebrate") -> abs(sin(phase * PI.toFloat() * 2f)) * .18f
             acting && reaction == "curious" -> sin(phase * PI.toFloat()) * .035f
             acting && reaction == "wiggle" -> abs(sin(elapsed * 13f)) * .065f * pulse
             else -> sin(time * 1.7f) * .018f
