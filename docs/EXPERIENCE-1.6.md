@@ -22,12 +22,12 @@ This remains native procedural OpenGL ES geometry, not a downloaded rigged chara
 - Session type can be marked as Study, Revision, Practice or Reading, with an optional task label.
 - The focus room includes the animated selected companion, changing companion cues, animated progress ring, remaining-time display, pause/resume and explicit end-session flow.
 - The session pauses when the app leaves the foreground. It is an in-app foreground timer, not a background service and not a notification-based timer.
-- Completed sessions and sessions ended early are both saved locally. Session records retain start time, planned duration, actual duration, activity/task label and completion status.
+- Completed sessions and sessions ended early are both saved locally. Session records retain start time, planned duration, actual duration, activity category, optional task label and completion status as separate fields.
 
 ## Progress history
 
 - Progress contains a dedicated **Focus session history** card with total sessions, completions, minutes and this-week count.
-- Opening the card shows a separate history view with filters for all, completed and ended-early sessions.
+- Opening the card shows a separate history view with filters for all, completed, ended-early, Study, Revision, Practice and Reading sessions.
 - Focus sessions use their own DataStore key and record model. They do not enter the streak graph, reset timeline or streak calculations.
 - The local history retains up to 1,000 recent sessions and remains on-device across app updates.
 
