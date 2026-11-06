@@ -296,7 +296,7 @@ fun InteractiveCompanion(
             }
         }
         if (showMoreActions) {
-            listOf("spin" to "Spin", "focus" to "Focus", "tip" to "Tip",
+            listOf("spin" to "Spin", "tip" to "Tip",
                 "listen" to "Listen", "think" to "Think", "remind" to "Remind")
                 .chunked(3).forEach { actions ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
