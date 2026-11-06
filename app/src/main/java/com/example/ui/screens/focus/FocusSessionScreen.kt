@@ -94,7 +94,7 @@ fun FocusSessionScreen(
     var saved by rememberSaveable { mutableStateOf(false) }
     var showEndConfirmation by remember { mutableStateOf(false) }
     var showCompletion by rememberSaveable { mutableStateOf(false) }
-    var reaction by remember { mutableStateOf("focus") }
+    var reaction by remember { mutableStateOf("happy_hop") }
     var reactionKey by remember { mutableIntStateOf(1) }
     var companionCaption by remember { mutableStateOf("Pick a duration. I'll keep the study corner cosy.") }
 
@@ -320,7 +320,7 @@ fun FocusSessionScreen(
                             sessionStartedAt = System.currentTimeMillis()
                             isRunning = true
                             showCompletion = false
-                            reaction = "focus"
+                            reaction = "happy_hop"
                             reactionKey++
                             companionCaption = "I'm settling in. You take the first step."
                         },
