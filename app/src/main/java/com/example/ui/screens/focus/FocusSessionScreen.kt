@@ -96,7 +96,7 @@ fun FocusSessionScreen(
     var reactionKey by remember { mutableIntStateOf(1) }
     var companionCaption by remember { mutableStateOf("Pick a duration. I'll keep the study corner cosy.") }
 
-    BackHandler(enabled = hasStarted && !saved) { showEndConfirmation = true }
+    BackHandler(enabled = hasStarted && !saved && !showEndConfirmation) { showEndConfirmation = true }
 
     val plannedSeconds = selectedMinutes * 60
     val remainingSeconds = (plannedSeconds - elapsedSeconds).coerceAtLeast(0)
@@ -123,7 +123,8 @@ fun FocusSessionScreen(
                 startedAtMillis = sessionStartedAt,
                 plannedSeconds = plannedSeconds,
                 actualSeconds = elapsedSeconds,
-                activity = taskName.trim().ifBlank { activity },
+                activity = activity,
+                taskName = taskName,
                 completed = completed
             )
             scope.launch {
@@ -153,7 +154,8 @@ fun FocusSessionScreen(
                         startedAtMillis = sessionStartedAt,
                         plannedSeconds = plannedSeconds,
                         actualSeconds = elapsedSeconds,
-                        activity = taskName.trim().ifBlank { activity },
+                        activity = activity,
+                        taskName = taskName,
                         completed = true
                     )
                 )
@@ -184,7 +186,7 @@ fun FocusSessionScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = {
-                if (hasStarted && elapsedSeconds > 0 && !saved) showEndConfirmation = true else onBack()
+                if (hasStarted && !saved) showEndConfirmation = true else onBack()
             }) { Text("‹  Back") }
             Spacer(Modifier.weight(1f))
             Text("FOCUS ROOM", style = MaterialTheme.typography.labelLarge,
@@ -477,6 +479,7 @@ fun FocusSessionHistoryDialog(
         when (filter) {
             "Completed" -> sessions.filter { it.completed }
             "Ended early" -> sessions.filterNot { it.completed }
+            "Study", "Revision", "Practice", "Reading" -> sessions.filter { it.activity == filter }
             else -> sessions
         }
     }
@@ -492,7 +495,7 @@ fun FocusSessionHistoryDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    listOf("All", "Completed", "Ended early").forEach { option ->
+                    listOf("All", "Completed", "Ended early", "Study", "Revision", "Practice", "Reading").forEach { option ->
                         FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option) })
                     }
                 }
@@ -509,13 +512,13 @@ fun FocusSessionHistoryDialog(
                                 .format(DateTimeFormatter.ofPattern("dd MMM yyyy · hh:mm a", Locale.getDefault()))
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(session.activity, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                                    Text(session.taskName.ifBlank { session.activity }, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                                     Text(if (session.completed) "Completed" else "Ended early",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (session.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Text(
-                                    "${session.actualSeconds / 60} min ${session.actualSeconds % 60} sec of ${session.plannedSeconds / 60} min · $date",
+                                    "${session.activity} · ${session.actualSeconds / 60} min ${session.actualSeconds % 60} sec of ${session.plannedSeconds / 60} min · $date",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
