@@ -130,7 +130,8 @@ internal fun StreakHeroCard(
     onRecordReset: () -> Unit, onEditGoal: () -> Unit,
     companionName: String = "", onRecordToday: () -> Unit = onRecordReset,
     soundEnabled: Boolean = false, onSoundChange: (Boolean) -> Unit = {},
-    dailyCheckInDone: Boolean = false
+    dailyCheckInDone: Boolean = false,
+    onStartFocusSession: () -> Unit = {}
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp)) {
         Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -161,6 +162,7 @@ internal fun StreakHeroCard(
                             currentStreak = stats.currentDays, bestStreak = stats.bestDays,
                             goalDays = goalDays, checkInDone = dailyCheckInDone,
                             onRecordToday = onRecordToday, onEditGoal = onEditGoal,
+                            onStartFocusSession = onStartFocusSession,
                             dashboardMode = true
                         )
                     }
@@ -173,6 +175,7 @@ internal fun StreakHeroCard(
                             currentStreak = stats.currentDays, bestStreak = stats.bestDays,
                             goalDays = goalDays, checkInDone = dailyCheckInDone,
                             onRecordToday = onRecordToday, onEditGoal = onEditGoal,
+                            onStartFocusSession = onStartFocusSession,
                             dashboardMode = true
                         )
                     }
