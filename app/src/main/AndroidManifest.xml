@@ -16,6 +16,8 @@
 
     <!-- Query launchable apps -->
     <queries>
+        <!-- The instrumented browser fixture lives in the test APK and is package-visibility filtered on API 35. -->
+        <package android:name="com.aistudio.strictblocker.kzvwpq.test" />
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
