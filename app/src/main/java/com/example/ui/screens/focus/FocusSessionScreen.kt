@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -503,11 +505,11 @@ fun FocusSessionHistoryDialog(
                     Text(if (sessions.isEmpty()) "No focus sessions yet. Finish your first session and it will show up here."
                     else "No sessions match this filter.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Column(
-                        modifier = Modifier.height(340.dp).verticalScroll(rememberScrollState()),
+                    LazyColumn(
+                        modifier = Modifier.height(340.dp),
                         verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
-                        visible.take(100).forEachIndexed { index, session ->
+                        items(items = visible, key = { it.id }) { session ->
                             val date = Instant.ofEpochMilli(session.startedAtMillis).atZone(ZoneId.systemDefault())
                                 .format(DateTimeFormatter.ofPattern("dd MMM yyyy · hh:mm a", Locale.getDefault()))
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -522,8 +524,8 @@ fun FocusSessionHistoryDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
                             }
-                            if (index != visible.take(100).lastIndex) Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
                         }
                     }
                 }
