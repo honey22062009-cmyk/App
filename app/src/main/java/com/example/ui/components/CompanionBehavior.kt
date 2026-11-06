@@ -17,7 +17,11 @@ internal object CompanionBehavior {
         CompanionCue("rest", "A quiet breath. Nothing needs doing this exact second."),
         CompanionCue("tail_wag", "Just a tiny tail wiggle. Carry on."),
         CompanionCue("listen", "I'm listening. Take your time."),
-        CompanionCue("think", "Thinking very hard. The ears are helping.")
+        CompanionCue("think", "Thinking very hard. The ears are helping."),
+        CompanionCue("happy_hop", "A tiny happy hop, just because."),
+        CompanionCue("paw_wave", "One paw is waving. The other is on important bunny duty."),
+        CompanionCue("wiggle", "A small wiggle to keep the quiet from getting too serious."),
+        CompanionCue("look_up", "Checking the ceiling. Still there. Good.")
     )
 
     private val dialogue = mapOf(
@@ -139,6 +143,26 @@ internal object CompanionBehavior {
             "A tiny plan beats ten imaginary perfect plans.",
             "We can break a big task into a smaller first move.",
             "One clear decision is enough for now."
+        ),
+        "happy_hop" to listOf(
+            "A hop for absolutely no reason. Those are underrated.",
+            "Tiny bounce, maximum enthusiasm.",
+            "I have discovered a little extra energy."
+        ),
+        "paw_wave" to listOf(
+            "Hello from the left paw. The right one is busy waving too.",
+            "A small wave to make the room feel less quiet.",
+            "One paw up. All is well."
+        ),
+        "wiggle" to listOf(
+            "A little wiggle. Systems remain operational.",
+            "The wiggles arrived before the explanation.",
+            "Quiet does not mean motionless."
+        ),
+        "look_up" to listOf(
+            "Looking up for a second. Back with you now.",
+            "Ceiling inspection complete.",
+            "Sometimes a different angle helps."
         ),
         "focus" to listOf(
             "Choose one task. Let the rest wait its turn.",
