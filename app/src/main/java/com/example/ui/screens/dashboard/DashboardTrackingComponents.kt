@@ -1045,6 +1045,7 @@ internal fun DashboardCustomizationDialog(
         "hero" to "Streak hero",
         "stats" to "Stats",
         "graph" to "Graph",
+        "focus" to "Focus-session history",
         "milestones" to "Milestones",
         "checkin" to "Daily check-in",
         "calendar" to "Calendar",
