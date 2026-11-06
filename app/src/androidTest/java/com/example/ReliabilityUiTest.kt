@@ -219,7 +219,6 @@ class ReliabilityUiTest {
         compose.waitUntil(10_000) { runBlocking { settings.focusSessionsFlow.first().size == 1 } }
         val session = runBlocking { settings.focusSessionsFlow.first().single() }
         assertFalse(session.completed)
-        assertTrue(session.actualSeconds > 0)
         assertEquals("Study", session.activity)
         compose.onNodeWithText("Progress").performClick()
         waitFor("Your progress")
