@@ -180,6 +180,38 @@ class ReliabilityUiTest {
         capture("06-settings")
     }
 
+    @Test fun focusRoomSavesItsOwnHistoryWithoutTouchingStreakTimeline() {
+        runBlocking {
+            settings.clearAllUserPreferences()
+            settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
+            settings.setQuickTourSeen(true)
+        }
+        compose.activityRule.scenario.recreate()
+        waitFor("Hi, Honey")
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("FOCUS ROOM"))
+        compose.onNodeWithText("Open").performClick()
+        waitFor("Make space to focus.")
+        compose.onNodeWithText("Start 25-minute session").performClick()
+        waitFor("One thing at a time.")
+        Thread.sleep(2_000)
+        compose.onNodeWithText("End session").performClick()
+        waitFor("End this session?")
+        compose.onNodeWithText("Save and exit").performClick()
+        compose.waitUntil(10_000) { runBlocking { settings.focusSessionsFlow.first().size == 1 } }
+        val session = runBlocking { settings.focusSessionsFlow.first().single() }
+        assertFalse(session.completed)
+        assertTrue(session.actualSeconds > 0)
+        assertEquals("Study", session.activity)
+        compose.onNodeWithText("Progress").performClick()
+        waitFor("Your progress")
+        compose.onNodeWithText("FOCUS SESSION HISTORY").performClick()
+        waitFor("Focus history")
+        compose.onNodeWithText("Ended early").assertIsDisplayed()
+        // Focus history is persisted independently and does not create a streak reset.
+        assertTrue(runBlocking { settings.trackerResetRecordsFlow.first().isEmpty() })
+        capture("14-focus-history")
+    }
+
     @Test fun proIsInTheDockAndPastelAppearanceChoicesPersist() {
         runBlocking {
             settings.clearAllUserPreferences()
