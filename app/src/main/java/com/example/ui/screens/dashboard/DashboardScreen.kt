@@ -106,7 +106,8 @@ fun DashboardScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
     onNavigateToAdultProtection: () -> Unit = {},
-    onOpenPro: () -> Unit = {}
+    onOpenPro: () -> Unit = {},
+    onStartFocusSession: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -118,6 +119,7 @@ fun DashboardScreen(
     val resetRecords by repository.settings.trackerResetRecordsFlow.collectAsState(initial = emptyList())
     val checkIns by repository.settings.dailyCheckInsFlow.collectAsState(initial = emptyList())
     val sleepEntries by repository.settings.sleepEntriesFlow.collectAsState(initial = emptyList())
+    val focusSessions by repository.settings.focusSessionsFlow.collectAsState(initial = emptyList())
     val goalDays by repository.settings.trackerGoalDaysFlow.collectAsState(initial = 0)
     val cardOrder by repository.settings.dashboardCardOrderFlow.collectAsState(
         initial = com.example.data.preferences.SettingsPreferences.defaultDashboardCardOrder()
@@ -145,6 +147,7 @@ fun DashboardScreen(
     var showGoal by remember { mutableStateOf(false) }
     var showMilestones by remember { mutableStateOf(false) }
     var showTimeline by remember { mutableStateOf(false) }
+    var showFocusHistory by remember { mutableStateOf(false) }
     var showCustomization by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<LocalDate?>(null) }
     var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
@@ -229,7 +232,7 @@ fun DashboardScreen(
     ) {
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
-        val progressKeys = setOf("stats", "graph", "calendar", "timeline", "milestones", "insights")
+        val progressKeys = setOf("stats", "graph", "focus", "calendar", "timeline", "milestones", "insights")
         val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
             else if (wideHome) listOf("protection") else listOf("protection", "hero")
         val tabletRows = remember(visibleCardOrder) {
@@ -253,7 +256,8 @@ fun DashboardScreen(
                                 editingReset = null
                                 showResetEditor = true
                             },
-                            onEditGoal = { showGoal = true }
+                            onEditGoal = { showGoal = true },
+                            onStartFocusSession = onStartFocusSession
                         )
     
                         "stats" -> StatsStrip(stats, tablet)
@@ -263,6 +267,11 @@ fun DashboardScreen(
                             resets = resetRecords,
                             zone = zone,
                             tablet = tablet
+                        )
+
+                        "focus" -> com.example.ui.screens.focus.FocusSessionsProgressCard(
+                            sessions = focusSessions,
+                            onOpenHistory = { showFocusHistory = true }
                         )
     
                         "milestones" -> MilestoneCard(
@@ -539,9 +548,16 @@ fun DashboardScreen(
         )
     }
 
+    if (showFocusHistory) {
+        com.example.ui.screens.focus.FocusSessionHistoryDialog(
+            sessions = focusSessions,
+            onDismiss = { showFocusHistory = false }
+        )
+    }
+
     if (showCustomization) {
         DashboardCustomizationDialog(
-            order = cardOrder.filter { it in setOf("stats", "graph", "calendar", "timeline", "milestones", "insights") },
+            order = cardOrder.filter { it in setOf("stats", "graph", "focus", "calendar", "timeline", "milestones", "insights") },
             hidden = hiddenCards,
             onDismiss = { showCustomization = false },
             onSave = { order, hidden ->
