@@ -228,7 +228,16 @@ fun DashboardScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = .24f),
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .16f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
     ) {
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
@@ -265,6 +274,7 @@ fun DashboardScreen(
                         "graph" -> StreakGraphCard(
                             trackerStartedAt = trackerStartedAt,
                             resets = resetRecords,
+                            stats = stats,
                             zone = zone,
                             tablet = tablet
                         )
