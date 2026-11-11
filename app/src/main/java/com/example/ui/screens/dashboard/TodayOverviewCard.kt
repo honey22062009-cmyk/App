@@ -71,7 +71,7 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
 internal fun QuickTourCard(reduceMotion: Boolean, onDone: () -> Unit) {
     var page by rememberSaveable { mutableIntStateOf(0) }
     val steps = listOf(
-        "Welcome to your day" to "Home is for a quick check-in and your companion. One save records today; your elapsed streak grows with time.",
+        "Welcome to your day" to "Home is for a quick check-in and your companion. Your streak count updates automatically at local midnight. Daily check-ins are optional, and Reset records a fresh start.",
         "Set your boundaries" to "Block holds your apps and schedules. Browser Guard interrupts explicit searches after you enable Accessibility and consent to field inspection.",
         "Make it yours" to "Progress keeps your history. Pro has its own dock tab. Tap, turn, feed or talk to your companion; sound is optional. Colours and motion live in Settings."
     )
