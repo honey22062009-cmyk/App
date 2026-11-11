@@ -39,9 +39,9 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
                 Column(Modifier.weight(1f)) {
                     AnimatedContent(current != null, label = "saved_today",
                         transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 200)) togetherWith fadeOut(tween(100)) }) { saved ->
-                        Text(if (saved) "Saved today" else "Your daily check-in", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(if (saved) "Saved today" else "Optional daily check-in", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
-                    Text(if (current == null) "A few taps. A clear picture of your day."
+                    Text(if (current == null) "Your streak counts automatically. Add an optional note about today here."
                         else "${when (current.rating) { "easy" -> "Good"; "difficult" -> "Tough"; else -> "Okay" }}${sleep?.let { " · Sleep ${it.durationMinutes / 60}h ${it.durationMinutes % 60}m" }.orEmpty()} · stored on this device",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -61,7 +61,7 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
             Text("${logged.size} ${if (logged.size == 1) "day" else "days"} recorded · ${logged.count { it in today.minusDays(6)..today }} of 7 this week",
                 style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = onRecord, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(18.dp)) {
-                Text(if (current == null) "Record today" else "Edit today's entry")
+                Text(if (current == null) "Add optional check-in" else "Edit check-in")
             }
         }
     }
