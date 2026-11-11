@@ -160,7 +160,7 @@ fun InteractiveCompanion(
     LaunchedEffect(reduceMotion, characterId) {
         if (reduceMotion) return@LaunchedEffect
         while (true) {
-            delay((5_500L..9_000L).random())
+            delay((3_800L..6_500L).random())
             val now = SystemClock.uptimeMillis()
             if (now - lastInteractionAt >= 6_500L) {
                 val cue = CompanionBehavior.nextIdleCue()
