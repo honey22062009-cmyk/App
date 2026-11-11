@@ -169,6 +169,28 @@ class TrackerCalculatorTest {
     }
 
     @Test
+    fun dayCounterAdvancesAtLocalMidnightWithoutWaitingTwentyFourHours() {
+        val start = ms(2026, 1, 1, 23)
+        val now = ms(2026, 1, 2, 0)
+        val stats = TrackerCalculator.stats(start, emptyList(), now, zone)
+        assertEquals(1, stats.currentDays)
+        assertEquals(1, stats.bestDays)
+    }
+
+    @Test
+    fun previousBestIsTrackedSeparatelyFromTheCurrentRun() {
+        val start = ms(2026, 1, 1)
+        val events = listOf(
+            TrackerResetRecord("first", ms(2026, 1, 4)),
+            TrackerResetRecord("second", ms(2026, 1, 10))
+        )
+        val stats = TrackerCalculator.stats(start, events, ms(2026, 1, 12), zone)
+        assertEquals(2, stats.currentDays)
+        assertEquals(6, stats.previousBestDays)
+        assertEquals(6, stats.bestDays)
+    }
+
+    @Test
     fun monthAndYearBoundariesUseLocalCalendarDates() {
         val start = ms(2025, 12, 29, 12)
         val events = listOf(
@@ -192,7 +214,8 @@ class TrackerCalculatorTest {
         val utcStats = TrackerCalculator.stats(start, events, now, ZoneId.of("UTC"))
         val pacificStats = TrackerCalculator.stats(start, events, now, ZoneId.of("America/Los_Angeles"))
 
-        assertEquals(utcStats.currentDays, pacificStats.currentDays)
+        assertEquals(0, utcStats.currentDays)
+        assertEquals(1, pacificStats.currentDays)
         assertEquals(1, utcStats.resetsThisMonth)
         assertEquals(0, pacificStats.resetsThisMonth)
     }
