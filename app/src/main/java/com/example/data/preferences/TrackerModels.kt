@@ -105,6 +105,7 @@ data class SleepEntry(
 data class TrackerStats(
     val currentDays: Int,
     val previousDays: Int,
+    val previousBestDays: Int,
     val bestDays: Int,
     val totalResets: Int,
     val resetsThisMonth: Int,
@@ -126,6 +127,16 @@ object TrackerCalculator {
             .coerceAtMost(Int.MAX_VALUE.toLong())
             .toInt()
 
+    /** Calendar-day streaks tick over at local midnight, not 24 hours after a reset. */
+    private fun calendarDaysBetween(startMillis: Long, endMillis: Long, zone: ZoneId): Int {
+        if (endMillis < startMillis) return 0
+        val startDate = Instant.ofEpochMilli(startMillis).atZone(zone).toLocalDate()
+        val endDate = Instant.ofEpochMilli(endMillis).atZone(zone).toLocalDate()
+        return ChronoUnit.DAYS.between(startDate, endDate)
+            .coerceIn(0L, Int.MAX_VALUE.toLong())
+            .toInt()
+    }
+
     fun stats(
         trackerStartedAt: Long,
         resets: List<TrackerResetRecord>,
@@ -140,12 +151,13 @@ object TrackerCalculator {
         var baseline = start
 
         sorted.forEach { event ->
-            intervals += fullDaysBetween(baseline, event.timestamp)
+            intervals += calendarDaysBetween(baseline, event.timestamp, zone)
             baseline = max(baseline, event.timestamp)
         }
-        val current = fullDaysBetween(baseline, nowMillis)
+        val current = calendarDaysBetween(baseline, nowMillis, zone)
         val previous = intervals.lastOrNull() ?: 0
-        val best = (intervals + current).maxOrNull() ?: current
+        val previousBest = intervals.maxOrNull() ?: 0
+        val best = max(previousBest, current)
 
         val nowDate = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val resetsThisMonth = sorted.count {
@@ -157,10 +169,10 @@ object TrackerCalculator {
         var yearBaseline = max(start, yearStart)
         var longestThisYear = 0
         sorted.filter { it.timestamp >= yearStart }.forEach { event ->
-            longestThisYear = max(longestThisYear, fullDaysBetween(yearBaseline, event.timestamp))
+            longestThisYear = max(longestThisYear, calendarDaysBetween(yearBaseline, event.timestamp, zone))
             yearBaseline = max(yearBaseline, event.timestamp)
         }
-        longestThisYear = max(longestThisYear, fullDaysBetween(yearBaseline, nowMillis))
+        longestThisYear = max(longestThisYear, calendarDaysBetween(yearBaseline, nowMillis, zone))
 
         val recentIntervals = intervals.takeLast(5)
         val averageRecent = if (recentIntervals.isEmpty()) 0 else recentIntervals.average().toInt()
@@ -168,6 +180,7 @@ object TrackerCalculator {
         return TrackerStats(
             currentDays = current,
             previousDays = previous,
+            previousBestDays = previousBest,
             bestDays = best,
             totalResets = sorted.size,
             resetsThisMonth = resetsThisMonth,
@@ -189,7 +202,7 @@ object TrackerCalculator {
             .map { it.timestamp }
             .filter { it <= endOfDay }
             .maxOrNull()
-        return fullDaysBetween(latestReset ?: start, endOfDay)
+        return calendarDaysBetween(latestReset ?: start, endOfDay, zone)
     }
 
     fun graphPoints(
