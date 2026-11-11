@@ -137,7 +137,7 @@ internal fun StreakHeroCard(
         Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val streakContent: @Composable () -> Unit = {
                 Column {
-                    Text("YOUR ELAPSED STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("YOUR CURRENT STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     AnimatedContent(targetState = stats.currentDays,
                         transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 240)) togetherWith fadeOut(tween(120)) },
                         label = "streak_count") { days ->
@@ -145,6 +145,9 @@ internal fun StreakHeroCard(
                     }
                     Text(if (stats.currentDays == 1) "day of progress" else "days of progress",
                         style = MaterialTheme.typography.titleMedium)
+                    Text("Auto-counts at local midnight · no daily tap needed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (stats.currentDays == 0) Text("Your first day is in progress.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Personal best · ${stats.bestDays} days", style = MaterialTheme.typography.bodySmall,
@@ -306,6 +309,16 @@ private fun StreakComparisonGraph(
     val scale = max(1, max(previousBestDays, currentDays))
     val previousBlue = Color(0xFF4388F5)
     val currentRed = Color(0xFFE34C5B)
+    val previousProgress by animateFloatAsState(
+        targetValue = previousBestDays.toFloat() / scale,
+        animationSpec = tween(700),
+        label = "previous_best_progress"
+    )
+    val currentProgress by animateFloatAsState(
+        targetValue = currentDays.toFloat() / scale,
+        animationSpec = tween(700),
+        label = "current_streak_progress"
+    )
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -318,7 +331,7 @@ private fun StreakComparisonGraph(
                 fontWeight = FontWeight.Bold, color = previousBlue)
         }
         LinearProgressIndicator(
-            progress = { previousBestDays.toFloat() / scale },
+            progress = { previousProgress },
             modifier = Modifier.fillMaxWidth().height(9.dp),
             color = previousBlue,
             trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f)
@@ -333,7 +346,7 @@ private fun StreakComparisonGraph(
                 fontWeight = FontWeight.Bold, color = currentRed)
         }
         LinearProgressIndicator(
-            progress = { currentDays.toFloat() / scale },
+            progress = { currentProgress },
             modifier = Modifier.fillMaxWidth().height(9.dp),
             color = currentRed,
             trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f)
