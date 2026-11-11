@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Strict Blocker</string>
+    <string name="app_name">No goon</string>
     <string name="accessibility_service_description">Detects foreground app names for your blocking schedules. With your consent, reads visible browser address and search fields to interrupt restricted domains or explicit searches. Passwords and other editable fields are excluded. Inspected browser text stays in memory on this device; only generic block counts are saved.</string>
     
     <!-- Navigation -->
@@ -20,17 +20,17 @@
     <string name="perm_accessibility_title">Accessibility Service</string>
     <string name="perm_accessibility_why">Detects active app names and permitted browser fields to apply the rules you choose.</string>
     <string name="perm_accessibility_what">Without it, the blocker cannot immediately detect when you tap a blocked app.</string>
-    <string name="perm_accessibility_how">Tap below, select \'Strict Blocker\' under Installed Services, and switch it ON.</string>
+    <string name="perm_accessibility_how">Tap below, select \'No goon\' under Installed Services, and switch it ON.</string>
 
     <string name="perm_usage_title">Usage Access</string>
     <string name="perm_usage_why">System-level background usage query and fallback enforcement engine.</string>
     <string name="perm_usage_what">Required to verify foreground transitions and cross-check active app status.</string>
-    <string name="perm_usage_how">Find \'Strict Blocker\' in the list and toggle \'Permit usage access\' to ON.</string>
+    <string name="perm_usage_how">Find \'No goon\' in the list and toggle \'Permit usage access\' to ON.</string>
 
     <string name="perm_overlay_title">Display Over Other Apps</string>
     <string name="perm_overlay_why">Displays the full-screen interrupt shield immediately over blocked applications.</string>
     <string name="perm_overlay_what">Without overlay access, the blocker screen cannot interrupt the target app.</string>
-    <string name="perm_overlay_how">Toggle \'Allow display over other apps\' ON for Strict Blocker.</string>
+    <string name="perm_overlay_how">Toggle \'Allow display over other apps\' ON for No goon.</string>
 
     <string name="perm_battery_title">Unrestricted Battery (Samsung)</string>
     <string name="perm_battery_why">Prevents Samsung One UI from sleeping or killing the blocking engine.</string>
