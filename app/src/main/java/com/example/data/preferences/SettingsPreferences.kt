@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
+import org.json.JSONArray
+import org.json.JSONObject
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -886,6 +890,75 @@ class SettingsPreferences(private val context: Context) {
             "timeline",
             "protection"
         )
+    }
+
+    /**
+     * Portable, versioned backup for every DataStore preference, including tracker and focus history.
+     * The user chooses where the file is stored; it is not silently uploaded anywhere.
+     */
+    suspend fun exportBackupJson(): String {
+        val entries = JSONObject()
+        context.dataStore.data.first().asMap().forEach { (key, value) ->
+            val item = JSONObject()
+            when (value) {
+                is Boolean -> item.put("type", "boolean").put("value", value)
+                is Int -> item.put("type", "int").put("value", value)
+                is Long -> item.put("type", "long").put("value", value)
+                is Float -> item.put("type", "float").put("value", value.toDouble())
+                is Double -> item.put("type", "double").put("value", value)
+                is String -> item.put("type", "string").put("value", value)
+                is Set<*> -> {
+                    val values = JSONArray()
+                    value.filterIsInstance<String>().forEach(values::put)
+                    item.put("type", "string_set").put("value", values)
+                }
+                else -> error("Unsupported preference type for ${key.name}")
+            }
+            entries.put(key.name, item)
+        }
+        return JSONObject()
+            .put("format", "no-goon-data-backup")
+            .put("schema", 1)
+            .put("applicationId", "com.aistudio.strictblocker.kzvwpq")
+            .put("createdAt", System.currentTimeMillis())
+            .put("entries", entries)
+            .toString(2)
+    }
+
+    /**
+     * Restores only a validated No goon backup. Existing preferences are replaced atomically.
+     */
+    suspend fun importBackupJson(json: String) {
+        val root = JSONObject(json)
+        require(root.optString("format") == "no-goon-data-backup") { "This is not a No goon backup." }
+        require(root.optInt("schema") == 1) { "This backup version is not supported." }
+        require(root.optString("applicationId") == "com.aistudio.strictblocker.kzvwpq") {
+            "This backup belongs to a different app."
+        }
+        val entries = root.getJSONObject("entries")
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+            val iterator = entries.keys()
+            while (iterator.hasNext()) {
+                val name = iterator.next()
+                val item = entries.getJSONObject(name)
+                when (item.getString("type")) {
+                    "boolean" -> preferences[booleanPreferencesKey(name)] = item.getBoolean("value")
+                    "int" -> preferences[intPreferencesKey(name)] = item.getInt("value")
+                    "long" -> preferences[longPreferencesKey(name)] = item.getLong("value")
+                    "float" -> preferences[floatPreferencesKey(name)] = item.getDouble("value").toFloat()
+                    "double" -> preferences[doublePreferencesKey(name)] = item.getDouble("value")
+                    "string" -> preferences[stringPreferencesKey(name)] = item.getString("value")
+                    "string_set" -> {
+                        val values = item.getJSONArray("value")
+                        preferences[stringSetPreferencesKey(name)] = buildSet {
+                            for (index in 0 until values.length()) add(values.getString(index))
+                        }
+                    }
+                    else -> error("Unknown backup preference type.")
+                }
+            }
+        }
     }
 
     /**
