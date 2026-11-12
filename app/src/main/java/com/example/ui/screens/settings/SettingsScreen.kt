@@ -325,7 +325,7 @@ fun SettingsScreen(
                                 onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
                                 onReplayTour = onReplayTour,
                                 onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
-                                onImportBackup = { showRestoreWarning = true },
+                                onImportBackup = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
                                 backupStatus = backupStatus,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
