@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
-    <cloud-backup disableIfNoEncryptionCapabilities="true">
+    <cloud-backup>
         <!-- Preferences DataStore lives under files/datastore/. -->
         <include domain="file" path="." />
         <!-- Room database, including SQLite journals, lives in the database domain. -->
