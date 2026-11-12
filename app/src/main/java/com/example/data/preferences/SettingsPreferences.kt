@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -74,6 +75,7 @@ class SettingsPreferences(private val context: Context) {
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
         val FOCUS_SESSION_RECORDS = stringSetPreferencesKey("focus_session_records_v1")
+        val DAILY_FOCUS_TASKS = stringSetPreferencesKey("daily_focus_tasks_v1")
 
         // User-selectable blocker customization
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
@@ -198,6 +200,12 @@ class SettingsPreferences(private val context: Context) {
         (preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] ?: emptySet())
             .mapNotNull(FocusSessionRecord::decode)
             .sortedByDescending { it.startedAtMillis }
+    }
+
+    val dailyFocusTasksFlow: Flow<List<DailyFocusTask>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+            .mapNotNull(DailyFocusTask::decode)
+            .sortedWith(compareBy<DailyFocusTask> { it.localDate }.thenBy { it.id })
     }
 
     val trackerStartedAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -491,6 +499,48 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setAppGroups(groups: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_GROUPS] = groups
+        }
+    }
+
+    suspend fun addDailyFocusTask(title: String, localDate: LocalDate = LocalDate.now()): Boolean {
+        val cleanTitle = title.trim().take(80)
+        if (cleanTitle.isBlank()) return false
+        var added = false
+        context.dataStore.edit { preferences ->
+            val tasks = (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                .mapNotNull(DailyFocusTask::decode)
+                .toMutableList()
+            if (tasks.count { it.localDate == localDate } >= 3) return@edit
+            tasks += DailyFocusTask.create(localDate, cleanTitle)
+            val keepFrom = localDate.minusDays(60)
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] = tasks
+                .filter { !it.localDate.isBefore(keepFrom) }
+                .map(DailyFocusTask::encode)
+                .toSet()
+            added = true
+        }
+        return added
+    }
+
+    suspend fun setDailyFocusTaskCompleted(id: String, completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] =
+                (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                    .mapNotNull(DailyFocusTask::decode)
+                    .map { if (it.id == id) it.copy(completed = completed) else it }
+                    .map(DailyFocusTask::encode)
+                    .toSet()
+        }
+    }
+
+    suspend fun deleteDailyFocusTask(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] =
+                (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                    .mapNotNull(DailyFocusTask::decode)
+                    .filterNot { it.id == id }
+                    .map(DailyFocusTask::encode)
+                    .toSet()
         }
     }
 
