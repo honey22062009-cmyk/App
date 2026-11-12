@@ -661,7 +661,7 @@ private fun SettingsSectionContent(
 
         SettingsSection.About -> {
             Text(
-                text = "Strict Blocker",
+                text = "No goon",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
