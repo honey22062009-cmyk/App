@@ -205,7 +205,7 @@ class SettingsPreferences(private val context: Context) {
     val dailyFocusTasksFlow: Flow<List<DailyFocusTask>> = context.dataStore.data.map { preferences ->
         (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
             .mapNotNull(DailyFocusTask::decode)
-            .sortedWith(compareBy<DailyFocusTask> { it.localDate }.thenBy { it.id })
+            .sortedWith(compareBy<DailyFocusTask> { it.localDate }.thenBy { it.createdAtMillis })
     }
 
     val trackerStartedAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
