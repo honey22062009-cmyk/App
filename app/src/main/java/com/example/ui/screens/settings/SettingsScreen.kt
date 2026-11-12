@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -72,6 +73,7 @@ private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Protection("Protection", Icons.Default.Shield),
     Permissions("Permissions", Icons.Default.Security),
     Privacy("Privacy & legal", Icons.Default.PrivacyTip),
+    DataBackup("Data & backup", Icons.Default.Info),
     About("About", Icons.Default.Info)
 }
 
@@ -106,6 +108,41 @@ fun SettingsScreen(
     val sleepReminderHour by repository.settings.sleepReminderHourFlow.collectAsState(initial = 6)
     val sleepReminderMinute by repository.settings.sleepReminderMinuteFlow.collectAsState(initial = 0)
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
+    var backupStatus by remember { mutableStateOf("") }
+    var showRestoreWarning by remember { mutableStateOf(false) }
+
+    val exportBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val json = repository.settings.exportBackupJson()
+                val output = context.contentResolver.openOutputStream(uri)
+                    ?: error("Could not open the selected backup file.")
+                output.bufferedWriter().use { it.write(json) }
+            }.onSuccess {
+                backupStatus = "Backup saved. Keep this file somewhere safe."
+            }.onFailure {
+                backupStatus = "Backup failed: ${it.message ?: "unknown error"}"
+            }
+        }
+    }
+    val importBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val json = context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()?.use { it.readText() }
+                    ?: error("Could not read the selected backup file.")
+                repository.settings.importBackupJson(json)
+            }.onSuccess {
+                backupStatus = "Backup restored. Your settings and progress have been loaded."
+            }.onFailure {
+                backupStatus = "Restore failed: ${it.message ?: "unknown error"}"
+            }
+        }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -173,6 +210,9 @@ fun SettingsScreen(
                                 onAccentChange = { scope.launch { repository.settings.setAccentStyle(it) } },
                                 onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
                                 onReplayTour = onReplayTour,
+                                onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
+                                onImportBackup = { showRestoreWarning = true },
+                                backupStatus = backupStatus,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -286,6 +326,9 @@ fun SettingsScreen(
                                 onAccentChange = { scope.launch { repository.settings.setAccentStyle(it) } },
                                 onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
                                 onReplayTour = onReplayTour,
+                                onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
+                                onImportBackup = { showRestoreWarning = true },
+                                backupStatus = backupStatus,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -393,6 +436,9 @@ private fun SettingsSectionContent(
     onAccentChange: (String) -> Unit,
     onCompanionSoundChange: (Boolean) -> Unit,
     onReplayTour: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
+    backupStatus: String,
     delayMinutes: Int,
     isProtectionEnabled: Boolean,
     reduceMotion: Boolean,
@@ -575,6 +621,27 @@ private fun SettingsSectionContent(
             }
         }
 
+        SettingsSection.DataBackup -> {
+            SettingsDescription(
+                "Create a portable copy of your No goon settings, tracker history, focus sessions and dashboard layout. The file stays wherever you choose to save it."
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(onClick = onExportBackup, modifier = Modifier.fillMaxWidth()) {
+                Text("Create backup")
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onImportBackup, modifier = Modifier.fillMaxWidth()) {
+                Text("Restore from backup")
+            }
+            Spacer(Modifier.height(8.dp))
+            SettingsDescription("Restoring replaces the current saved preferences. Backup files contain personal data, so store them privately.")
+            if (backupStatus.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(backupStatus, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
         SettingsSection.About -> {
             Text(
                 text = "Strict Blocker",
@@ -599,6 +666,23 @@ private fun SettingsSectionContent(
             SettingsLinkRow("Replay the quick tour", "Three short tips for recording, browsing and your companion", onReplayTour)
             Spacer(modifier = Modifier.height(14.dp))
         }
+    }
+
+    if (showRestoreWarning) {
+        AlertDialog(
+            onDismissRequest = { showRestoreWarning = false },
+            title = { Text("Restore a backup?") },
+            text = { Text("This replaces the current saved preferences and progress with the contents of the selected backup file.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showRestoreWarning = false
+                    onImportBackup()
+                }) { Text("Choose backup") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showRestoreWarning = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
