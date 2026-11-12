@@ -12,6 +12,7 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
+    testApplicationId = "com.aistudio.strictblocker.kzvwpq.browserqa"
     minSdk = 26
     targetSdk = 36
     versionCode = 8
