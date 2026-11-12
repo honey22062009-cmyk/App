@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -109,7 +108,6 @@ fun SettingsScreen(
     val sleepReminderMinute by repository.settings.sleepReminderMinuteFlow.collectAsState(initial = 0)
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
     var backupStatus by remember { mutableStateOf("") }
-    var showRestoreWarning by remember { mutableStateOf(false) }
 
     val exportBackupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -211,7 +209,7 @@ fun SettingsScreen(
                                 onCompanionSoundChange = { scope.launch { repository.settings.setCompanionSound(it) } },
                                 onReplayTour = onReplayTour,
                                 onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
-                                onImportBackup = { showRestoreWarning = true },
+                                onImportBackup = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
                                 backupStatus = backupStatus,
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
@@ -668,22 +666,6 @@ private fun SettingsSectionContent(
         }
     }
 
-    if (showRestoreWarning) {
-        AlertDialog(
-            onDismissRequest = { showRestoreWarning = false },
-            title = { Text("Restore a backup?") },
-            text = { Text("This replaces the current saved preferences and progress with the contents of the selected backup file.") },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    showRestoreWarning = false
-                    onImportBackup()
-                }) { Text("Choose backup") }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showRestoreWarning = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 @Composable
