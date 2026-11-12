@@ -117,6 +117,15 @@ jobs:
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
+      - name: Build installable debug APK
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: no-goon-1.8.0-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v7
