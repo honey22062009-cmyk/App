@@ -75,12 +75,12 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$APKSIGNER" && test -n "$AAPT"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
-          "$AAPT" dump badging "$APK" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='9' versionName='1.7.1'"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='10' versionName='1.8.0'"
       - name: Upload signed update APK
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: no-goon-1.7.1-signed-update-apk
+          name: no-goon-1.8.0-signed-update-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
@@ -91,7 +91,7 @@ jobs:
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: no-goon-1.7.1-release-bundle
+          name: no-goon-1.8.0-release-bundle
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
