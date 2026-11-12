@@ -112,7 +112,7 @@ internal fun DailyFocusPlanCard(
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
-            tasks.sortedBy { it.id }.forEachIndexed { index, task ->
+            tasks.sortedBy { it.createdAtMillis }.forEachIndexed { index, task ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
