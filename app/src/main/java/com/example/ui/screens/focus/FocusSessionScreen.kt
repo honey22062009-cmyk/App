@@ -198,76 +198,104 @@ fun FocusSessionScreen(
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        if (!hasStarted) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Make space to focus.", style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold)
+                Text("Choose a session length and let your companion settle in.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
             Text(
-                when {
-                    showCompletion -> "You did it."
-                    isRunning -> "One thing at a time."
-                    hasStarted -> "Take your next step."
-                    else -> "Make space to focus."
-                },
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                when {
-                    showCompletion -> "Your session has been added to Progress."
-                    isRunning -> "Stay with the task. Your companion will keep you company."
-                    hasStarted -> "Your session is paused. Continue whenever you're ready."
-                    else -> "Choose a session length and let your companion settle in."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                if (showCompletion) "Session complete" else if (isRunning) "One thing at a time." else "Paused. Reset your pace.",
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold
             )
         }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .42f)
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (hasStarted) .30f else .42f)
         ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    Modifier.fillMaxWidth().height(if (hasStarted) 158.dp else 210.dp),
-                    contentAlignment = Alignment.Center
+            if (hasStarted) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(116.dp).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    CompanionScene(
-                        characterId = characterId,
-                        modifier = Modifier.fillMaxSize(),
-                        interactive = true,
-                        reduceMotion = reduceMotion,
-                        reaction = reaction,
-                        reactionKey = reactionKey,
-                        backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
-                        onPet = {
-                            reaction = "pet"
-                            reactionKey++
-                            companionCaption = CompanionBehavior.dialogue("pet")
+                    Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
+                        CompanionScene(
+                            characterId = characterId,
+                            modifier = Modifier.fillMaxSize(),
+                            interactive = true,
+                            reduceMotion = reduceMotion,
+                            reaction = reaction,
+                            reactionKey = reactionKey,
+                            backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
+                            onPet = {
+                                reaction = "pet"
+                                reactionKey++
+                                companionCaption = CompanionBehavior.dialogue("pet")
+                            }
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary)
+                        AnimatedContent(
+                            targetState = companionCaption,
+                            transitionSpec = {
+                                (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
+                            },
+                            label = "focus_companion_caption"
+                        ) { caption ->
+                            Text(caption, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                         }
-                    )
+                    }
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface.copy(alpha = .75f)) {
+                        Text(if (isRunning) "● LIVE" else if (showCompletion) "✓ DONE" else "Ⅱ PAUSED",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
-                AnimatedContent(
-                    targetState = companionCaption,
-                    transitionSpec = {
-                        (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
-                    },
-                    label = "focus_companion_caption"
-                ) { caption ->
-                    Text(caption, textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+            } else {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(Modifier.fillMaxWidth().height(210.dp), contentAlignment = Alignment.Center) {
+                        CompanionScene(
+                            characterId = characterId, modifier = Modifier.fillMaxSize(),
+                            interactive = true, reduceMotion = reduceMotion,
+                            reaction = reaction, reactionKey = reactionKey,
+                            backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
+                            onPet = {
+                                reaction = "pet"
+                                reactionKey++
+                                companionCaption = CompanionBehavior.dialogue("pet")
+                            }
+                        )
+                    }
+                    AnimatedContent(
+                        targetState = companionCaption,
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
+                        },
+                        label = "focus_companion_caption"
+                    ) { caption ->
+                        Text(caption, textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+                    }
+                    Text(companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
+                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary)
                 }
-                Text(
-                    companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
 
@@ -343,7 +371,7 @@ fun FocusSessionScreen(
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -380,13 +408,13 @@ fun FocusSessionScreen(
                         label = "focus_progress"
                     )
                     Box(
-                        Modifier.fillMaxWidth().height(244.dp),
+                        Modifier.fillMaxWidth().height(224.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
                             progress = { animatedProgress },
-                            modifier = Modifier.size(224.dp),
-                            strokeWidth = 12.dp,
+                            modifier = Modifier.size(212.dp),
+                            strokeWidth = 13.dp,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .8f),
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -396,8 +424,8 @@ fun FocusSessionScreen(
                         ) {
                             Text(
                                 "%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
-                                fontSize = 52.sp,
-                                lineHeight = 58.sp,
+                                fontSize = 58.sp,
+                                lineHeight = 64.sp,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1
