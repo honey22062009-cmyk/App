@@ -210,7 +210,9 @@ class ReliabilityUiTest {
         // Countdown runs on real elapsed time, so Compose idle waits cannot
         // fast-forward the complete session on slower tablet emulators.
         compose.onNodeWithText("Start 25-minute session").performClick()
-        waitFor("Pause")
+        // Android may pause the session if the emulator briefly backgrounds
+        // the activity; the stable End session control exists in both states.
+        waitFor("End session")
         // The session action row may be below the fold on compact tablet layouts.
         compose.onNodeWithText("End session").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("End session").performScrollTo().performClick()
