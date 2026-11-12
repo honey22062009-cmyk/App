@@ -1,8 +1,8 @@
-> Version 1.7.0: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
+> Version 1.7.1: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 # No goon (Android)
 
-Current app release target: **1.7.0**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
+Current app release target: **1.7.1**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 A production-grade, native Android application engineered for **strict scheduled application blocking** with non-root enforcement. Designed and optimized for phones and tablets, including the **Samsung Galaxy Tab A9+** running modern Samsung One UI and Android 13+.
 
@@ -18,6 +18,14 @@ No goon helps device owners to manage installed applications and define precise 
 - **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. With consent, Browser Guard inspects visible address/search fields locally. Version 1.4 removes the VPN/DNS tunnel.
 
 ---
+
+## Updates and local data safety
+
+- The Android application ID is kept stable across releases: `com.aistudio.strictblocker.kzvwpq`.
+- A normal in-place update preserves the app's private DataStore and Room database when the application ID and signing certificate remain unchanged.
+- Update APKs are published only when the repository's retained Android signing key is configured. Do not install a runner-debug-signed APK over a stable-key release.
+- Room forward migrations must be explicit. The app does not use destructive forward-migration fallback.
+- Android Auto Backup and device-transfer rules include the app's DataStore files and Room database. Reinstall restoration still depends on Android backup being enabled and an available backup dataset; backup is not a substitute for the stable in-place update path.
 
 ## Architecture & Technology Stack
 
