@@ -61,7 +61,7 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
             Text("${logged.size} ${if (logged.size == 1) "day" else "days"} recorded · ${logged.count { it in today.minusDays(6)..today }} of 7 this week",
                 style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = onRecord, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(18.dp)) {
-                Text(if (current == null) "Add optional check-in" else "Edit check-in")
+                Text(if (current == null) "Record today" else "Edit today's entry")
             }
         }
     }
