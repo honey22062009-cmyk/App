@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -228,7 +230,10 @@ fun FocusSessionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(Modifier.fillMaxWidth().height(210.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxWidth().height(if (hasStarted) 158.dp else 210.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     CompanionScene(
                         characterId = characterId,
                         modifier = Modifier.fillMaxSize(),
@@ -331,68 +336,150 @@ fun FocusSessionScreen(
         } else {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface
+                shape = RoundedCornerShape(30.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = .97f)
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(activity.uppercase(), style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            Text(taskName.ifBlank { "Your focus session" },
-                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                taskName.ifBlank { "Your focus session" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
                         }
-                        Box(contentAlignment = Alignment.Center) {
-                            val animatedProgress by animateFloatAsState(
-                                targetValue = progress,
-                                animationSpec = tween(if (reduceMotion) 0 else 700, easing = FastOutSlowInEasing),
-                                label = "focus_progress"
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (isRunning) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                if (isRunning) "● LIVE" else if (showCompletion) "✓ DONE" else "Ⅱ PAUSED",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
                             )
-                            CircularProgressIndicator(
-                                progress = { animatedProgress },
-                                modifier = Modifier.size(86.dp),
-                                strokeWidth = 8.dp,
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    }
+
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress,
+                        animationSpec = tween(if (reduceMotion) 0 else 650, easing = FastOutSlowInEasing),
+                        label = "focus_progress"
+                    )
+                    Box(
+                        Modifier.fillMaxWidth().height(244.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.size(224.dp),
+                            strokeWidth = 12.dp,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .8f),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                "%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
+                                fontSize = 52.sp,
+                                lineHeight = 58.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
                             )
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
-                                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            }
+                            Text(
+                                if (showCompletion) "COMPLETE" else if (isRunning) "TIME LEFT" else "PAUSED",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxWidth().height(7.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("FOCUSED", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "%02d:%02d".format(elapsedSeconds / 60, elapsedSeconds % 60),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("SESSION LENGTH", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "$selectedMinutes min",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (showCompletion) {
+                            Button(
+                                onClick = onBack,
+                                modifier = Modifier.fillMaxWidth().height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text("Done") }
+                        } else {
+                            FilledTonalButton(
+                                onClick = {
+                                    if (!isRunning) {
+                                        isRunning = true
+                                        companionCaption = "Welcome back. Pick up right where you paused."
+                                        reaction = "wave"
+                                        reactionKey++
+                                    } else {
+                                        isRunning = false
+                                        companionCaption = "A pause is allowed. Your session is safe."
+                                        reaction = "rest"
+                                        reactionKey++
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text(if (isRunning) "Pause" else "Resume") }
+                            OutlinedButton(
+                                onClick = { showEndConfirmation = true },
+                                modifier = Modifier.weight(1f).height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text("End session") }
                         }
                     }
                     Text(
-                        if (isRunning) "FOCUSING · ${elapsedSeconds / 60} MIN ${elapsedSeconds % 60} SEC ELAPSED"
-                        else if (showCompletion) "SESSION COMPLETE"
-                        else "PAUSED · ${elapsedSeconds / 60} MIN ${elapsedSeconds % 60} SEC COMPLETED",
+                        "Your session is saved on this device and kept separate from streak history.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = {
-                                if (showCompletion) {
-                                    onBack()
-                                } else if (!isRunning) {
-                                    isRunning = true
-                                    companionCaption = "Welcome back. Pick up right where you paused."
-                                    reaction = "wave"
-                                    reactionKey++
-                                } else {
-                                    isRunning = false
-                                    companionCaption = "A pause is allowed. Your session is safe."
-                                    reaction = "rest"
-                                    reactionKey++
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) { Text(if (showCompletion) "Done" else if (isRunning) "Pause" else "Resume") }
-                        if (!showCompletion) {
-                            OutlinedButton(onClick = { showEndConfirmation = true }) { Text("End session") }
-                        }
-                    }
-                    Text("Your time is saved on this device and appears in Progress, separately from streak history.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
