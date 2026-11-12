@@ -247,8 +247,10 @@ fun DashboardScreen(
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
         val progressKeys = setOf("stats", "graph", "focus", "calendar", "timeline", "milestones", "insights")
+        val homeKeys = setOf("hero", "checkin", "focus", "graph", "milestones", "protection")
         val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
-            else if (wideHome) listOf("protection") else listOf("protection", "hero")
+            else if (wideHome) listOf("focus", "protection")
+            else cardOrder.filter { it in homeKeys && it !in hiddenCards }
         val tabletRows = remember(visibleCardOrder) {
             buildTabletDashboardRows(visibleCardOrder)
         }
