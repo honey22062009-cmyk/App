@@ -667,9 +667,9 @@ private class CompanionRenderer(private val state: CompanionState) {
         val danceSway = if (acting && reaction == "dance") sin(elapsed * 7.2f) * .22f * pulse else 0f
         Matrix.translateM(base, 0, danceSway, bounce - .06f, 0f)
         Matrix.rotateM(base, 0, pitch + when {
-            acting && reaction == "snack" -> -4f - biteBeat * 5f
+            acting && reaction == "snack" -> -7f - biteBeat * 10f
             acting && reaction == "look_up" -> -12f * pulse
-            acting && reaction in setOf("jump", "happy_hop") -> -5f * hopArc
+            acting && reaction in setOf("jump", "happy_hop") -> -9f * hopArc
             else -> 0f
         }, 1f, 0f, 0f)
         val curiousTurn = if (acting && reaction in setOf("curious", "look_around")) sin(phase * PI.toFloat()) * 15f else 0f
@@ -677,7 +677,7 @@ private class CompanionRenderer(private val state: CompanionState) {
         Matrix.rotateM(base, 0, yaw + spin + curiousTurn + idleLook, 0f, 1f, 0f)
         val idleSway = if (!reducedMotion && !acting) sin(time * .72f) * 1.5f else 0f
         val reactionTilt = when {
-            acting && reaction == "dance" -> danceBeat * 9f * pulse
+            acting && reaction == "dance" -> danceBeat * 13f * pulse
             acting && reaction in setOf("pet", "curious", "listen", "think", "wiggle") -> sin(elapsed * 5.5f) * 8f * pulse
             else -> 0f
         }
