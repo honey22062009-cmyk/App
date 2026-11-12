@@ -42,15 +42,34 @@ jobs:
       - name: Configure optional retained Android signing key
         id: signing
         env:
+          ANDROID_SIGNING_BUNDLE_BASE64: ${{ secrets.ANDROID_SIGNING_BUNDLE_BASE64 }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No retained Android signing key configured. No installable update APK will be published until the stable key is configured."
-          else
+          set -euo pipefail
+          if [ -n "$ANDROID_SIGNING_BUNDLE_BASE64" ]; then
+            BUNDLE_DIR="$RUNNER_TEMP/no-goon-signing"
+            mkdir -p "$BUNDLE_DIR"
+            printf '%s' "$ANDROID_SIGNING_BUNDLE_BASE64" | base64 --decode > "$RUNNER_TEMP/no-goon-signing.zip"
+            unzip -q "$RUNNER_TEMP/no-goon-signing.zip" -d "$BUNDLE_DIR"
+            PROPERTIES_FILE="$BUNDLE_DIR/signing.properties"
+            KEYSTORE_FILE="$BUNDLE_DIR/$(sed -n 's/^KEYSTORE_FILE=//p' "$PROPERTIES_FILE")"
+            STORE_PASSWORD="$(sed -n 's/^STORE_PASSWORD=//p' "$PROPERTIES_FILE")"
+            KEY_PASSWORD="$(sed -n 's/^KEY_PASSWORD=//p' "$PROPERTIES_FILE")"
+            KEY_ALIAS="$(sed -n 's/^KEY_ALIAS=//p' "$PROPERTIES_FILE")"
+            test -f "$KEYSTORE_FILE" && test -n "$STORE_PASSWORD" && test -n "$KEY_PASSWORD" && test -n "$KEY_ALIAS"
+            chmod 600 "$KEYSTORE_FILE" "$PROPERTIES_FILE"
+            echo "::add-mask::$STORE_PASSWORD"
+            echo "::add-mask::$KEY_PASSWORD"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            rm -f "$RUNNER_TEMP/no-goon-signing.zip"
+          elif [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_STORE_PASSWORD" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             KEYSTORE_FILE="$RUNNER_TEMP/strict-blocker-update-key.jks"
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
             chmod 600 "$KEYSTORE_FILE"
@@ -59,6 +78,9 @@ jobs:
             echo "KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-upload}" >> "$GITHUB_ENV"
             echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No retained Android signing key configured. Add the repository secret ANDROID_SIGNING_BUNDLE_BASE64 to publish stable update APKs."
           fi
       - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace --no-daemon
