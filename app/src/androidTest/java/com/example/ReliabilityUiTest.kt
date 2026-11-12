@@ -199,6 +199,12 @@ class ReliabilityUiTest {
     @Test fun focusRoomSavesItsOwnHistoryWithoutTouchingStreakTimeline() {
         runBlocking {
             settings.clearAllUserPreferences()
+            // This test covers focus-session history only. Keep blocking and
+            // browser inspection disabled so no accessibility shield can
+            // background the focus room while the tablet emulator is running.
+            settings.setProtectionEnabled(false)
+            settings.setAdultProtectionEnabled(false)
+            settings.setBrowserInspectionConsent(false)
             settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
             settings.setQuickTourSeen(true)
         }
