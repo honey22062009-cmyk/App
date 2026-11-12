@@ -224,7 +224,7 @@ class ReliabilityUiTest {
         waitFor("Your progress")
         compose.onNodeWithText("FOCUS SESSION HISTORY").performClick()
         waitFor("Focus history")
-        compose.onNodeWithText("Ended early").assertIsDisplayed()
+        compose.onAllNodesWithText("Ended early").onFirst().assertIsDisplayed()
         // Focus history is persisted independently and does not create a streak reset.
         assertTrue(runBlocking { settings.trackerResetRecordsFlow.first().isEmpty() })
         capture("14-focus-history")
