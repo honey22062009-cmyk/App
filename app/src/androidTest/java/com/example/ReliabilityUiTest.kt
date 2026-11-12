@@ -214,8 +214,12 @@ class ReliabilityUiTest {
         compose.onNodeWithText("Start 25-minute session").performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
-        // The redesigned session card can place controls below the fold on the
-        // compact tablet viewport. Scroll the session content to its action row.
+        // Wait for the running state to enter composition before querying the
+        // controls. Tablet emulators can take longer to settle after navigation.
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("Pause").fetchSemanticsNodes().isNotEmpty()
+        }
+        // The session action row may be below the fold on compact tablet layouts.
         compose.onNodeWithText("End session").performScrollTo().assertIsDisplayed()
         // Advance only a short, controlled interval rather than sleeping the instrumentation thread.
         compose.mainClock.advanceTimeBy(2_500L)
