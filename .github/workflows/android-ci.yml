@@ -49,7 +49,7 @@ jobs:
         run: |
           if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No retained Android signing key configured. The debug APK will use the runner debug key; it may not update an existing installation."
+            echo "::warning::No retained Android signing key configured. No installable update APK will be published until the stable key is configured."
           else
             KEYSTORE_FILE="$RUNNER_TEMP/strict-blocker-update-key.jks"
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
@@ -62,35 +62,39 @@ jobs:
           fi
       - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace --no-daemon
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: no-goon-1.7.0-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
-      - name: Build release bundle
-        run: gradle :app:bundleRelease --stacktrace --no-daemon
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: strict-blocker-release-bundle
-          path: app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
-      - name: Build retained-key release APK
+      - name: Build update APK with retained signing key
         if: steps.signing.outputs.configured == 'true'
         run: gradle :app:assembleRelease --stacktrace --no-daemon
-      - name: Upload retained-key release APK
+      - name: Verify update APK identity and signature
+        if: steps.signing.outputs.configured == 'true'
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" && test -n "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='9' versionName='1.7.1'"
+      - name: Upload signed update APK
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: strict-blocker-release-apk-retained-key
+          name: no-goon-1.7.1-signed-update-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+          retention-days: 14
+      - name: Build release bundle
+        if: steps.signing.outputs.configured == 'true'
+        run: gradle :app:bundleRelease --stacktrace --no-daemon
+      - name: Upload release bundle
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-goon-1.7.1-release-bundle
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
