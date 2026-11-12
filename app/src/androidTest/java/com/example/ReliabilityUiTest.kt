@@ -214,11 +214,13 @@ class ReliabilityUiTest {
         compose.onNodeWithText("Start 25-minute session").performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
-        compose.onNodeWithText("End session").assertIsDisplayed()
+        // The redesigned session card can place controls below the fold on the
+        // compact tablet viewport. Scroll the session content to its action row.
+        compose.onNodeWithText("End session").performScrollTo().assertIsDisplayed()
         // Advance only a short, controlled interval rather than sleeping the instrumentation thread.
         compose.mainClock.advanceTimeBy(2_500L)
         compose.waitForIdle()
-        compose.onNodeWithText("End session").performClick()
+        compose.onNodeWithText("End session").performScrollTo().performClick()
         compose.mainClock.autoAdvance = true
         waitFor("End this session?")
         compose.onNodeWithText("Save and exit").performClick()
