@@ -56,6 +56,39 @@ data class TrackerResetRecord(
     }
 }
 
+data class DailyFocusTask(
+    val id: String,
+    val localDate: LocalDate,
+    val title: String,
+    val completed: Boolean = false
+) {
+    fun encode(): String = listOf(
+        id,
+        localDate.toString(),
+        completed.toString(),
+        Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(title.toByteArray(StandardCharsets.UTF_8))
+    ).joinToString("|")
+
+    companion object {
+        fun create(localDate: LocalDate, title: String): DailyFocusTask =
+            DailyFocusTask(UUID.randomUUID().toString(), localDate, title.trim().take(80))
+
+        fun decode(raw: String): DailyFocusTask? {
+            val parts = raw.split("|", limit = 4)
+            val id = parts.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return null
+            val date = parts.getOrNull(1)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+            val completed = parts.getOrNull(2)?.toBooleanStrictOrNull() ?: return null
+            val title = parts.getOrNull(3)?.let {
+                runCatching {
+                    String(Base64.getUrlDecoder().decode(it), StandardCharsets.UTF_8)
+                }.getOrDefault("")
+            }?.trim()?.take(80)?.takeIf { it.isNotBlank() } ?: return null
+            return DailyFocusTask(id, date, title, completed)
+        }
+    }
+}
+
 data class DailyCheckIn(
     val localDate: LocalDate,
     val rating: String
