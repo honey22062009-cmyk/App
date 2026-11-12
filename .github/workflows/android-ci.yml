@@ -35,7 +35,7 @@ jobs:
             printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
           else
             printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
-            echo "::warning::Google Sign-In is not configured yet. Core offline features remain available."
+            echo "::notice::Google Sign-In is optional and not configured. Offline focus, progress and blocking features remain available."
           fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
