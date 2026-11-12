@@ -652,8 +652,8 @@ private class CompanionRenderer(private val state: CompanionState) {
         val bounce = when {
             reducedMotion -> 0f
             acting && reaction in setOf("jump", "happy_hop") -> hopBounce
-            acting && reaction == "dance" -> (.025f + abs(danceBeat) * .075f) * pulse
-            acting && reaction == "snack" -> abs(sin(elapsed * 8.4f)) * .018f * pulse
+            acting && reaction == "dance" -> (.035f + abs(danceBeat) * .105f) * pulse
+            acting && reaction == "snack" -> abs(sin(elapsed * 9.2f)) * .025f * pulse
             acting && reaction == "stretch" -> sin(phase * PI.toFloat()) * .07f
             acting && reaction in setOf("cheer", "celebrate") -> abs(sin(phase * PI.toFloat() * 2f)) * .18f
             acting && reaction == "curious" -> sin(phase * PI.toFloat()) * .035f
@@ -664,7 +664,7 @@ private class CompanionRenderer(private val state: CompanionState) {
         Matrix.setIdentityM(base, 0)
         // A soft stage shadow makes the character feel grounded, including mid-jump.
         draw(sphere, 0f, -.93f, -.06f, .47f - max(0f, bounce) * .18f, .025f, .29f - max(0f, bounce) * .10f, 0xdccbdc)
-        val danceSway = if (acting && reaction == "dance") sin(elapsed * 7.2f) * .17f * pulse else 0f
+        val danceSway = if (acting && reaction == "dance") sin(elapsed * 7.2f) * .22f * pulse else 0f
         Matrix.translateM(base, 0, danceSway, bounce - .06f, 0f)
         Matrix.rotateM(base, 0, pitch + when {
             acting && reaction == "snack" -> -4f - biteBeat * 5f
@@ -702,15 +702,22 @@ private class CompanionRenderer(private val state: CompanionState) {
             ball(0f, -.29f, .285f, .235f, .31f, .055f, 0xfff9f3)
             ball(-.20f, -.68f, .13f, .20f, .22f, .24f, coat)
             ball(.20f, -.68f, .13f, .20f, .22f, .24f, coat)
-            // Forefeet with individual toe marks and soft pink pads.
-            ball(-.19f, -.86f, .32f, .17f, .105f, .25f, coat)
-            ball(.19f, -.86f, .32f, .17f, .105f, .25f, coat)
-            ball(-.19f, -.89f, .515f, .105f, .025f, .075f, 0xe9aabd)
-            ball(.19f, -.89f, .515f, .105f, .025f, .075f, 0xe9aabd)
-            for (toe in -1..1) {
-                ball(-.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
-                ball(.19f + toe * .055f, -.88f, .555f, .018f, .012f, .012f, 0xffdce5)
+            // Individually pivoted hind feet make hops land and dance steps read clearly.
+            fun bunnyFoot(side: Float, angle: Float) {
+                val saved = base.copyOf()
+                Matrix.translateM(base, 0, side * .19f, -.84f, .32f)
+                Matrix.rotateM(base, 0, angle, 1f, 0f, 0f)
+                ball(0f, 0f, 0f, .17f, .105f, .25f, coat)
+                ball(0f, -.03f, .195f, .105f, .025f, .075f, 0xe9aabd)
+                for (toe in -1..1) {
+                    ball(toe * .055f, -.02f, .235f, .018f, .012f, .012f, 0xffdce5)
+                }
+                System.arraycopy(saved, 0, base, 0, 16)
             }
+            val hopKick = if (acting && reaction in setOf("jump", "happy_hop")) sin(phase * PI.toFloat()) * 28f else 0f
+            val danceStep = if (acting && reaction == "dance") sin(elapsed * 7.2f) * 22f * pulse else 0f
+            bunnyFoot(-1f, hopKick + danceStep)
+            bunnyFoot(1f, -hopKick - danceStep)
             val tailWag = when {
                 reducedMotion -> 0f
                 acting && reaction in setOf("tail_wag", "wiggle") -> sin(elapsed * 15f) * 30f * pulse
@@ -790,14 +797,14 @@ private class CompanionRenderer(private val state: CompanionState) {
             acting && reaction in setOf("wave", "paw_wave") -> sin(elapsed * 15f) * 22f * pulse + 125f * pulse
             acting && reaction == "dance" -> (58f - danceBeat * 48f) * pulse
             acting && reaction in setOf("jump", "happy_hop") -> 100f * hopArc
-            acting && reaction == "snack" -> 26f + biteBeat * 9f
+            acting && reaction == "snack" -> 142f + biteBeat * 11f
             acting && reaction == "stretch" -> -92f * pulse
             acting && reaction == "curious" -> -48f * pulse
             !reducedMotion && !acting -> sin(time * 1.65f) * 3f
             else -> 12f
         }
         val leftArm = when {
-            acting && reaction == "snack" -> 136f + biteBeat * 8f
+            acting && reaction == "snack" -> 140f + biteBeat * 10f
             acting && reaction == "dance" -> (-58f - danceBeat * 48f) * pulse
             acting && reaction in setOf("jump", "happy_hop") -> -100f * hopArc
             acting && reaction == "stretch" -> 92f * pulse
@@ -808,11 +815,11 @@ private class CompanionRenderer(private val state: CompanionState) {
         arm(1f, wave - idleArm)
         if (acting && reaction == "snack") {
             // A small carrot travels from the raised paw towards the muzzle with each bite.
-            val carrotLift = biteBeat * .055f
-            val carrotTilt = sin(elapsed * 8.4f) * 12f * pulse
-            draw(cone, -.12f, .34f + carrotLift, .52f, .055f, .15f, .05f, 0xf09a68, -16f + carrotTilt)
-            ball(-.12f, .49f + carrotLift, .52f, .045f, .025f, .028f, 0x89b782, carrotTilt)
-            ball(-.025f, .34f + carrotLift, .51f, .035f, .03f, .025f, 0xd9b7e8)
+            val carrotLift = biteBeat * .075f
+            val carrotTilt = sin(elapsed * 9.2f) * 18f * pulse
+            draw(cone, -.085f, .385f + carrotLift, .535f, .052f, .145f, .048f, 0xf09a68, -8f + carrotTilt)
+            ball(-.085f, .535f + carrotLift, .535f, .043f, .026f, .026f, 0x89b782, carrotTilt)
+            ball(.005f, .39f + carrotLift, .525f, .032f, .028f, .024f, 0xd9b7e8)
         }
         // Species: fox, bear, cat, panda, rabbit and owl. Each has actual 3D ears/features.
         if (character == "milo" || character == "kai") {
