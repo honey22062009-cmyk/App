@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.SleepEntry
@@ -128,6 +129,7 @@ internal fun DailyFocusPlanCard(
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant
                             else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
                         maxLines = 2
                     )
                     TextButton(onClick = { onDelete(task.id) }) {
@@ -179,7 +181,7 @@ internal fun QuickTourCard(reduceMotion: Boolean, onDone: () -> Unit) {
     val steps = listOf(
         "Welcome to your day" to "Home is for a quick check-in and your companion. Your streak count updates automatically at local midnight. Daily check-ins are optional, and Reset records a fresh start.",
         "Set your boundaries" to "Block holds your apps and schedules. Browser Guard interrupts explicit searches after you enable Accessibility and consent to field inspection.",
-        "Make it yours" to "Progress keeps your history. Pro has its own dock tab. Tap, turn, feed or talk to your companion; sound is optional. Colours and motion live in Settings."
+        "Make it yours" to "Home has a saved top-three priority list. Focus keeps separate study-session history. Progress keeps your streak and milestones. Your companion has play actions; colours and motion live in Settings."
     )
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = .50f)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
