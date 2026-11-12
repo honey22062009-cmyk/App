@@ -207,25 +207,13 @@ class ReliabilityUiTest {
         compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("FOCUS ROOM"))
         compose.onNodeWithText("Open").performClick()
         waitFor("Make space to focus.")
-        // Freeze the virtual clock while asserting the active-session controls.
-        // Otherwise a slow tablet emulator can auto-advance the full 25-minute
-        // test session before the End session node is queried.
-        compose.mainClock.autoAdvance = false
+        // Countdown runs on real elapsed time, so Compose idle waits cannot
+        // fast-forward the complete session on slower tablet emulators.
         compose.onNodeWithText("Start 25-minute session").performClick()
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-        // Wait for the running state to enter composition before querying the
-        // controls. Tablet emulators can take longer to settle after navigation.
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithText("Pause").fetchSemanticsNodes().isNotEmpty()
-        }
+        waitFor("Pause")
         // The session action row may be below the fold on compact tablet layouts.
         compose.onNodeWithText("End session").performScrollTo().assertIsDisplayed()
-        // Advance only a short, controlled interval rather than sleeping the instrumentation thread.
-        compose.mainClock.advanceTimeBy(2_500L)
-        compose.waitForIdle()
         compose.onNodeWithText("End session").performScrollTo().performClick()
-        compose.mainClock.autoAdvance = true
         waitFor("End this session?")
         compose.onNodeWithText("Save and exit").performClick()
         compose.waitUntil(10_000) { runBlocking { settings.focusSessionsFlow.first().size == 1 } }
