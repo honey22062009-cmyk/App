@@ -66,6 +66,8 @@ import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.CompanionBehavior
 import com.example.ui.components.CompanionScene
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.Instant
@@ -142,8 +144,11 @@ fun FocusSessionScreen(
     }
 
     LaunchedEffect(isRunning, plannedSeconds) {
+        // A real focus timer must advance with wall-clock time, not the Compose
+        // animation/test clock. This keeps the session stable on slow tablets
+        // and prevents UI-idle waits from consuming an entire 25-minute session.
         while (isRunning && elapsedSeconds < plannedSeconds) {
-            delay(1_000L)
+            withContext(Dispatchers.Default) { delay(1_000L) }
             if (isRunning) elapsedSeconds = (elapsedSeconds + 1).coerceAtMost(plannedSeconds)
         }
         if (isRunning && elapsedSeconds >= plannedSeconds) {
