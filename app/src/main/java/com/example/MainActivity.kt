@@ -115,12 +115,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
 
-        val corePermissionsReady =
-            PermissionHelper.isAccessibilityServiceEnabled(this) &&
-                PermissionHelper.isUsageAccessGranted(this) &&
+        val fallbackPermissionsReady =
+            PermissionHelper.isUsageAccessGranted(this) &&
                 PermissionHelper.canDrawOverlays(this)
 
-        if (!corePermissionsReady) {
+        if (!fallbackPermissionsReady) {
             BlockerMonitoringService.stop(this)
             return
         }
