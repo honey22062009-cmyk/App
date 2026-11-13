@@ -2,6 +2,7 @@ package com.example.ui.screens.protection
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -324,7 +325,7 @@ fun ProtectionStatusScreen(
 }
 
 @Composable
-private fun StatusSurface(content: @Composable () -> Unit) {
+private fun StatusSurface(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
