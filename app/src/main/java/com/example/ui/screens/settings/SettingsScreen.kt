@@ -45,7 +45,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Switch
@@ -243,24 +243,6 @@ fun SettingsScreen(
                                         showPinVerify = true
                                     }
                                 },
-                                localPinConfigured = localPinConfigured,
-                                localPinGateEnabled = localPinGateEnabled,
-                                onConfigurePin = {
-                                    pinEntry = ""; pinConfirm = ""; pinError = ""
-                                    if (localPinConfigured) {
-                                        pendingPinAction = "change_pin"
-                                        showPinVerify = true
-                                    } else showPinSetup = true
-                                },
-                                onPinGateChange = { enabled ->
-                                    if (enabled) {
-                                        if (localPinConfigured) scope.launch { repository.settings.setLocalSecurityPinGateEnabled(true) }
-                                        else { pinEntry = ""; pinConfirm = ""; pinError = ""; showPinSetup = true }
-                                    } else {
-                                        pendingPinAction = "disable_gate"
-                                        showPinVerify = true
-                                    }
-                                },
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -382,6 +364,24 @@ fun SettingsScreen(
                                 onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
                                 onImportBackup = { showRestoreWarning = true },
                                 backupStatus = backupStatus,
+                                localPinConfigured = localPinConfigured,
+                                localPinGateEnabled = localPinGateEnabled,
+                                onConfigurePin = {
+                                    pinEntry = ""; pinConfirm = ""; pinError = ""
+                                    if (localPinConfigured) {
+                                        pendingPinAction = "change_pin"
+                                        showPinVerify = true
+                                    } else showPinSetup = true
+                                },
+                                onPinGateChange = { enabled ->
+                                    if (enabled) {
+                                        if (localPinConfigured) scope.launch { repository.settings.setLocalSecurityPinGateEnabled(true) }
+                                        else { pinEntry = ""; pinConfirm = ""; pinError = ""; showPinSetup = true }
+                                    } else {
+                                        pendingPinAction = "disable_gate"
+                                        showPinVerify = true
+                                    }
+                                },
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
