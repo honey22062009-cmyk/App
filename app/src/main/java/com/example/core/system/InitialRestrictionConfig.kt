@@ -26,6 +26,9 @@ object InitialRestrictionConfig {
 
     data class TimeWindow(val startHour: Int, val startMinute: Int, val endHour: Int, val endMinute: Int)
 
+    // Website hosts are handled by the browser Accessibility path, not as app packages.
+    val targetDomains = listOf("anifam.net")
+
     val targetApps = listOf(
         TargetApp("Instagram", "com.instagram.android"),
         TargetApp("Roblox", "com.roblox.client"),
