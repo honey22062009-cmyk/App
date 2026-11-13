@@ -18,6 +18,11 @@ import java.time.LocalDate
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.datastore.preferences.core.floatPreferencesKey
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 import androidx.datastore.preferences.core.doublePreferencesKey
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
@@ -26,6 +31,11 @@ class SettingsPreferences(private val context: Context) {
 
     private object PreferencesKeys {
         val PROTECTION_ENABLED = booleanPreferencesKey("protection_enabled")
+        val LOCAL_PIN_SALT = stringPreferencesKey("local_security_pin_salt_v1")
+        val LOCAL_PIN_HASH = stringPreferencesKey("local_security_pin_hash_v1")
+        val LOCAL_PIN_GATE_ENABLED = booleanPreferencesKey("local_security_pin_gate_enabled_v1")
+        val LOCAL_PIN_LOCK_UNTIL = longPreferencesKey("local_security_pin_lock_until_v1")
+        val LOCAL_PIN_FAILED_ATTEMPTS = intPreferencesKey("local_security_pin_failed_attempts_v1")
         val STRICT_CHANGE_DELAY_MINUTES = intPreferencesKey("strict_change_delay_minutes")
         val PENDING_CHANGE_UNLOCK_TIME = longPreferencesKey("pending_change_unlock_time")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
@@ -104,6 +114,14 @@ class SettingsPreferences(private val context: Context) {
 
     val isProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.PROTECTION_ENABLED] ?: true
+    }
+
+    val localSecurityPinConfiguredFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        !preferences[PreferencesKeys.LOCAL_PIN_SALT].isNullOrBlank() && !preferences[PreferencesKeys.LOCAL_PIN_HASH].isNullOrBlank()
+    }
+
+    val localSecurityPinGateEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] ?: false
     }
 
     val strictChangeDelayMinutesFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -354,6 +372,63 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setProtectionEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.PROTECTION_ENABLED] = enabled
+        }
+    }
+
+    /**
+     * Local in-app PIN gate only. This does NOT block Android's package installer/uninstaller.
+     * The verifier is salted PBKDF2-HMAC-SHA256; the PIN itself is never persisted.
+     */
+    suspend fun configureLocalSecurityPin(pin: String) {
+        require(pin.matches(Regex("[0-9]{4,8}"))) { "PIN must contain 4 to 8 digits." }
+        val salt = ByteArray(16).also(SecureRandom()::nextBytes)
+        val hash = deriveLocalPinHash(pin, salt)
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LOCAL_PIN_SALT] = Base64.getEncoder().encodeToString(salt)
+            preferences[PreferencesKeys.LOCAL_PIN_HASH] = Base64.getEncoder().encodeToString(hash)
+            preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+            preferences.remove(PreferencesKeys.LOCAL_PIN_LOCK_UNTIL)
+        }
+    }
+
+    suspend fun verifyLocalSecurityPin(pin: String): Boolean {
+        val snapshot = context.dataStore.data.first()
+        val lockUntil = snapshot[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] ?: 0L
+        if (System.currentTimeMillis() < lockUntil) return false
+        val saltText = snapshot[PreferencesKeys.LOCAL_PIN_SALT] ?: return false
+        val hashText = snapshot[PreferencesKeys.LOCAL_PIN_HASH] ?: return false
+        val salt = runCatching { Base64.getDecoder().decode(saltText) }.getOrNull() ?: return false
+        val expected = runCatching { Base64.getDecoder().decode(hashText) }.getOrNull() ?: return false
+        val actual = runCatching { deriveLocalPinHash(pin, salt) }.getOrNull() ?: return false
+        val matches = MessageDigest.isEqual(expected, actual)
+        context.dataStore.edit { preferences ->
+            if (matches) {
+                preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+                preferences.remove(PreferencesKeys.LOCAL_PIN_LOCK_UNTIL)
+            } else {
+                val failures = (preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] ?: 0) + 1
+                preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = failures
+                if (failures >= 5) {
+                    preferences[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] = System.currentTimeMillis() + 30_000L
+                    preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+                }
+            }
+        }
+        return matches
+    }
+
+    suspend fun setLocalSecurityPinGateEnabled(enabled: Boolean) {
+        val configured = localSecurityPinConfiguredFlow.first()
+        require(!enabled || configured) { "Set a PIN before enabling the PIN gate." }
+        context.dataStore.edit { it[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] = enabled }
+    }
+
+    private fun deriveLocalPinHash(pin: String, salt: ByteArray): ByteArray {
+        val spec = PBEKeySpec(pin.toCharArray(), salt, 150_000, 256)
+        return try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
         }
     }
 
