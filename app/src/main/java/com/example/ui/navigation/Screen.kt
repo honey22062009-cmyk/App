@@ -49,6 +49,13 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.Shield
     )
 
+    data object ProtectionStatus : Screen(
+        route = "protection_status",
+        title = "Protection Status",
+        selectedIcon = Icons.Filled.Security,
+        unselectedIcon = Icons.Outlined.Security
+    )
+
     data object Permissions : Screen(
         route = "permissions",
         title = "Permissions",

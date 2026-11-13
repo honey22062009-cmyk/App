@@ -8,6 +8,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.core.evaluator.AdultContentEvaluator
 import com.example.core.system.SafetyWhitelist
+import com.example.core.system.InitialRestrictionConfig
+import com.example.core.evaluator.ScheduleEvaluator
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.util.Locale
+import java.time.LocalDateTime
 
 /**
  * High-performance, zero-latency accessibility service.
@@ -34,6 +37,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     private var lastBlockedPackage: String? = null
     private var lastBlockTimestamp: Long = 0L
+    private var lastDomainBlockedPackage: String? = null
+    private var lastDomainBlockTimestamp: Long = 0L
 
     private var lastAdultTriggerTimestamp: Long = 0L
     private var adultBlockedPackage: String? = null
@@ -65,6 +70,66 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
 
         serviceScope.launch {
+            // Scheduled website rule: inspect browser address-bar surfaces, not arbitrary page text.
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED
+            ) {
+                if (isBrowserApp(packageName)) {
+                    val matchedDomain = findRestrictedDomainInAddressBar(packageName, event)
+                    if (matchedDomain != null) {
+                        val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
+                        if (!protectionEnabled) return@launch
+
+                        val domainEvaluation = ScheduleEvaluator.evaluate(
+                            InitialRestrictionConfig.defaultAllowedPeriods("domain:$matchedDomain"),
+                            LocalDateTime.now()
+                        )
+                        if (domainEvaluation.isBlocked) {
+                            if (packageName == lastDomainBlockedPackage &&
+                                now - lastDomainBlockTimestamp < 2_000L
+                            ) {
+                                return@launch
+                            }
+
+                            lastDomainBlockedPackage = packageName
+                            lastDomainBlockTimestamp = now
+                            repository.recordBlockEvent(
+                                packageName,
+                                "AniFam website",
+                                "Scheduled website restriction: $matchedDomain"
+                            )
+
+                            performGlobalAction(GLOBAL_ACTION_HOME)
+                            delay(120)
+
+                            val blockIntent = Intent(
+                                this@AppBlockerAccessibilityService,
+                                BlockerActivity::class.java
+                            ).apply {
+                                addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                                )
+                                putExtra(BlockerActivity.EXTRA_PACKAGE_NAME, packageName)
+                                putExtra(BlockerActivity.EXTRA_APP_NAME, "AniFam website")
+                                putExtra(
+                                    BlockerActivity.EXTRA_NEXT_ALLOWED,
+                                    domainEvaluation.formattedNextAllowedTime
+                                )
+                                putExtra(
+                                    BlockerActivity.EXTRA_BLOCK_TYPE,
+                                    BlockerActivity.BLOCK_TYPE_SCHEDULE
+                                )
+                            }
+                            startActivity(blockIntent)
+                            return@launch
+                        }
+                    }
+                }
+            }
+
             // If explicit content was just detected in this app, keep the offending app
             // out of view for the configured cooldown even if its next accessibility event
             // no longer exposes the original text.
@@ -125,6 +190,70 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 }
             }
         }
+    }
+
+    /**
+     * Matches the configured site only when its hostname is exposed through a known
+     * browser address bar or an accessibility event sourced from an address field.
+     */
+    private fun findRestrictedDomainInAddressBar(
+        packageName: String,
+        event: AccessibilityEvent
+    ): String? {
+        val candidateTexts = mutableListOf<String>()
+        val source = try { event.source } catch (_: Exception) { null }
+
+        if (source != null) {
+            val metadata = listOf(
+                source.viewIdResourceName,
+                source.contentDescription?.toString(),
+                source.hintText?.toString()
+            ).filterNotNull().joinToString(" ").lowercase(Locale.ROOT)
+
+            if (isLikelyAddressSearchField(source) ||
+                listOf("url", "address", "omnibox", "location bar").any(metadata::contains)
+            ) {
+                source.text?.toString()?.let(candidateTexts::add)
+                source.contentDescription?.toString()?.let(candidateTexts::add)
+            }
+        }
+
+        val root = try { rootInActiveWindow } catch (_: Exception) { null }
+        if (root != null) {
+            val addressBarIds = listOf(
+                "com.android.chrome:id/url_bar",
+                "com.sec.android.app.sbrowser:id/location_bar_edit_text",
+                "org.mozilla.firefox:id/mozac_browser_toolbar_url_view",
+                "com.microsoft.emmx:id/url_bar",
+                "com.brave.browser:id/url_bar",
+                "com.opera.browser:id/url_field",
+                "com.duckduckgo.mobile.android:id/omnibar_text_input"
+            )
+            for (viewId in addressBarIds) {
+                try {
+                    root.findAccessibilityNodeInfosByViewId(viewId)
+                        ?.forEach { node ->
+                            node.text?.toString()?.let(candidateTexts::add)
+                            node.contentDescription?.toString()?.let(candidateTexts::add)
+                        }
+                } catch (_: Exception) {
+                    // A browser may not expose every known resource ID.
+                }
+            }
+        }
+
+        return InitialRestrictionConfig.targetDomains.firstOrNull { domain ->
+            candidateTexts.any { candidate -> containsHost(candidate, domain) }
+        }
+    }
+
+    private fun containsHost(candidate: String, domain: String): Boolean {
+        val hostPattern = Regex(
+            "(?i)(?:^|[^a-z0-9.-])(?:[a-z0-9-]+\\.)*" +
+                Regex.escape(domain) +
+                "(?::\\d+)?(?:[/?#\\s]|$)"
+        )
+        return hostPattern.containsMatchIn(candidate)
     }
 
     /**

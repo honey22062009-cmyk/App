@@ -19,6 +19,7 @@ import androidx.core.app.ServiceCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.core.system.SafetyWhitelist
+import com.example.core.system.ProtectionHealthStore
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.blocker.BlockerActivity
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,7 @@ class BlockerMonitoringService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var repository: AppBlockerRepository
+    private var lastHealthHeartbeatAt: Long = 0L
 
     @Volatile
     private var lastKnownForegroundPackage: String? = null
@@ -71,7 +73,6 @@ class BlockerMonitoringService : Service() {
     override fun onCreate() {
         super.onCreate()
         repository = AppBlockerRepository(applicationContext)
-
         try {
             createNotificationChannel()
             val notification = buildNotification("Strict protection active")
@@ -87,6 +88,8 @@ class BlockerMonitoringService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
 
+            lastHealthHeartbeatAt = System.currentTimeMillis()
+            ProtectionHealthStore.recordMonitorHeartbeat(applicationContext, lastHealthHeartbeatAt)
             startFallbackMonitoringLoop()
         } catch (t: Throwable) {
             Log.e("BlockerService", "FGS startup failed or restricted by system", t)
@@ -162,6 +165,11 @@ class BlockerMonitoringService : Service() {
                     // Safe execution loop
                 }
 
+                val heartbeatNow = System.currentTimeMillis()
+                if (heartbeatNow - lastHealthHeartbeatAt >= 60_000L) {
+                    ProtectionHealthStore.recordMonitorHeartbeat(applicationContext, heartbeatNow)
+                    lastHealthHeartbeatAt = heartbeatNow
+                }
                 delay(1500L) // Lightweight verification cadence
             }
         }

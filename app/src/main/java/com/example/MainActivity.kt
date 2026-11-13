@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
+import com.example.service.BlockerMonitoringService
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.adult.AdultProtectionScreen
@@ -62,10 +63,13 @@ import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
+import com.example.ui.screens.protection.ProtectionStatusScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -104,6 +108,37 @@ class MainActivity : ComponentActivity() {
                     repository = repository,
                     initialTargetPackage = targetPackage
                 )
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        val fallbackPermissionsReady =
+            PermissionHelper.isUsageAccessGranted(this) &&
+                PermissionHelper.canDrawOverlays(this)
+
+        if (!fallbackPermissionsReady) {
+            BlockerMonitoringService.stop(this)
+            return
+        }
+
+        // Starting from a visible Activity is compatible with modern background
+        // foreground-service launch restrictions. Boot recovery remains separate.
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val enabled = AppBlockerRepository(this@MainActivity)
+                    .settings.isProtectionEnabledFlow.first()
+                runOnUiThread {
+                    if (enabled) {
+                        BlockerMonitoringService.start(this@MainActivity)
+                    } else {
+                        BlockerMonitoringService.stop(this@MainActivity)
+                    }
+                }
+            } catch (_: Exception) {
+                // The dashboard and Accessibility service remain usable if this check fails.
             }
         }
     }
@@ -175,7 +210,7 @@ fun MainAppScaffold(
         enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
     ) {
         when (currentScreen) {
-            Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
+            Screen.AntiBypassGuide, Screen.Legal, Screen.ProtectionStatus -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -380,6 +415,12 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
             )
         }
+        Screen.ProtectionStatus -> {
+            ProtectionStatusScreen(
+                repository = repository,
+                onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
+            )
+        }
         Screen.Permissions -> {
             PermissionsScreen(
                 onContinue = {
@@ -396,7 +437,8 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToProtectionStatus = { onNavigateToScreen(Screen.ProtectionStatus) }
             )
         }
         Screen.AntiBypassGuide -> {
