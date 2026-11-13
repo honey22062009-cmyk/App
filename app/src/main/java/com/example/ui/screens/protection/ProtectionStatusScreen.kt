@@ -134,7 +134,16 @@ fun ProtectionStatusScreen(
     val nowMillis = System.currentTimeMillis()
     val monitorRecent = lastHeartbeat?.let { nowMillis - it <= 3 * 60 * 1000L } == true
     val coreReady = permissions?.requiredReady == true
-    val anyRestricted = targets.any { it.installed && it.restrictedNow }
+    val domainNow = LocalDateTime.now()
+    val websiteDomain = InitialRestrictionConfig.targetDomains.first()
+    val websitePeriods = InitialRestrictionConfig.defaultAllowedPeriods("domain:$websiteDomain")
+    val websiteEvaluation = ScheduleEvaluator.evaluate(websitePeriods, domainNow)
+    val websiteNextBoundary = if (websiteEvaluation.isBlocked) {
+        websiteEvaluation.nextAllowedDateTime
+    } else {
+        ScheduleEvaluator.findNextTransition(websitePeriods, domainNow)?.dateTime
+    }
+    val anyRestricted = targets.any { it.installed && it.restrictedNow } || websiteEvaluation.isBlocked
 
     val overallStatus = when {
         !protectionEnabled -> "Protection paused"
@@ -269,8 +278,43 @@ fun ProtectionStatusScreen(
         }
 
         item {
+            StatusSurface {
+                Text("AniFam website", fontWeight = FontWeight.SemiBold)
+                Text(
+                    websiteDomain,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    when {
+                        !protectionEnabled -> "Paused"
+                        websiteEvaluation.isBlocked -> "Restricted now"
+                        else -> "Available now"
+                    },
+                    color = if (websiteEvaluation.isBlocked && protectionEnabled) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+                Text(
+                    websiteNextBoundary?.let {
+                        "${if (websiteEvaluation.isBlocked) "Expected unlock" else "Next restriction start"}: ${it.format(formatter)}"
+                    } ?: "No upcoming website boundary found",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "The website rule depends on supported browsers exposing the hostname in an accessibility address-bar node. Other domains and browsers that do not expose the address bar are not covered.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        item {
             Text(
-                "Not installed apps remain in this configuration. Website access is separate from app-package blocking, and this screen does not claim to cover other Android users or profiles.",
+                "Not installed apps remain in this configuration. App and website rules are separate. This screen does not claim to cover other Android users or profiles.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
