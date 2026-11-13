@@ -73,9 +73,6 @@ class BlockerMonitoringService : Service() {
     override fun onCreate() {
         super.onCreate()
         repository = AppBlockerRepository(applicationContext)
-        lastHealthHeartbeatAt = System.currentTimeMillis()
-        ProtectionHealthStore.recordMonitorHeartbeat(applicationContext, lastHealthHeartbeatAt)
-
         try {
             createNotificationChannel()
             val notification = buildNotification("Strict protection active")
@@ -91,6 +88,8 @@ class BlockerMonitoringService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
 
+            lastHealthHeartbeatAt = System.currentTimeMillis()
+            ProtectionHealthStore.recordMonitorHeartbeat(applicationContext, lastHealthHeartbeatAt)
             startFallbackMonitoringLoop()
         } catch (t: Throwable) {
             Log.e("BlockerService", "FGS startup failed or restricted by system", t)
