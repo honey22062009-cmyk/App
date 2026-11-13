@@ -62,6 +62,7 @@ import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
+import com.example.ui.screens.protection.ProtectionStatusScreen
 import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
@@ -175,7 +176,7 @@ fun MainAppScaffold(
         enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Permissions
     ) {
         when (currentScreen) {
-            Screen.AntiBypassGuide, Screen.Legal -> currentScreen = Screen.Settings
+            Screen.AntiBypassGuide, Screen.Legal, Screen.ProtectionStatus -> currentScreen = Screen.Settings
             else -> currentScreen = Screen.Dashboard
         }
     }
@@ -358,7 +359,8 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToProtectionStatus = { onNavigateToScreen(Screen.ProtectionStatus) }
             )
         }
         Screen.Apps -> {
@@ -376,6 +378,12 @@ fun ScreenContent(
         }
         Screen.AdultProtection -> {
             AdultProtectionScreen(
+                repository = repository,
+                onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
+            )
+        }
+        Screen.ProtectionStatus -> {
+            ProtectionStatusScreen(
                 repository = repository,
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) }
             )
