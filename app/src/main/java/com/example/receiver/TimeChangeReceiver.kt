@@ -17,7 +17,8 @@ class TimeChangeReceiver : BroadcastReceiver() {
         when (intent?.action) {
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_DATE_CHANGED -> {
+            Intent.ACTION_DATE_CHANGED,
+            android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED -> {
                 AlarmScheduler.scheduleNextTransition(context)
             }
         }
