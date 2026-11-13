@@ -973,7 +973,7 @@ class SettingsPreferences(private val context: Context) {
      */
     suspend fun exportBackupJson(): String {
         val entries = JSONObject()
-        context.dataStore.data.first().asMap().forEach { (key, value) ->
+        context.dataStore.data.first().asMap().filterKeys { !it.name.startsWith("local_security_pin_") }.forEach { (key, value) ->
             val item = JSONObject()
             when (value) {
                 is Boolean -> item.put("type", "boolean").put("value", value)
@@ -1011,8 +1011,16 @@ class SettingsPreferences(private val context: Context) {
             "This backup belongs to a different app."
         }
         val entries = root.getJSONObject("entries")
+        val existingSecurity = context.dataStore.data.first()
         context.dataStore.edit { preferences ->
             preferences.clear()
+            // Security credentials are deliberately excluded from portable backups.
+            // Preserve the current device's verifier and gate state during data restore.
+            existingSecurity[PreferencesKeys.LOCAL_PIN_SALT]?.let { preferences[PreferencesKeys.LOCAL_PIN_SALT] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_HASH]?.let { preferences[PreferencesKeys.LOCAL_PIN_HASH] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_GATE_ENABLED]?.let { preferences[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL]?.let { preferences[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS]?.let { preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = it }
             val iterator = entries.keys()
             while (iterator.hasNext()) {
                 val name = iterator.next()
