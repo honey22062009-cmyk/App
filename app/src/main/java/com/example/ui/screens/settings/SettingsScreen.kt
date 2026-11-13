@@ -44,6 +44,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,6 +111,14 @@ fun SettingsScreen(
     val sleepReminderEnabled by repository.settings.sleepReminderEnabledFlow.collectAsState(initial = false)
     val sleepReminderHour by repository.settings.sleepReminderHourFlow.collectAsState(initial = 6)
     val sleepReminderMinute by repository.settings.sleepReminderMinuteFlow.collectAsState(initial = 0)
+    val localPinConfigured by repository.settings.localSecurityPinConfiguredFlow.collectAsState(initial = false)
+    val localPinGateEnabled by repository.settings.localSecurityPinGateEnabledFlow.collectAsState(initial = false)
+    var showPinSetup by remember { mutableStateOf(false) }
+    var showPinVerify by remember { mutableStateOf(false) }
+    var pinEntry by remember { mutableStateOf("") }
+    var pinConfirm by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf("") }
+    var pendingPinAction by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
     var backupStatus by remember { mutableStateOf("") }
     var showRestoreWarning by remember { mutableStateOf(false) }
@@ -213,6 +225,42 @@ fun SettingsScreen(
                                 onExportBackup = { exportBackupLauncher.launch("No-goon-backup.json") },
                                 onImportBackup = { showRestoreWarning = true },
                                 backupStatus = backupStatus,
+                                localPinConfigured = localPinConfigured,
+                                localPinGateEnabled = localPinGateEnabled,
+                                onConfigurePin = {
+                                    pinEntry = ""; pinConfirm = ""; pinError = ""
+                                    if (localPinConfigured) {
+                                        pendingPinAction = "change_pin"
+                                        showPinVerify = true
+                                    } else showPinSetup = true
+                                },
+                                onPinGateChange = { enabled ->
+                                    if (enabled) {
+                                        if (localPinConfigured) scope.launch { repository.settings.setLocalSecurityPinGateEnabled(true) }
+                                        else { pinEntry = ""; pinConfirm = ""; pinError = ""; showPinSetup = true }
+                                    } else {
+                                        pendingPinAction = "disable_gate"
+                                        showPinVerify = true
+                                    }
+                                },
+                                localPinConfigured = localPinConfigured,
+                                localPinGateEnabled = localPinGateEnabled,
+                                onConfigurePin = {
+                                    pinEntry = ""; pinConfirm = ""; pinError = ""
+                                    if (localPinConfigured) {
+                                        pendingPinAction = "change_pin"
+                                        showPinVerify = true
+                                    } else showPinSetup = true
+                                },
+                                onPinGateChange = { enabled ->
+                                    if (enabled) {
+                                        if (localPinConfigured) scope.launch { repository.settings.setLocalSecurityPinGateEnabled(true) }
+                                        else { pinEntry = ""; pinConfirm = ""; pinError = ""; showPinSetup = true }
+                                    } else {
+                                        pendingPinAction = "disable_gate"
+                                        showPinVerify = true
+                                    }
+                                },
                                 delayMinutes = delayMinutes,
                                 isProtectionEnabled = isProtectionEnabled,
                                 reduceMotion = reduceMotion,
@@ -233,7 +281,12 @@ fun SettingsScreen(
                                     scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
                                 },
                                 onProtectionChange = { enabled ->
-                                    scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                    if (!enabled && localPinGateEnabled) {
+                                        pendingPinAction = "disable_blocking"
+                                        showPinVerify = true
+                                    } else {
+                                        scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                    }
                                 },
                                 onNavigateToPermissions = onNavigateToPermissions,
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
@@ -349,7 +402,12 @@ fun SettingsScreen(
                                     scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
                                 },
                                 onProtectionChange = { enabled ->
-                                    scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                    if (!enabled && localPinGateEnabled) {
+                                        pendingPinAction = "disable_blocking"
+                                        showPinVerify = true
+                                    } else {
+                                        scope.launch { repository.settings.setProtectionEnabled(enabled) }
+                                    }
                                 },
                                 onNavigateToPermissions = onNavigateToPermissions,
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
@@ -388,6 +446,87 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+
+    if (showPinSetup) {
+        AlertDialog(
+            onDismissRequest = { showPinSetup = false; pinEntry = ""; pinConfirm = ""; pinError = "" },
+            title = { Text(if (localPinConfigured) "Change security PIN" else "Set security PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose 4 to 8 digits. This PIN only protects the in-app app-blocking setting; it cannot lock Android's uninstall screen.")
+                    OutlinedTextField(
+                        value = pinEntry, onValueChange = { pinEntry = it.filter(Char::isDigit).take(8); pinError = "" },
+                        label = { Text("New PIN") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    OutlinedTextField(
+                        value = pinConfirm, onValueChange = { pinConfirm = it.filter(Char::isDigit).take(8); pinError = "" },
+                        label = { Text("Confirm PIN") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (pinError.isNotBlank()) Text(pinError, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    if (pinEntry.length !in 4..8) pinError = "Use 4 to 8 digits."
+                    else if (pinEntry != pinConfirm) pinError = "PINs do not match."
+                    else scope.launch {
+                        runCatching { repository.settings.configureLocalSecurityPin(pinEntry) }
+                            .onSuccess {
+                                repository.settings.setLocalSecurityPinGateEnabled(true)
+                                showPinSetup = false
+                                pinEntry = ""; pinConfirm = ""; pinError = ""
+                            }
+                            .onFailure { pinError = it.message ?: "Could not save PIN." }
+                    }
+                }) { Text("Save PIN") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showPinSetup = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showPinVerify) {
+        AlertDialog(
+            onDismissRequest = { showPinVerify = false; pinEntry = ""; pinError = ""; pendingPinAction = "" },
+            title = { Text("Confirm with PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter your security PIN to continue.")
+                    OutlinedTextField(
+                        value = pinEntry, onValueChange = { pinEntry = it.filter(Char::isDigit).take(8); pinError = "" },
+                        label = { Text("Security PIN") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (pinError.isNotBlank()) Text(pinError, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    scope.launch {
+                        val valid = repository.settings.verifyLocalSecurityPin(pinEntry)
+                        if (!valid) {
+                            pinError = "Incorrect PIN or temporary retry delay. Try again shortly."
+                            pinEntry = ""
+                        } else {
+                            when (pendingPinAction) {
+                                "disable_blocking" -> repository.settings.setProtectionEnabled(false)
+                                "disable_gate" -> repository.settings.setLocalSecurityPinGateEnabled(false)
+                                "change_pin" -> showPinSetup = true
+                            }
+                            showPinVerify = false
+                            pinEntry = ""; pinError = ""; pendingPinAction = ""
+                        }
+                    }
+                }) { Text("Verify") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showPinVerify = false; pinEntry = ""; pinError = ""; pendingPinAction = "" }) { Text("Cancel") } }
+        )
     }
 
     if (showRestoreWarning) {
@@ -456,6 +595,10 @@ private fun SettingsSectionContent(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     backupStatus: String,
+    localPinConfigured: Boolean,
+    localPinGateEnabled: Boolean,
+    onConfigurePin: () -> Unit,
+    onPinGateChange: (Boolean) -> Unit,
     delayMinutes: Int,
     isProtectionEnabled: Boolean,
     reduceMotion: Boolean,
@@ -588,6 +731,28 @@ private fun SettingsSectionContent(
         }
 
         SettingsSection.Protection -> {
+            Text("Uninstall protection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            SettingsDescription("Android does not let an ordinary personal app block its own removal. No goon cannot place a PIN inside Android's system uninstall screen.")
+            Spacer(Modifier.height(10.dp))
+            Text("Status: unavailable on this personal device", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(18.dp))
+            Text("In-app PIN gate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            SettingsDescription("This optional PIN protects the app's own App blocking switch. It does not prevent uninstalling No goon, force-stopping it, or clearing its data.")
+            Spacer(Modifier.height(12.dp))
+            SettingsToggleRow(
+                title = "Require PIN before disabling app blocking",
+                subtitle = if (localPinConfigured) "A PIN is configured on this device." else "Set a PIN first to enable this gate.",
+                checked = localPinGateEnabled,
+                onCheckedChange = onPinGateChange
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onConfigurePin, modifier = Modifier.fillMaxWidth()) {
+                Text(if (localPinConfigured) "Change security PIN" else "Set security PIN")
+            }
+            Spacer(Modifier.height(18.dp))
+            SettingsDescription("PIN data stays on this device as a salted PBKDF2 verifier. Five incorrect attempts trigger a 30-second delay. The PIN is not sent to a server.")
+            Spacer(Modifier.height(20.dp))
             SettingsLinkRow(
                 title = "18+ content protection",
                 subtitle = "Explicit-search guard and filtered search shortcuts",
