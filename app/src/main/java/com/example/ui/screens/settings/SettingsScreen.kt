@@ -362,7 +362,7 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.2")
+            SettingsDescription("Version 1.3")
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { },
@@ -372,7 +372,7 @@ private fun SettingsSectionContent(
                     disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             ) {
-                Text("Update to v1.3")
+                Text("Latest version")
             }
             Spacer(modifier = Modifier.height(8.dp))
             SettingsDescription("Schedules and app preferences are stored on-device.")
