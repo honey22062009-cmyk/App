@@ -29,6 +29,9 @@ class BrowserGuardNativeTest {
         }
         val previous = shell("settings get secure enabled_accessibility_services").takeUnless { it == "null" }.orEmpty()
         val previousEnabled = shell("settings get secure accessibility_enabled").takeIf { it == "1" } ?: "0"
+        val previousProtection = runBlocking { settings.isProtectionEnabledFlow.first() }
+        val previousAdultProtection = runBlocking { settings.isAdultProtectionEnabledFlow.first() }
+        val previousConsent = runBlocking { settings.browserInspectionConsentFlow.first() }
         val component = "${context.packageName}/com.example.service.AppBlockerAccessibilityService"
         try {
             runBlocking {
@@ -61,9 +64,16 @@ class BrowserGuardNativeTest {
             Thread.sleep(800)
             assertEquals(before + 1, runBlocking { settings.adultBlocksCountFlow.first() })
         } finally {
+            // The last clean fixture activity must not leak into the next UI test.
+            runCatching { automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK) }
+            Thread.sleep(350)
             shell("settings put secure enabled_accessibility_services ${if (previous.isEmpty()) "null" else previous}")
             shell("settings put secure accessibility_enabled $previousEnabled")
-            runBlocking { settings.setProtectionEnabled(true) }
+            runBlocking {
+                settings.setProtectionEnabled(previousProtection)
+                settings.setAdultProtectionEnabled(previousAdultProtection)
+                settings.setBrowserInspectionConsent(previousConsent)
+            }
         }
     }
 }

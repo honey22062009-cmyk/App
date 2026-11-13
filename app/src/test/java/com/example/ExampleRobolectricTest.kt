@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.system.SafetyWhitelist
 import com.example.data.db.AppDatabase
+import com.example.data.preferences.SettingsPreferences
+import kotlinx.coroutines.flow.first
 import com.example.data.db.entity.AppEntity
 import com.example.data.db.entity.ManagedAppEntity
 import com.example.data.db.entity.ScheduleEntity
@@ -45,7 +47,55 @@ class ExampleRobolectricTest {
     @Test
     fun testAppNameString() {
         val appName = context.getString(R.string.app_name)
-        assertEquals("Strict Blocker", appName)
+        assertEquals("No goon", appName)
+    }
+
+    @Test
+    fun localDataBackupRoundTripsPreferencesAndProgress() = runBlocking {
+        val settings = SettingsPreferences(context)
+        settings.clearAllUserPreferences()
+        try {
+            settings.setTrackerGoalDays(30)
+            settings.setCompanionSound(true)
+            settings.ensureStreakTrackerStarted(1_800_000_000_000L)
+
+            val backup = settings.exportBackupJson()
+
+            settings.setTrackerGoalDays(3)
+            settings.setCompanionSound(false)
+            settings.resetStreakTracker(1_800_000_100_000L)
+
+            settings.importBackupJson(backup)
+
+            assertEquals(30, settings.trackerGoalDaysFlow.first())
+            assertTrue(settings.companionSoundFlow.first())
+            assertTrue(settings.trackerStartedAtFlow.first() > 0L)
+        } finally {
+            settings.clearAllUserPreferences()
+        }
+    }
+
+    @Test
+    fun localSecurityPinIsHashedAndExcludedFromPortableBackup() = runBlocking {
+        val settings = SettingsPreferences(context)
+        settings.clearAllUserPreferences()
+        try {
+            settings.configureLocalSecurityPin("4821")
+            assertFalse(settings.verifyLocalSecurityPin("0000"))
+            assertTrue(settings.verifyLocalSecurityPin("4821"))
+
+            val backup = settings.exportBackupJson()
+            assertFalse(backup.contains("local_security_pin_hash_v1"))
+            assertFalse(backup.contains("local_security_pin_salt_v1"))
+
+            // Restoring another backup must retain the current device's own PIN.
+            settings.configureLocalSecurityPin("7395")
+            settings.importBackupJson(backup)
+            assertTrue(settings.verifyLocalSecurityPin("7395"))
+            assertFalse(settings.verifyLocalSecurityPin("4821"))
+        } finally {
+            settings.clearAllUserPreferences()
+        }
     }
 
     @Test

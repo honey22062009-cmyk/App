@@ -21,7 +21,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.1"
       - uses: actions/setup-node@v5
@@ -35,22 +35,41 @@ jobs:
             printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
           else
             printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
-            echo "::warning::Google Sign-In is not configured yet. Core offline features remain available."
+            echo "::notice::Google Sign-In is optional and not configured. Offline focus, progress and blocking features remain available."
           fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
       - name: Configure optional retained Android signing key
         id: signing
         env:
+          ANDROID_SIGNING_BUNDLE_BASE64: ${{ secrets.ANDROID_SIGNING_BUNDLE_BASE64 }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No retained Android signing key configured. The debug APK will use the runner debug key; it may not update an existing installation."
-          else
+          set -euo pipefail
+          if [ -n "$ANDROID_SIGNING_BUNDLE_BASE64" ]; then
+            BUNDLE_DIR="$RUNNER_TEMP/no-goon-signing"
+            mkdir -p "$BUNDLE_DIR"
+            printf '%s' "$ANDROID_SIGNING_BUNDLE_BASE64" | base64 --decode > "$RUNNER_TEMP/no-goon-signing.zip"
+            unzip -q "$RUNNER_TEMP/no-goon-signing.zip" -d "$BUNDLE_DIR"
+            PROPERTIES_FILE="$BUNDLE_DIR/signing.properties"
+            KEYSTORE_FILE="$BUNDLE_DIR/$(sed -n 's/^KEYSTORE_FILE=//p' "$PROPERTIES_FILE")"
+            STORE_PASSWORD="$(sed -n 's/^STORE_PASSWORD=//p' "$PROPERTIES_FILE")"
+            KEY_PASSWORD="$(sed -n 's/^KEY_PASSWORD=//p' "$PROPERTIES_FILE")"
+            KEY_ALIAS="$(sed -n 's/^KEY_ALIAS=//p' "$PROPERTIES_FILE")"
+            test -f "$KEYSTORE_FILE" && test -n "$STORE_PASSWORD" && test -n "$KEY_PASSWORD" && test -n "$KEY_ALIAS"
+            chmod 600 "$KEYSTORE_FILE" "$PROPERTIES_FILE"
+            echo "::add-mask::$STORE_PASSWORD"
+            echo "::add-mask::$KEY_PASSWORD"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            rm -f "$RUNNER_TEMP/no-goon-signing.zip"
+          elif [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_STORE_PASSWORD" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             KEYSTORE_FILE="$RUNNER_TEMP/strict-blocker-update-key.jks"
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
             chmod 600 "$KEYSTORE_FILE"
@@ -59,41 +78,57 @@ jobs:
             echo "KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-upload}" >> "$GITHUB_ENV"
             echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No retained Android signing key configured. Add the repository secret ANDROID_SIGNING_BUNDLE_BASE64 to publish stable update APKs."
           fi
       - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace --no-daemon
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+      - name: Build update APK with retained signing key
+        if: steps.signing.outputs.configured == 'true'
+        run: gradle :app:assembleRelease --stacktrace --no-daemon
+      - name: Verify update APK identity and signature
+        if: steps.signing.outputs.configured == 'true'
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" && test -n "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='10' versionName='1.8.0'"
+      - name: Upload signed update APK
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v7
         with:
-          name: strict-blocker-debug-apk
+          name: no-goon-1.8.0-signed-update-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build release bundle
+        if: steps.signing.outputs.configured == 'true'
+        run: gradle :app:bundleRelease --stacktrace --no-daemon
+      - name: Upload release bundle
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: no-goon-1.8.0-release-bundle
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build installable debug APK
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: no-goon-1.8.0-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Run unit tests
-        run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
-      - name: Build release bundle
-        run: gradle :app:bundleRelease --stacktrace --no-daemon
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: strict-blocker-release-bundle
-          path: app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
-      - name: Build retained-key release APK
-        if: steps.signing.outputs.configured == 'true'
-        run: gradle :app:assembleRelease --stacktrace --no-daemon
-      - name: Upload retained-key release APK
-        if: steps.signing.outputs.configured == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: strict-blocker-release-apk-retained-key
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
       - name: Upload test and lint reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-check-reports
           path: |
@@ -120,7 +155,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.1"
       - name: Enable emulator acceleration
@@ -142,7 +177,7 @@ jobs:
           script: bash scripts/run-tablet-ui.sh
       - name: Upload tablet UI evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-evidence-${{ matrix.device }}
           path: |

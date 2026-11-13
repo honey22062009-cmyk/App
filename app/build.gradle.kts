@@ -12,10 +12,11 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
+    testApplicationId = "com.aistudio.strictblocker.kzvwpq.browserqa"
     minSdk = 26
     targetSdk = 36
-    versionCode = 7
-    versionName = "1.6.0"
+    versionCode = 10
+    versionName = "1.8.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

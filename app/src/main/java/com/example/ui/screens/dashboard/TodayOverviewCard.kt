@@ -20,9 +20,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.data.preferences.DailyCheckIn
 import com.example.data.preferences.SleepEntry
+import com.example.data.preferences.DailyFocusTask
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -39,9 +41,9 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
                 Column(Modifier.weight(1f)) {
                     AnimatedContent(current != null, label = "saved_today",
                         transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 200)) togetherWith fadeOut(tween(100)) }) { saved ->
-                        Text(if (saved) "Saved today" else "Your daily check-in", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(if (saved) "Saved today" else "Optional daily check-in", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
-                    Text(if (current == null) "A few taps. A clear picture of your day."
+                    Text(if (current == null) "Your streak counts automatically. Add an optional note about today here."
                         else "${when (current.rating) { "easy" -> "Good"; "difficult" -> "Tough"; else -> "Okay" }}${sleep?.let { " · Sleep ${it.durationMinutes / 60}h ${it.durationMinutes % 60}m" }.orEmpty()} · stored on this device",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -68,12 +70,118 @@ internal fun TodayOverviewCard(entries: List<DailyCheckIn>, current: DailyCheckI
 }
 
 @Composable
+internal fun DailyFocusPlanCard(
+    tasks: List<DailyFocusTask>,
+    onAdd: (String) -> Unit,
+    onToggle: (DailyFocusTask, Boolean) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var draft by rememberSaveable { mutableStateOf("") }
+    val done = tasks.count { it.completed }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("TODAY'S TOP 3", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(
+                        when {
+                            tasks.isEmpty() -> "Choose three things that would make today feel useful."
+                            done == tasks.size -> "All planned tasks complete. Nice work."
+                            else -> "$done of 3 priorities complete"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("$done/${tasks.size.coerceAtLeast(3)}",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold)
+            }
+            LinearProgressIndicator(
+                progress = { if (tasks.isEmpty()) 0f else done.toFloat() / tasks.size },
+                modifier = Modifier.fillMaxWidth().height(7.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            tasks.sortedBy { it.createdAtMillis }.forEachIndexed { index, task ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Checkbox(
+                        checked = task.completed,
+                        onCheckedChange = { checked -> onToggle(task, checked) }
+                    )
+                    Text(
+                        task.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
+                        maxLines = 2
+                    )
+                    TextButton(onClick = { onDelete(task.id) }) {
+                        Text("Remove", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (index < tasks.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+            }
+            if (tasks.size < 3) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it.take(80) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = { Text("Add a priority") },
+                        placeholder = { Text("e.g. Revise human physiology") }
+                    )
+                    Button(
+                        onClick = {
+                            val clean = draft.trim()
+                            if (clean.isNotEmpty()) {
+                                onAdd(clean)
+                                draft = ""
+                            }
+                        },
+                        enabled = draft.isNotBlank()
+                    ) { Text("Add") }
+                }
+                Text("Up to three priorities · saved on this device",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("Three priorities set. Finish or remove one to add another.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 internal fun QuickTourCard(reduceMotion: Boolean, onDone: () -> Unit) {
     var page by rememberSaveable { mutableIntStateOf(0) }
     val steps = listOf(
-        "Welcome to your day" to "Home is for a quick check-in and your companion. One save records today; your elapsed streak grows with time.",
+        "Welcome to your day" to "Home is for a quick check-in and your companion. Your streak count updates automatically at local midnight. Daily check-ins are optional, and Reset records a fresh start.",
         "Set your boundaries" to "Block holds your apps and schedules. Browser Guard interrupts explicit searches after you enable Accessibility and consent to field inspection.",
-        "Make it yours" to "Progress keeps your history. Pro has its own dock tab. Tap, turn, feed or talk to your companion; sound is optional. Colours and motion live in Settings."
+        "Make it yours" to "Home has a saved top-three priority list. Focus keeps separate study-session history. Progress keeps your streak and milestones. Your companion has play actions; colours and motion live in Settings."
     )
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = .50f)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

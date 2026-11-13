@@ -199,6 +199,12 @@ class ReliabilityUiTest {
     @Test fun focusRoomSavesItsOwnHistoryWithoutTouchingStreakTimeline() {
         runBlocking {
             settings.clearAllUserPreferences()
+            // This test covers focus-session history only. Keep blocking and
+            // browser inspection disabled so no accessibility shield can
+            // background the focus room while the tablet emulator is running.
+            settings.setProtectionEnabled(false)
+            settings.setAdultProtectionEnabled(false)
+            settings.setBrowserInspectionConsent(false)
             settings.saveLocalProfile("Honey", 18, "male", "luna", "Luna")
             settings.setQuickTourSeen(true)
         }
@@ -207,13 +213,15 @@ class ReliabilityUiTest {
         compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("FOCUS ROOM"))
         compose.onNodeWithText("Open").performClick()
         waitFor("Make space to focus.")
+        // Countdown runs on real elapsed time, so Compose idle waits cannot
+        // fast-forward the complete session on slower tablet emulators.
         compose.onNodeWithText("Start 25-minute session").performClick()
-        // End-session is visible only after the start action has taken effect.
-        // Advance Compose's test clock rather than sleeping the instrumentation thread.
+        // Android may pause the session if the emulator briefly backgrounds
+        // the activity; the stable End session control exists in both states.
         waitFor("End session")
-        compose.mainClock.advanceTimeBy(2_500L)
-        compose.waitForIdle()
-        compose.onNodeWithText("End session").performClick()
+        // The session action row may be below the fold on compact tablet layouts.
+        compose.onNodeWithText("End session").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("End session").performScrollTo().performClick()
         waitFor("End this session?")
         compose.onNodeWithText("Save and exit").performClick()
         compose.waitUntil(10_000) { runBlocking { settings.focusSessionsFlow.first().size == 1 } }
@@ -224,7 +232,7 @@ class ReliabilityUiTest {
         waitFor("Your progress")
         compose.onNodeWithText("FOCUS SESSION HISTORY").performClick()
         waitFor("Focus history")
-        compose.onNodeWithText("Ended early").assertIsDisplayed()
+        compose.onAllNodesWithText("Ended early").onFirst().assertIsDisplayed()
         // Focus history is persisted independently and does not create a streak reset.
         assertTrue(runBlocking { settings.trackerResetRecordsFlow.first().isEmpty() })
         capture("14-focus-history")

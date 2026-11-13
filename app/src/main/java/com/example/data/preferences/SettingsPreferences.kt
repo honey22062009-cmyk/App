@@ -14,6 +14,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
+import org.json.JSONArray
+import org.json.JSONObject
+import androidx.datastore.preferences.core.floatPreferencesKey
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import androidx.datastore.preferences.core.doublePreferencesKey
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -21,6 +31,11 @@ class SettingsPreferences(private val context: Context) {
 
     private object PreferencesKeys {
         val PROTECTION_ENABLED = booleanPreferencesKey("protection_enabled")
+        val LOCAL_PIN_SALT = stringPreferencesKey("local_security_pin_salt_v1")
+        val LOCAL_PIN_HASH = stringPreferencesKey("local_security_pin_hash_v1")
+        val LOCAL_PIN_GATE_ENABLED = booleanPreferencesKey("local_security_pin_gate_enabled_v1")
+        val LOCAL_PIN_LOCK_UNTIL = longPreferencesKey("local_security_pin_lock_until_v1")
+        val LOCAL_PIN_FAILED_ATTEMPTS = intPreferencesKey("local_security_pin_failed_attempts_v1")
         val STRICT_CHANGE_DELAY_MINUTES = intPreferencesKey("strict_change_delay_minutes")
         val PENDING_CHANGE_UNLOCK_TIME = longPreferencesKey("pending_change_unlock_time")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
@@ -74,6 +89,7 @@ class SettingsPreferences(private val context: Context) {
         val DASHBOARD_HIDDEN_CARDS = stringSetPreferencesKey("dashboard_hidden_cards")
         val SEEN_MILESTONES = stringSetPreferencesKey("seen_tracker_milestones")
         val FOCUS_SESSION_RECORDS = stringSetPreferencesKey("focus_session_records_v1")
+        val DAILY_FOCUS_TASKS = stringSetPreferencesKey("daily_focus_tasks_v1")
 
         // User-selectable blocker customization
         val BLOCKER_STYLE = stringPreferencesKey("blocker_style")
@@ -98,6 +114,14 @@ class SettingsPreferences(private val context: Context) {
 
     val isProtectionEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.PROTECTION_ENABLED] ?: true
+    }
+
+    val localSecurityPinConfiguredFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        !preferences[PreferencesKeys.LOCAL_PIN_SALT].isNullOrBlank() && !preferences[PreferencesKeys.LOCAL_PIN_HASH].isNullOrBlank()
+    }
+
+    val localSecurityPinGateEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] ?: false
     }
 
     val strictChangeDelayMinutesFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -198,6 +222,12 @@ class SettingsPreferences(private val context: Context) {
         (preferences[PreferencesKeys.FOCUS_SESSION_RECORDS] ?: emptySet())
             .mapNotNull(FocusSessionRecord::decode)
             .sortedByDescending { it.startedAtMillis }
+    }
+
+    val dailyFocusTasksFlow: Flow<List<DailyFocusTask>> = context.dataStore.data.map { preferences ->
+        (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+            .mapNotNull(DailyFocusTask::decode)
+            .sortedWith(compareBy<DailyFocusTask> { it.localDate }.thenBy { it.createdAtMillis })
     }
 
     val trackerStartedAtFlow: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -342,6 +372,63 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setProtectionEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.PROTECTION_ENABLED] = enabled
+        }
+    }
+
+    /**
+     * Local in-app PIN gate only. This does NOT block Android's package installer/uninstaller.
+     * The verifier is salted PBKDF2-HMAC-SHA256; the PIN itself is never persisted.
+     */
+    suspend fun configureLocalSecurityPin(pin: String) {
+        require(pin.matches(Regex("[0-9]{4,8}"))) { "PIN must contain 4 to 8 digits." }
+        val salt = ByteArray(16).also(SecureRandom()::nextBytes)
+        val hash = deriveLocalPinHash(pin, salt)
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LOCAL_PIN_SALT] = Base64.getEncoder().encodeToString(salt)
+            preferences[PreferencesKeys.LOCAL_PIN_HASH] = Base64.getEncoder().encodeToString(hash)
+            preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+            preferences.remove(PreferencesKeys.LOCAL_PIN_LOCK_UNTIL)
+        }
+    }
+
+    suspend fun verifyLocalSecurityPin(pin: String): Boolean {
+        val snapshot = context.dataStore.data.first()
+        val lockUntil = snapshot[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] ?: 0L
+        if (System.currentTimeMillis() < lockUntil) return false
+        val saltText = snapshot[PreferencesKeys.LOCAL_PIN_SALT] ?: return false
+        val hashText = snapshot[PreferencesKeys.LOCAL_PIN_HASH] ?: return false
+        val salt = runCatching { Base64.getDecoder().decode(saltText) }.getOrNull() ?: return false
+        val expected = runCatching { Base64.getDecoder().decode(hashText) }.getOrNull() ?: return false
+        val actual = runCatching { deriveLocalPinHash(pin, salt) }.getOrNull() ?: return false
+        val matches = MessageDigest.isEqual(expected, actual)
+        context.dataStore.edit { preferences ->
+            if (matches) {
+                preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+                preferences.remove(PreferencesKeys.LOCAL_PIN_LOCK_UNTIL)
+            } else {
+                val failures = (preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] ?: 0) + 1
+                preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = failures
+                if (failures >= 5) {
+                    preferences[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] = System.currentTimeMillis() + 30_000L
+                    preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = 0
+                }
+            }
+        }
+        return matches
+    }
+
+    suspend fun setLocalSecurityPinGateEnabled(enabled: Boolean) {
+        val configured = localSecurityPinConfiguredFlow.first()
+        require(!enabled || configured) { "Set a PIN before enabling the PIN gate." }
+        context.dataStore.edit { it[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] = enabled }
+    }
+
+    private fun deriveLocalPinHash(pin: String, salt: ByteArray): ByteArray {
+        val spec = PBEKeySpec(pin.toCharArray(), salt, 150_000, 256)
+        return try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
         }
     }
 
@@ -491,6 +578,48 @@ class SettingsPreferences(private val context: Context) {
     suspend fun setAppGroups(groups: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_GROUPS] = groups
+        }
+    }
+
+    suspend fun addDailyFocusTask(title: String, localDate: LocalDate = LocalDate.now()): Boolean {
+        val cleanTitle = title.trim().take(80)
+        if (cleanTitle.isBlank()) return false
+        var added = false
+        context.dataStore.edit { preferences ->
+            val tasks = (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                .mapNotNull(DailyFocusTask::decode)
+                .toMutableList()
+            if (tasks.count { it.localDate == localDate } >= 3) return@edit
+            tasks += DailyFocusTask.create(localDate, cleanTitle)
+            val keepFrom = localDate.minusDays(60)
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] = tasks
+                .filter { !it.localDate.isBefore(keepFrom) }
+                .map(DailyFocusTask::encode)
+                .toSet()
+            added = true
+        }
+        return added
+    }
+
+    suspend fun setDailyFocusTaskCompleted(id: String, completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] =
+                (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                    .mapNotNull(DailyFocusTask::decode)
+                    .map { if (it.id == id) it.copy(completed = completed) else it }
+                    .map(DailyFocusTask::encode)
+                    .toSet()
+        }
+    }
+
+    suspend fun deleteDailyFocusTask(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_FOCUS_TASKS] =
+                (preferences[PreferencesKeys.DAILY_FOCUS_TASKS] ?: emptySet())
+                    .mapNotNull(DailyFocusTask::decode)
+                    .filterNot { it.id == id }
+                    .map(DailyFocusTask::encode)
+                    .toSet()
         }
     }
 
@@ -836,6 +965,83 @@ class SettingsPreferences(private val context: Context) {
             "timeline",
             "protection"
         )
+    }
+
+    /**
+     * Portable, versioned backup for every DataStore preference, including tracker and focus history.
+     * The user chooses where the file is stored; it is not silently uploaded anywhere.
+     */
+    suspend fun exportBackupJson(): String {
+        val entries = JSONObject()
+        context.dataStore.data.first().asMap().filterKeys { !it.name.startsWith("local_security_pin_") }.forEach { (key, value) ->
+            val item = JSONObject()
+            when (value) {
+                is Boolean -> item.put("type", "boolean").put("value", value)
+                is Int -> item.put("type", "int").put("value", value)
+                is Long -> item.put("type", "long").put("value", value)
+                is Float -> item.put("type", "float").put("value", value.toDouble())
+                is Double -> item.put("type", "double").put("value", value)
+                is String -> item.put("type", "string").put("value", value)
+                is Set<*> -> {
+                    val values = JSONArray()
+                    value.filterIsInstance<String>().forEach(values::put)
+                    item.put("type", "string_set").put("value", values)
+                }
+                else -> error("Unsupported preference type for ${key.name}")
+            }
+            entries.put(key.name, item)
+        }
+        return JSONObject()
+            .put("format", "no-goon-data-backup")
+            .put("schema", 1)
+            .put("applicationId", "com.aistudio.strictblocker.kzvwpq")
+            .put("createdAt", System.currentTimeMillis())
+            .put("entries", entries)
+            .toString(2)
+    }
+
+    /**
+     * Restores only a validated No goon backup. Existing preferences are replaced atomically.
+     */
+    suspend fun importBackupJson(json: String) {
+        val root = JSONObject(json)
+        require(root.optString("format") == "no-goon-data-backup") { "This is not a No goon backup." }
+        require(root.optInt("schema") == 1) { "This backup version is not supported." }
+        require(root.optString("applicationId") == "com.aistudio.strictblocker.kzvwpq") {
+            "This backup belongs to a different app."
+        }
+        val entries = root.getJSONObject("entries")
+        val existingSecurity = context.dataStore.data.first()
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+            // Security credentials are deliberately excluded from portable backups.
+            // Preserve the current device's verifier and gate state during data restore.
+            existingSecurity[PreferencesKeys.LOCAL_PIN_SALT]?.let { preferences[PreferencesKeys.LOCAL_PIN_SALT] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_HASH]?.let { preferences[PreferencesKeys.LOCAL_PIN_HASH] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_GATE_ENABLED]?.let { preferences[PreferencesKeys.LOCAL_PIN_GATE_ENABLED] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL]?.let { preferences[PreferencesKeys.LOCAL_PIN_LOCK_UNTIL] = it }
+            existingSecurity[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS]?.let { preferences[PreferencesKeys.LOCAL_PIN_FAILED_ATTEMPTS] = it }
+            val iterator = entries.keys()
+            while (iterator.hasNext()) {
+                val name = iterator.next()
+                val item = entries.getJSONObject(name)
+                when (item.getString("type")) {
+                    "boolean" -> preferences[booleanPreferencesKey(name)] = item.getBoolean("value")
+                    "int" -> preferences[intPreferencesKey(name)] = item.getInt("value")
+                    "long" -> preferences[longPreferencesKey(name)] = item.getLong("value")
+                    "float" -> preferences[floatPreferencesKey(name)] = item.getDouble("value").toFloat()
+                    "double" -> preferences[doublePreferencesKey(name)] = item.getDouble("value")
+                    "string" -> preferences[stringPreferencesKey(name)] = item.getString("value")
+                    "string_set" -> {
+                        val values = item.getJSONArray("value")
+                        preferences[stringSetPreferencesKey(name)] = buildSet {
+                            for (index in 0 until values.length()) add(values.getString(index))
+                        }
+                    }
+                    else -> error("Unknown backup preference type.")
+                }
+            }
+        }
     }
 
     /**

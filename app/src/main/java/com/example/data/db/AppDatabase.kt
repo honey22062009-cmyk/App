@@ -45,7 +45,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "strict_blocker.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    // Never silently delete user data on upgrades or downgrades.
+                    // Every future schema change must ship an explicit Room Migration.
                     .build()
                     .also { INSTANCE = it }
             }

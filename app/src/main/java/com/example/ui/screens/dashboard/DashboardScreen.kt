@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.system.ProtectionHealth
 import com.example.core.system.ProtectionHealthSnapshot
 import com.example.data.preferences.DailyCheckIn
+import com.example.data.preferences.DailyFocusTask
 import com.example.data.preferences.TrackerCalculator
 import com.example.data.preferences.TrackerResetRecord
 import com.example.data.repository.AppBlockerRepository
@@ -120,6 +121,7 @@ fun DashboardScreen(
     val checkIns by repository.settings.dailyCheckInsFlow.collectAsState(initial = emptyList())
     val sleepEntries by repository.settings.sleepEntriesFlow.collectAsState(initial = emptyList())
     val focusSessions by repository.settings.focusSessionsFlow.collectAsState(initial = emptyList())
+    val dailyFocusTasks by repository.settings.dailyFocusTasksFlow.collectAsState(initial = emptyList())
     val goalDays by repository.settings.trackerGoalDaysFlow.collectAsState(initial = 0)
     val cardOrder by repository.settings.dashboardCardOrderFlow.collectAsState(
         initial = com.example.data.preferences.SettingsPreferences.defaultDashboardCardOrder()
@@ -208,6 +210,9 @@ fun DashboardScreen(
     }
     val today = remember(nowMillis, zone) { Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate() }
     val todayCheckIn = remember(checkIns, today) { checkIns.firstOrNull { it.localDate == today } }
+    val todayFocusTasks = remember(dailyFocusTasks, today) {
+        dailyFocusTasks.filter { it.localDate == today }.sortedBy { it.id }
+    }
     val todaySleep = remember(sleepEntries, today) { sleepEntries.firstOrNull { it.localDate == today } }
     val insight = remember(stats, resetRecords, nowMillis, zone) {
         buildInsight(stats, resetRecords, nowMillis, zone)
@@ -228,13 +233,24 @@ fun DashboardScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = .24f),
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .16f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
     ) {
         val tablet = maxWidth >= 720.dp
         val wideHome = maxWidth >= 1000.dp && !progressOnly
         val progressKeys = setOf("stats", "graph", "focus", "calendar", "timeline", "milestones", "insights")
+        val homeKeys = setOf("hero", "checkin", "focus", "graph", "milestones", "protection")
         val visibleCardOrder = if (progressOnly) cardOrder.filter { it in progressKeys && it !in hiddenCards }
-            else if (wideHome) listOf("protection") else listOf("protection", "hero")
+            else if (wideHome) listOf("focus", "protection")
+            else cardOrder.filter { it in homeKeys && it !in hiddenCards }
         val tabletRows = remember(visibleCardOrder) {
             buildTabletDashboardRows(visibleCardOrder)
         }
@@ -265,6 +281,7 @@ fun DashboardScreen(
                         "graph" -> StreakGraphCard(
                             trackerStartedAt = trackerStartedAt,
                             resets = resetRecords,
+                            stats = stats,
                             zone = zone,
                             tablet = tablet
                         )
@@ -354,6 +371,14 @@ fun DashboardScreen(
                 TodayOverviewCard(checkIns, todayCheckIn, todaySleep, today,
                     reduceMotion, onRecord = { showQuickEntry = true })
             }
+            if (!progressOnly && !wideHome) item(key = "daily_focus_plan") {
+                DailyFocusPlanCard(
+                    tasks = todayFocusTasks,
+                    onAdd = { title -> scope.launch { repository.settings.addDailyFocusTask(title, today) } },
+                    onToggle = { task, completed -> scope.launch { repository.settings.setDailyFocusTaskCompleted(task.id, completed) } },
+                    onDelete = { id -> scope.launch { repository.settings.deleteDailyFocusTask(id) } }
+                )
+            }
 
             if (!progressOnly) item(key = "shortcuts") {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -370,6 +395,14 @@ fun DashboardScreen(
                     }
                     Box(Modifier.weight(1.65f)) { renderDashboardCard("hero") }
                 }
+            }
+            if (wideHome) item(key = "daily_focus_plan") {
+                DailyFocusPlanCard(
+                    tasks = todayFocusTasks,
+                    onAdd = { title -> scope.launch { repository.settings.addDailyFocusTask(title, today) } },
+                    onToggle = { task, completed -> scope.launch { repository.settings.setDailyFocusTaskCompleted(task.id, completed) } },
+                    onDelete = { id -> scope.launch { repository.settings.deleteDailyFocusTask(id) } }
+                )
             }
 
             if (tablet) {

@@ -1,8 +1,8 @@
-> Version 1.6.0: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
+> Version 1.8.0: refined species-specific companion silhouettes and articulated limbs, more autonomous idle animations, and a dedicated animated focus room with configurable sessions and a separate persistent history section in Progress. Focus records are stored locally and never mixed with streak/reset history. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
-# Strict Blocker (Android)
+# No goon (Android)
 
-Current companion release target: **1.6.0**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
+Current app release target: **1.8.0**. See [the 1.6.0 experience notes](docs/EXPERIENCE-1.6.md).
 
 A production-grade, native Android application engineered for **strict scheduled application blocking** with non-root enforcement. Designed and optimized for phones and tablets, including the **Samsung Galaxy Tab A9+** running modern Samsung One UI and Android 13+.
 
@@ -10,7 +10,7 @@ A production-grade, native Android application engineered for **strict scheduled
 
 ## Core Purpose
 
-Strict Blocker allows device owners to manage installed applications and define precise recurring time windows when those applications are allowed to run.
+No goon helps device owners to manage installed applications and define precise recurring time windows when those applications are allowed to run.
 
 - **Strict Enforcement**: Outside an allowed schedule window, managed applications are strictly blocked.
 - **Immediate Interruption**: When an unallowed application is opened, an immediate fullscreen interrupt shield (`BlockerActivity`) intercepts access.
@@ -18,6 +18,17 @@ Strict Blocker allows device owners to manage installed applications and define 
 - **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. With consent, Browser Guard inspects visible address/search fields locally. Version 1.4 removes the VPN/DNS tunnel.
 
 ---
+
+## Updates and local data safety
+
+- The Android application ID is kept stable across releases: `com.aistudio.strictblocker.kzvwpq`.
+- A normal in-place update preserves the app's private DataStore and Room database when the application ID and signing certificate remain unchanged.
+- Update APKs are published only when the repository's retained Android signing key is configured. Do not install a runner-debug-signed APK over a stable-key release.
+- Configure the single GitHub Actions repository secret `ANDROID_SIGNING_BUNDLE_BASE64` with the complete contents of the private signing bundle supplied for this project. Keep the bundle offline and private; it is the permanent key used for all future releases. Do not regenerate it for 1.8.1, 1.9, or later.
+- If changing from an earlier debug-signed install, the first release signed with this permanent key may require one clean install because Android rejects signature changes. Export a No goon backup before removing the old app; after the signed release is installed, keep using its APK for all future in-place updates.
+- Settings → Data & backup exports/restores DataStore preferences, personal progress, focus history and dashboard layout. Reinstall recovery also depends on Android backup being enabled; normal in-place updates retain both DataStore and Room files when the package ID and signing key remain unchanged.
+- Room forward migrations must be explicit. The app does not use destructive forward-migration fallback.
+- Android Auto Backup and device-transfer rules include the app's DataStore files and Room database. Reinstall restoration still depends on Android backup being enabled and an available backup dataset; backup is not a substitute for the stable in-place update path.
 
 ## Architecture & Technology Stack
 

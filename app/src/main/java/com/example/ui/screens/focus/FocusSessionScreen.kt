@@ -32,6 +32,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -63,6 +66,8 @@ import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.CompanionBehavior
 import com.example.ui.components.CompanionScene
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.Instant
@@ -139,8 +144,11 @@ fun FocusSessionScreen(
     }
 
     LaunchedEffect(isRunning, plannedSeconds) {
+        // A real focus timer must advance with wall-clock time, not the Compose
+        // animation/test clock. This keeps the session stable on slow tablets
+        // and prevents UI-idle waits from consuming an entire 25-minute session.
         while (isRunning && elapsedSeconds < plannedSeconds) {
-            delay(1_000L)
+            withContext(Dispatchers.Default) { delay(1_000L) }
             if (isRunning) elapsedSeconds = (elapsedSeconds + 1).coerceAtMost(plannedSeconds)
         }
         if (isRunning && elapsedSeconds >= plannedSeconds) {
@@ -195,73 +203,104 @@ fun FocusSessionScreen(
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        if (!hasStarted) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Make space to focus.", style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold)
+                Text("Choose a session length and let your companion settle in.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
             Text(
-                when {
-                    showCompletion -> "You did it."
-                    isRunning -> "One thing at a time."
-                    hasStarted -> "Take your next step."
-                    else -> "Make space to focus."
-                },
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                when {
-                    showCompletion -> "Your session has been added to Progress."
-                    isRunning -> "Stay with the task. Your companion will keep you company."
-                    hasStarted -> "Your session is paused. Continue whenever you're ready."
-                    else -> "Choose a session length and let your companion settle in."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                if (showCompletion) "Session complete" else if (isRunning) "One thing at a time." else "Paused. Reset your pace.",
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold
             )
         }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .42f)
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (hasStarted) .30f else .42f)
         ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(Modifier.fillMaxWidth().height(210.dp), contentAlignment = Alignment.Center) {
-                    CompanionScene(
-                        characterId = characterId,
-                        modifier = Modifier.fillMaxSize(),
-                        interactive = true,
-                        reduceMotion = reduceMotion,
-                        reaction = reaction,
-                        reactionKey = reactionKey,
-                        backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
-                        onPet = {
-                            reaction = "pet"
-                            reactionKey++
-                            companionCaption = CompanionBehavior.dialogue("pet")
+            if (hasStarted) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(116.dp).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
+                        CompanionScene(
+                            characterId = characterId,
+                            modifier = Modifier.fillMaxSize(),
+                            interactive = true,
+                            reduceMotion = reduceMotion,
+                            reaction = reaction,
+                            reactionKey = reactionKey,
+                            backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
+                            onPet = {
+                                reaction = "pet"
+                                reactionKey++
+                                companionCaption = CompanionBehavior.dialogue("pet")
+                            }
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary)
+                        AnimatedContent(
+                            targetState = companionCaption,
+                            transitionSpec = {
+                                (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
+                            },
+                            label = "focus_companion_caption"
+                        ) { caption ->
+                            Text(caption, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                         }
-                    )
+                    }
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface.copy(alpha = .75f)) {
+                        Text(if (isRunning) "● LIVE" else if (showCompletion) "✓ DONE" else "Ⅱ PAUSED",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
-                AnimatedContent(
-                    targetState = companionCaption,
-                    transitionSpec = {
-                        (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
-                    },
-                    label = "focus_companion_caption"
-                ) { caption ->
-                    Text(caption, textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+            } else {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(Modifier.fillMaxWidth().height(210.dp), contentAlignment = Alignment.Center) {
+                        CompanionScene(
+                            characterId = characterId, modifier = Modifier.fillMaxSize(),
+                            interactive = true, reduceMotion = reduceMotion,
+                            reaction = reaction, reactionKey = reactionKey,
+                            backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
+                            onPet = {
+                                reaction = "pet"
+                                reactionKey++
+                                companionCaption = CompanionBehavior.dialogue("pet")
+                            }
+                        )
+                    }
+                    AnimatedContent(
+                        targetState = companionCaption,
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = .98f)) togetherWith fadeOut(tween(140))
+                        },
+                        label = "focus_companion_caption"
+                    ) { caption ->
+                        Text(caption, textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+                    }
+                    Text(companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
+                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary)
                 }
-                Text(
-                    companionName.ifBlank { characterId.replaceFirstChar(Char::titlecase) },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
 
@@ -331,68 +370,150 @@ fun FocusSessionScreen(
         } else {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface
+                shape = RoundedCornerShape(30.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = .97f)
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(activity.uppercase(), style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            Text(taskName.ifBlank { "Your focus session" },
-                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                taskName.ifBlank { "Your focus session" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
                         }
-                        Box(contentAlignment = Alignment.Center) {
-                            val animatedProgress by animateFloatAsState(
-                                targetValue = progress,
-                                animationSpec = tween(if (reduceMotion) 0 else 700, easing = FastOutSlowInEasing),
-                                label = "focus_progress"
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (isRunning) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                if (isRunning) "● LIVE" else if (showCompletion) "✓ DONE" else "Ⅱ PAUSED",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
                             )
-                            CircularProgressIndicator(
-                                progress = { animatedProgress },
-                                modifier = Modifier.size(86.dp),
-                                strokeWidth = 8.dp,
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    }
+
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress,
+                        animationSpec = tween(if (reduceMotion) 0 else 650, easing = FastOutSlowInEasing),
+                        label = "focus_progress"
+                    )
+                    Box(
+                        Modifier.fillMaxWidth().height(224.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.size(212.dp),
+                            strokeWidth = 13.dp,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .8f),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                "%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
+                                fontSize = 58.sp,
+                                lineHeight = 64.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
                             )
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
-                                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            }
+                            Text(
+                                if (showCompletion) "COMPLETE" else if (isRunning) "TIME LEFT" else "PAUSED",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxWidth().height(7.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("FOCUSED", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "%02d:%02d".format(elapsedSeconds / 60, elapsedSeconds % 60),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("SESSION LENGTH", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "$selectedMinutes min",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (showCompletion) {
+                            Button(
+                                onClick = onBack,
+                                modifier = Modifier.fillMaxWidth().height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text("Done") }
+                        } else {
+                            FilledTonalButton(
+                                onClick = {
+                                    if (!isRunning) {
+                                        isRunning = true
+                                        companionCaption = "Welcome back. Pick up right where you paused."
+                                        reaction = "wave"
+                                        reactionKey++
+                                    } else {
+                                        isRunning = false
+                                        companionCaption = "A pause is allowed. Your session is safe."
+                                        reaction = "rest"
+                                        reactionKey++
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text(if (isRunning) "Pause" else "Resume") }
+                            OutlinedButton(
+                                onClick = { showEndConfirmation = true },
+                                modifier = Modifier.weight(1f).height(54.dp),
+                                shape = RoundedCornerShape(18.dp)
+                            ) { Text("End session") }
                         }
                     }
                     Text(
-                        if (isRunning) "FOCUSING · ${elapsedSeconds / 60} MIN ${elapsedSeconds % 60} SEC ELAPSED"
-                        else if (showCompletion) "SESSION COMPLETE"
-                        else "PAUSED · ${elapsedSeconds / 60} MIN ${elapsedSeconds % 60} SEC COMPLETED",
+                        "Your session is saved on this device and kept separate from streak history.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = {
-                                if (showCompletion) {
-                                    onBack()
-                                } else if (!isRunning) {
-                                    isRunning = true
-                                    companionCaption = "Welcome back. Pick up right where you paused."
-                                    reaction = "wave"
-                                    reactionKey++
-                                } else {
-                                    isRunning = false
-                                    companionCaption = "A pause is allowed. Your session is safe."
-                                    reaction = "rest"
-                                    reactionKey++
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) { Text(if (showCompletion) "Done" else if (isRunning) "Pause" else "Resume") }
-                        if (!showCompletion) {
-                            OutlinedButton(onClick = { showEndConfirmation = true }) { Text("End session") }
-                        }
-                    }
-                    Text("Your time is saved on this device and appears in Progress, separately from streak history.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

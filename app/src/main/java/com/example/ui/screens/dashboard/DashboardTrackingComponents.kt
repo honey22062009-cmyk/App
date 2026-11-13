@@ -137,7 +137,7 @@ internal fun StreakHeroCard(
         Column(Modifier.padding(if (tablet) 24.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val streakContent: @Composable () -> Unit = {
                 Column {
-                    Text("YOUR ELAPSED STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("YOUR CURRENT STREAK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     AnimatedContent(targetState = stats.currentDays,
                         transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 240)) togetherWith fadeOut(tween(120)) },
                         label = "streak_count") { days ->
@@ -145,6 +145,9 @@ internal fun StreakHeroCard(
                     }
                     Text(if (stats.currentDays == 1) "day of progress" else "days of progress",
                         style = MaterialTheme.typography.titleMedium)
+                    Text("Auto-counts at local midnight · no daily tap needed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (stats.currentDays == 0) Text("Your first day is in progress.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Personal best · ${stats.bestDays} days", style = MaterialTheme.typography.bodySmall,
@@ -247,6 +250,7 @@ private fun SmallMetricCard(label: String, value: String, accent: Color, modifie
 internal fun StreakGraphCard(
     trackerStartedAt: Long,
     resets: List<TrackerResetRecord>,
+    stats: TrackerStats,
     zone: ZoneId,
     tablet: Boolean
 ) {
@@ -268,8 +272,8 @@ internal fun StreakGraphCard(
         Column(Modifier.padding(17.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Streak history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Tap or drag across the line for a day", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Streak comparison & history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Blue is your previous best · red is your current run", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -284,9 +288,72 @@ internal fun StreakGraphCard(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
+            StreakComparisonGraph(
+                previousBestDays = stats.previousBestDays,
+                currentDays = stats.currentDays,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(14.dp))
             InteractiveStreakGraph(points, Modifier.fillMaxWidth().height(if (tablet) 220.dp else 170.dp))
         }
+    }
+}
+
+@Composable
+private fun StreakComparisonGraph(
+    previousBestDays: Int,
+    currentDays: Int,
+    modifier: Modifier = Modifier
+) {
+    val scale = max(1, max(previousBestDays, currentDays))
+    val previousBlue = Color(0xFF4388F5)
+    val currentRed = Color(0xFFE34C5B)
+    val previousProgress by animateFloatAsState(
+        targetValue = previousBestDays.toFloat() / scale,
+        animationSpec = tween(700),
+        label = "previous_best_progress"
+    )
+    val currentProgress by animateFloatAsState(
+        targetValue = currentDays.toFloat() / scale,
+        animationSpec = tween(700),
+        label = "current_streak_progress"
+    )
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(9.dp).background(previousBlue, CircleShape))
+            Spacer(Modifier.width(7.dp))
+            Text("Previous best", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text("$previousBestDays days", style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold, color = previousBlue)
+        }
+        LinearProgressIndicator(
+            progress = { previousProgress },
+            modifier = Modifier.fillMaxWidth().height(9.dp),
+            color = previousBlue,
+            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(9.dp).background(currentRed, CircleShape))
+            Spacer(Modifier.width(7.dp))
+            Text("Current streak", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text("$currentDays days", style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold, color = currentRed)
+        }
+        LinearProgressIndicator(
+            progress = { currentProgress },
+            modifier = Modifier.fillMaxWidth().height(9.dp),
+            color = currentRed,
+            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f)
+        )
+        Text("Same scale · both runs compared against the longer one",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
