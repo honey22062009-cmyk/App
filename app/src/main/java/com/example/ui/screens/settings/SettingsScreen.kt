@@ -66,7 +66,8 @@ fun SettingsScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+    onNavigateToAdultProtection: () -> Unit = {},
+    onNavigateToProtectionStatus: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -149,7 +150,8 @@ fun SettingsScreen(
                                 onNavigateToPermissions = onNavigateToPermissions,
                                 onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                 onNavigateToLegal = onNavigateToLegal,
-                                onNavigateToAdultProtection = onNavigateToAdultProtection
+                                onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                onNavigateToProtectionStatus = onNavigateToProtectionStatus
                             )
                         }
                     }
@@ -205,7 +207,8 @@ fun SettingsScreen(
                                     onNavigateToPermissions = onNavigateToPermissions,
                                     onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
                                     onNavigateToLegal = onNavigateToLegal,
-                                    onNavigateToAdultProtection = onNavigateToAdultProtection
+                                    onNavigateToAdultProtection = onNavigateToAdultProtection,
+                                    onNavigateToProtectionStatus = onNavigateToProtectionStatus
                                 )
                             }
                         }
@@ -264,7 +267,8 @@ private fun SettingsSectionContent(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit
+    onNavigateToAdultProtection: () -> Unit,
+    onNavigateToProtectionStatus: () -> Unit
 ) {
     when (section) {
         SettingsSection.Appearance -> {
@@ -315,6 +319,12 @@ private fun SettingsSectionContent(
         }
 
         SettingsSection.Protection -> {
+            SettingsLinkRow(
+                title = "Protection status",
+                subtitle = "Current restrictions, permissions and background health",
+                onClick = onNavigateToProtectionStatus
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             SettingsLinkRow(
                 title = "18+ content protection",
                 subtitle = "Browser, SafeSearch and DNS controls",
