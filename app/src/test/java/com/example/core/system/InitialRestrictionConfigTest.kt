@@ -53,10 +53,12 @@ class InitialRestrictionConfigTest {
     }
 
     @Test
-    fun allSixTargetsArePresentWithUniquePackageIdentifiers() {
-        assertEquals(6, InitialRestrictionConfig.targetApps.size)
-        assertEquals(6, InitialRestrictionConfig.targetApps.map { it.packageName }.toSet().size)
+    fun FiveInstalledAppTargetsAndSeparateWebsiteRuleAreConfigured() {
+        assertEquals(5, InitialRestrictionConfig.targetApps.size)
+        assertEquals(5, InitialRestrictionConfig.targetApps.map { it.packageName }.toSet().size)
         assertTrue(InitialRestrictionConfig.targetApps.any { it.packageName == "com.android.vending" })
+        assertTrue(InitialRestrictionConfig.targetDomains.contains("anifam.net"))
+        assertFalse(InitialRestrictionConfig.targetApps.any { it.name == "AniFam" })
     }
 
     @Test
