@@ -78,6 +78,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 if (isBrowserApp(packageName)) {
                     val matchedDomain = findRestrictedDomainInAddressBar(packageName, event)
                     if (matchedDomain != null) {
+                        val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
+                        if (!protectionEnabled) return@launch
+
                         val domainEvaluation = ScheduleEvaluator.evaluate(
                             InitialRestrictionConfig.defaultAllowedPeriods("domain:$matchedDomain"),
                             LocalDateTime.now()
