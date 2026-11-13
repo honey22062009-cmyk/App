@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
+import com.example.service.BlockerMonitoringService
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.adult.AdultProtectionScreen
@@ -67,6 +68,8 @@ import com.example.ui.screens.schedules.SchedulesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.theme.StrictBlockerTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -105,6 +108,38 @@ class MainActivity : ComponentActivity() {
                     repository = repository,
                     initialTargetPackage = targetPackage
                 )
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        val corePermissionsReady =
+            PermissionHelper.isAccessibilityServiceEnabled(this) &&
+                PermissionHelper.isUsageAccessGranted(this) &&
+                PermissionHelper.canDrawOverlays(this)
+
+        if (!corePermissionsReady) {
+            BlockerMonitoringService.stop(this)
+            return
+        }
+
+        // Starting from a visible Activity is compatible with modern background
+        // foreground-service launch restrictions. Boot recovery remains separate.
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val enabled = AppBlockerRepository(this@MainActivity)
+                    .settings.isProtectionEnabledFlow.first()
+                runOnUiThread {
+                    if (enabled) {
+                        BlockerMonitoringService.start(this@MainActivity)
+                    } else {
+                        BlockerMonitoringService.stop(this@MainActivity)
+                    }
+                }
+            } catch (_: Exception) {
+                // The dashboard and Accessibility service remain usable if this check fails.
             }
         }
     }
