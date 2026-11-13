@@ -76,6 +76,29 @@ class ExampleRobolectricTest {
     }
 
     @Test
+    fun localSecurityPinIsHashedAndExcludedFromPortableBackup() = runBlocking {
+        val settings = SettingsPreferences(context)
+        settings.clearAllUserPreferences()
+        try {
+            settings.configureLocalSecurityPin("4821")
+            assertFalse(settings.verifyLocalSecurityPin("0000"))
+            assertTrue(settings.verifyLocalSecurityPin("4821"))
+
+            val backup = settings.exportBackupJson()
+            assertFalse(backup.contains("local_security_pin_hash_v1"))
+            assertFalse(backup.contains("local_security_pin_salt_v1"))
+
+            // Restoring another backup must retain the current device's own PIN.
+            settings.configureLocalSecurityPin("7395")
+            settings.importBackupJson(backup)
+            assertTrue(settings.verifyLocalSecurityPin("7395"))
+            assertFalse(settings.verifyLocalSecurityPin("4821"))
+        } finally {
+            settings.clearAllUserPreferences()
+        }
+    }
+
+    @Test
     fun testScreenNavigationItems_neverNull() {
         val items = Screen.navItems
         assertEquals(5, items.size)
