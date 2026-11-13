@@ -34,7 +34,6 @@ object InitialRestrictionConfig {
         TargetApp("Roblox", "com.roblox.client"),
         TargetApp("Genshin Impact", "com.miHoYo.GenshinImpact"),
         TargetApp("Monoposto", "com.gabama.monopostolite"),
-        TargetApp("AniFam", "net.anifam.app"),
         TargetApp("Google Play Store", "com.android.vending")
     )
 
