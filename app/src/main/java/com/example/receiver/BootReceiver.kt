@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.core.system.AlarmScheduler
 import com.example.core.system.InitialRestrictionConfig
+import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.service.BlockerMonitoringService
 import com.example.service.AdultFilterVpnService
@@ -37,9 +38,13 @@ class BootReceiver : BroadcastReceiver() {
                         val repository = AppBlockerRepository(appContext)
                         val protectionEnabled = repository.settings.isProtectionEnabledFlow.first()
 
-                        if (protectionEnabled) {
-                            // Android may still reject a background service start on some
-                            // builds/OEM policies. The scheduled alarms remain a separate path.
+                        val fallbackReady =
+                            PermissionHelper.isUsageAccessGranted(appContext) &&
+                                PermissionHelper.canDrawOverlays(appContext)
+                        if (protectionEnabled && fallbackReady) {
+                            // Accessibility remains the primary path. The foreground usage
+                            // monitor is restored only when its required access is still granted.
+                            // Android may still reject a background service start on some OEM builds.
                             BlockerMonitoringService.start(appContext)
                         }
 
