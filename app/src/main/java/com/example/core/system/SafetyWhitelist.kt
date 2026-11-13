@@ -25,6 +25,7 @@ object SafetyWhitelist {
         "com.android.permissioncontroller",
         "com.google.android.packageinstaller",
         "com.android.packageinstaller",
+        "com.samsung.android.packageinstaller",
         "com.sec.android.app.launcher", // Samsung One UI Home
         "com.google.android.apps.nexuslauncher",
         "com.android.launcher3"
