@@ -394,8 +394,7 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onNavigateToProtectionStatus = { onNavigateToScreen(Screen.ProtectionStatus) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
         }
         Screen.Apps -> {
@@ -439,7 +438,8 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onNavigateToProtectionStatus = { onNavigateToScreen(Screen.ProtectionStatus) }
             )
         }
         Screen.AntiBypassGuide -> {
