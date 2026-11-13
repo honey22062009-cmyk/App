@@ -15,6 +15,54 @@ Strict Blocker allows device owners to manage installed applications and define 
 
 ---
 
+---
+
+## Default scheduled restriction profile (v1.3 branch)
+
+The feature/initial-scheduled-restrictions branch adds a versioned, local first-run seed. It creates managed-app records and schedule periods once, without overwriting existing per-app schedules or explicitly unmanaged app records.
+
+### App and website targets
+
+| Target | Identifier | Type |
+| :--- | :--- | :--- |
+| Instagram | com.instagram.android | Android package |
+| Roblox | com.roblox.client | Android package |
+| Genshin Impact | com.miHoYo.GenshinImpact | Android package |
+| Monoposto | com.gabama.monopostolite | Android package |
+| Google Play Store | com.android.vending | Android package |
+| AniFam | anifam.net | Website host, not an Android package |
+
+AniFam is configured as a separate website rule because a website does not have an Android package identifier. That browser rule only works when a supported browser exposes the hostname in an accessibility address-bar node. It is not a DNS filter and does not cover every browser, webview, URL shortener, mirror, or alternate host.
+
+The AniFam host should be confirmed against the exact site intended by the device owner before relying on it. The project does not attempt to enumerate or discover alternate hosts.
+
+### Initial weekly blocked periods
+
+All schedule boundaries are local device time. The tablet's initial timezone is expected to be Asia/Kolkata; a later device timezone change causes boundaries to be recalculated against the new local timezone.
+
+| Days | Blocked periods |
+| :--- | :--- |
+| Monday-Saturday | 09:00-15:00 and 22:00-01:00 next day |
+| Sunday | 11:00-13:00 and 22:00-23:00 |
+
+The existing database model stores **allowed** periods. The seed therefore stores the exact complement of the requested blocked periods, so the existing evaluator, schedule editor, and alarm engine retain their original semantics.
+
+### Recovery and Android limitations
+
+- The application seeds defaults on process startup and after eligible boot/package-replacement broadcasts, then recalculates and schedules the next boundary from the saved Room database.
+- The boot receiver uses credential-protected app data and therefore restores after Android has completed boot and the user has unlocked the device. It is not Direct-Boot aware.
+- A user force-stop can prevent broadcasts and background recovery until the app is manually opened again.
+- Android 14+ does not pre-grant SCHEDULE_EXACT_ALARM to most fresh installs targeting API 33+. Without the user's Alarms & reminders access, the project falls back to inexact alarms and the foreground usage monitor; exact transition timing is then not guaranteed. See the [Android exact-alarm guidance](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms).
+- Accessibility and Usage Access are user-granted capabilities. Android or Samsung battery/background policies can still stop or delay components.
+- Rules apply within the Android user/profile where the app and permissions are configured; they do not manage other profiles.
+- An ordinary app cannot prevent its own uninstall or permission revocation in Android Settings. Device Owner enrollment is not required or used.
+- The debug APK is signed with the standard debug certificate. It is suitable for testing, but it is not guaranteed to update an installation signed with a different release certificate.
+
+### Branch verification boundary
+
+The GitHub Actions workflow builds a debug APK and runs unit tests for schedule boundaries. CI success is not evidence of a Samsung Galaxy Tab A9+ real-device test. Reboot, power-cycle, process-kill, permission-revocation, battery-use, and update-signature acceptance tests still require the actual tablet.
+
+
 ## Architecture & Technology Stack
 
 - **Language**: 100% Kotlin
