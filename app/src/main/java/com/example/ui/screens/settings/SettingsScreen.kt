@@ -92,7 +92,7 @@ fun SettingsScreen(
                     Text(
                         text = "Settings",
                         style = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = "Preferences and protection",
@@ -127,7 +127,7 @@ fun SettingsScreen(
                             Text(
                                 text = selectedSection.title,
                                 style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
@@ -166,7 +166,7 @@ fun SettingsScreen(
                     Text(
                         text = "Settings",
                         style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = "App behavior and system controls",
@@ -352,20 +352,11 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 1.2")
+            SettingsDescription("Version 2.0.0")
             Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { },
-                enabled = false,
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Text("Update to v1.3")
-            }
+            SettingsDescription("Schedules, preferences and focus-session data are stored on this device")
             Spacer(modifier = Modifier.height(8.dp))
-            SettingsDescription("Schedules and app preferences are stored on-device.")
+            SettingsDescription("Focus progress stays local and does not require an account")
         }
     }
 }
