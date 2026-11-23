@@ -177,7 +177,7 @@ fun MainAppScaffold(
     }
 
     LaunchedEffect(currentScreen, isInitialRouteResolved, tourCompleted) {
-        if (isInitialRouteResolved && currentScreen == Screen.Dashboard && !tourCompleted) {
+        if (isInitialRouteResolved && !tourCompleted && initialTargetPackage.isNullOrEmpty()) {
             showTour = true
         }
     }
