@@ -60,6 +60,7 @@ import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.focus.FocusScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
@@ -358,8 +359,12 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
+                onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
+        }
+        Screen.Focus -> {
+            FocusScreen()
         }
         Screen.Apps -> {
             AppsScreen(
