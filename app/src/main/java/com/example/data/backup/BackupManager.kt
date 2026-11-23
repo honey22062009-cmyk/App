@@ -25,7 +25,7 @@ object BackupManager {
     suspend fun export(context: Context, repository: AppBlockerRepository, destination: Uri) =
         withContext(Dispatchers.IO) {
             repository.database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { }
-            AppDatabase.closeInstance()
+            // Checkpoint WAL before snapshotting; keep Room open so the live app container remains valid.
             val candidates = listOf(
                 context.getDatabasePath("strict_blocker.db"),
                 File(context.getDatabasePath("strict_blocker.db").path + "-wal"),
