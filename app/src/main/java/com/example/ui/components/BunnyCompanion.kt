@@ -2,12 +2,16 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -15,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 enum class BunnyMood { Resting, Focused, Celebrating }
 
@@ -31,6 +37,15 @@ fun BunnyCompanion(
     val blush = Color(0xFFE8B5A9)
     val scarf = Color(0xFF637A5C)
     val book = Color(0xFF3E5542)
+    var blinking by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(Random.nextLong(7_000L, 13_000L))
+            blinking = true
+            delay(140L)
+            blinking = false
+        }
+    }
 
     Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Box(
@@ -115,11 +130,12 @@ fun BunnyCompanion(
 
         val eyeY = if (mood == BunnyMood.Focused) size * 0.49f else size * 0.46f
         val eyeSize = if (mood == BunnyMood.Focused) size * 0.035f else size * 0.045f
+        val eyeHeight = if (blinking) size * 0.012f else eyeSize
         BunnyPart(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(x = -size * 0.14f, y = eyeY)
-                .size(eyeSize),
+                .size(eyeSize, eyeHeight),
             color = ink,
             shape = CircleShape
         )
