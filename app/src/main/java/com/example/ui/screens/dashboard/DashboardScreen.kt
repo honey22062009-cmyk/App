@@ -70,7 +70,7 @@ fun DashboardScreen(
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
-    onNavigateToFocus: () -> Unit,
+    onNavigateToFocus: () -> Unit = {},
     onNavigateToAdultProtection: () -> Unit = {}
 ) {
     val context = LocalContext.current
