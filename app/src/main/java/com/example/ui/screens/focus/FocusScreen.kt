@@ -1,5 +1,7 @@
 package com.example.ui.screens.focus
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,6 +86,7 @@ fun FocusScreen() {
         else -> totalMillis
     }
     val progress = (1f - remainingMillis.toFloat() / totalMillis.coerceAtLeast(1L)).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(progress, animationSpec = tween(700), label = "focus_progress")
     val minutes = remainingMillis / 60_000L
     val seconds = (remainingMillis % 60_000L) / 1_000L
     val timerText = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
@@ -126,7 +129,7 @@ fun FocusScreen() {
                         modifier = Modifier.weight(1.2f),
                         snapshot = snapshot,
                         remainingMillis = remainingMillis,
-                        progress = progress,
+                        progress = animatedProgress,
                         timerText = timerText,
                         isRunning = isRunning,
                         isPaused = isPaused,
@@ -150,7 +153,7 @@ fun FocusScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     snapshot = snapshot,
                     remainingMillis = remainingMillis,
-                    progress = progress,
+                    progress = animatedProgress,
                     timerText = timerText,
                     isRunning = isRunning,
                     isPaused = isPaused,
