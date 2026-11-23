@@ -55,8 +55,7 @@ import com.example.data.repository.AppBlockerRepository
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -75,6 +74,7 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val profileName by repository.settings.profileNameFlow.collectAsState(initial = "")
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
     val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
@@ -130,7 +130,7 @@ fun DashboardScreen(
         ) {
             item {
                 Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Your day, protected", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+                    Text(if (profileName.isBlank()) "Your day, protected" else "Welcome back, $profileName", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(4.dp))
                     Text("Choose what gets your attention and when", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -350,7 +350,7 @@ private fun CompanionPanel(modifier: Modifier, onFocus: () -> Unit) {
                     Text("Open focus")
                 }
             }
-            BunnyCompanion(size = 128.dp, mood = BunnyMood.Resting)
+            StrictBlockerLogo(size = 128.dp)
         }
     }
 }
