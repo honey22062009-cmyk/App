@@ -62,6 +62,7 @@ app/src/main/
 │       ├── blocker/ (BlockerActivity - Fullscreen interrupt shield)
 │       ├── navigation/ (Screen routes and definitions)
 │       ├── screens/
+│       │   ├── focus/ (FocusScreen with a persistent local timer and session summary)
 │       │   ├── dashboard/ (DashboardScreen)
 │       │   ├── apps/ (AppsScreen with search and multi-select)
 │       │   ├── schedules/ (SchedulesScreen with timeline and ScheduleEditorDialog)
@@ -163,12 +164,16 @@ adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.Devic
 
 ## UI Design System
 
-The app uses a reusable Material 3 design system with theme-aware glass surfaces, restrained brand colors, adaptive rounded shapes, and responsive layouts for phones and tablets. Visual effects live in shared Compose components so screens remain maintainable and feature logic stays separate from presentation.
+The native UI uses a warm paper, graphite and leaf-green palette, consistent 4dp spacing, restrained Material 3 surfaces, one icon family, and adaptive phone/tablet layouts. The visual signature is a small study-rabbit companion with a green journal. Rich visual detail is reserved for the mascot and focus timer; navigation, cards and controls stay quiet and legible.
+
+The dashboard, app manager, schedules, settings, adult-content protection, permission guide, legal screens and blocker interrupt use the same design tokens. The Focus screen adds a dedicated timer and a companion panel without changing the app-blocking engine.
 
 
 ## UX redesign and release boundaries
 
-The native app remains local-first: managed applications and schedules are stored with Room, and app preferences are stored with DataStore. The overview uses the saved protection setting together with current Accessibility, Usage Access, and overlay permission checks; it does not label the setting as active when these core permissions are missing. Permission state is re-checked when the activity resumes from Android Settings.
+The native app remains local-first: managed applications and schedules are stored with Room, and app preferences are stored with DataStore. The overview uses the saved protection setting together with current Accessibility, Usage Access, overlay and exact-alarm permission checks; it does not label enforcement as healthy when a required permission is missing. Permission state is re-checked when the activity resumes from Android Settings.
+
+Focus sessions use a separate local DataStore file. A session deadline is saved as an absolute timestamp, so a running timer can resume accurately after the app process is stopped or the device restarts. Completed-session count, focused minutes and the current consecutive-day streak are stored locally. The timer does not require a network connection or a continuously running service.
 
 First-run users are sent to the existing permission/setup guide. Continuing from that guide records onboarding completion locally, so returning users are not sent through setup again.
 
