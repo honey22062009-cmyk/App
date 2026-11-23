@@ -89,6 +89,8 @@ fun FocusScreen() {
     val timerText = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     val isRunning = snapshot.endAtMillis > 0L
     val isPaused = snapshot.isPaused
+    val todayEpochDay = java.time.LocalDate.now().toEpochDay()
+    val visibleStreak = if (snapshot.lastCompletionDay >= todayEpochDay - 1L) snapshot.currentStreak else 0
     val mascotMood = when {
         justCompleted -> BunnyMood.Celebrating
         isRunning -> BunnyMood.Focused
@@ -140,7 +142,7 @@ fun FocusScreen() {
                         mood = mascotMood,
                         sessions = snapshot.completedSessions,
                         minutes = snapshot.totalFocusMinutes,
-                        streak = snapshot.currentStreak
+                        streak = visibleStreak
                     )
                 }
             } else {
@@ -164,7 +166,7 @@ fun FocusScreen() {
                     mood = mascotMood,
                     sessions = snapshot.completedSessions,
                     minutes = snapshot.totalFocusMinutes,
-                    streak = snapshot.currentStreak
+                    streak = visibleStreak
                 )
             }
         }
