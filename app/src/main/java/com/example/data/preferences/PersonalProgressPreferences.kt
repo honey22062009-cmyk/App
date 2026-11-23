@@ -11,7 +11,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 private val Context.habitDataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_habits")
 
@@ -112,6 +115,73 @@ class PersonalProgressPreferences(private val context: Context) {
             val clean = note.trim().take(500)
             if (clean.isBlank()) notes.remove(day) else notes[day] = clean
             p[Keys.DAILY_NOTES] = encodeNotes(notes, day)
+        }
+    }
+
+    /**
+     * Migrates date-only tracker history from the legacy JSON backup into the
+     * new neutral personal-goal timeline. Free-text legacy notes are not copied.
+     */
+    suspend fun importLegacyBackup(entries: JSONObject) {
+        fun longValue(name: String): Long =
+            entries.optJSONObject(name)?.takeIf { it.optString("type") == "long" }?.optLong("value") ?: 0L
+
+        fun intValue(name: String): Int =
+            entries.optJSONObject(name)?.takeIf { it.optString("type") == "int" }?.optInt("value") ?: 0
+
+        fun stringSet(name: String): Set<String> {
+            val item = entries.optJSONObject(name) ?: return emptySet()
+            if (item.optString("type") != "string_set") return emptySet()
+            val values = item.optJSONArray("value") ?: return emptySet()
+            return buildSet {
+                for (index in 0 until values.length()) {
+                    val value = values.optString(index).takeIf { it.isNotBlank() } ?: continue
+                    add(value)
+                }
+            }
+        }
+
+        fun toEpochDay(timestamp: Long): Long? = if (timestamp > 0L) {
+            runCatching {
+                Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+            }.getOrNull()
+        } else null
+
+        val resetTimestamps = buildSet {
+            stringSet("fap_event_timestamps").mapNotNullTo(this) { it.toLongOrNull() }
+            stringSet("tracker_reset_records_v2").forEach { raw ->
+                raw.split("|", limit = 4).getOrNull(1)?.toLongOrNull()?.let(::add)
+            }
+            longValue("last_fap_at").takeIf { it > 0L }?.let(::add)
+        }.filter { it > 0L }.sorted()
+
+        val today = LocalDate.now().toEpochDay()
+        val startDay = toEpochDay(longValue("tracker_started_at"))
+            ?: resetTimestamps.firstOrNull()?.let(::toEpochDay)
+            ?: today
+        val lastResetDay = resetTimestamps.lastOrNull()?.let(::toEpochDay) ?: startDay
+
+        val dailyStatus = mutableMapOf<Long, Int>()
+        resetTimestamps.mapNotNull(::toEpochDay).forEach { dailyStatus[it] = 0 }
+        stringSet("daily_check_ins").forEach { raw ->
+            val date = raw.substringBefore("|").let { runCatching { LocalDate.parse(it).toEpochDay() }.getOrNull() }
+            if (date != null) dailyStatus[date] = 1
+        }
+
+        val best = maxOf(
+            intValue("best_fap_streak_days"),
+            intValue("previous_fap_streak_days")
+        ).coerceAtLeast(0)
+        val resetCount = maxOf(intValue("fap_log_count"), resetTimestamps.size).coerceAtLeast(0)
+        val checkIns = dailyStatus.values.count { it == 1 }
+
+        context.habitDataStore.edit { p ->
+            p[Keys.START_DAY] = startDay
+            p[Keys.LAST_RESET_DAY] = lastResetDay
+            p[Keys.BEST_STREAK] = best
+            p[Keys.RESET_COUNT] = resetCount
+            p[Keys.CHECK_IN_COUNT] = checkIns
+            p[Keys.DAILY_STATUS] = encodeStatus(dailyStatus, today)
         }
     }
 
