@@ -16,8 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
 import kotlinx.coroutines.delay
 
 @Composable
@@ -38,7 +37,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            BunnyCompanion(size = 172.dp, mood = BunnyMood.Resting)
+            StrictBlockerLogo(size = 172.dp)
             Spacer(Modifier.height(16.dp))
             Text(
                 text = "Strict Blocker",
