@@ -166,7 +166,7 @@ fun AdultProtectionScreen(
                     Text(
                         text = "18+ Adult Protection",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -300,7 +300,7 @@ fun AdultProtectionScreen(
                 Text(
                     text = "Protection controls",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -479,7 +479,7 @@ fun AdultProtectionScreen(
                                 Text(
                                     text = "SafeSearch",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
@@ -538,7 +538,7 @@ fun AdultProtectionScreen(
                                 Text(
                                     text = "Private browsing guard",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
@@ -569,7 +569,7 @@ fun AdultProtectionScreen(
                 Text(
                     text = "Diagnostics",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -580,7 +580,7 @@ fun AdultProtectionScreen(
                         Text(
                             text = "Test protection",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -639,7 +639,7 @@ fun AdultProtectionScreen(
                             Text(
                                 text = "Privacy & limitations",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -678,7 +678,7 @@ fun AdultProtectionScreen(
                 Text(
                     text = "Request Strict Mode Unlock",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             },
             text = {
@@ -699,7 +699,7 @@ fun AdultProtectionScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Start Unlock Delay", fontWeight = FontWeight.Bold)
+                    Text("Start Unlock Delay", fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -753,7 +753,7 @@ fun ProtectionLayerCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
