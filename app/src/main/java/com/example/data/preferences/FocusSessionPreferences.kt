@@ -11,7 +11,11 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.time.ZoneId
 import java.time.LocalDate
+import java.util.Base64
 
 private val Context.focusDataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_focus")
 
@@ -65,6 +69,79 @@ class FocusSessionPreferences(private val context: Context) {
             selectedTask = p[Keys.SELECTED_TASK] ?: "",
             activityCategory = p[Keys.ACTIVITY_CATEGORY] ?: "Study"
         )
+    }
+
+    /** Imports the legacy app's encoded focus history into the current local summary. */
+    suspend fun importLegacyRecords(records: Set<String>) {
+        if (records.isEmpty()) return
+        data class LegacySession(
+            val startedAt: Long,
+            val plannedSeconds: Int,
+            val actualSeconds: Int,
+            val completed: Boolean,
+            val activity: String,
+            val task: String
+        )
+
+        val decoder = Base64.getUrlDecoder()
+        val parsed = records.mapNotNull { raw ->
+            runCatching {
+                val parts = raw.split("|", limit = 7)
+                require(parts.size == 7)
+                val startedAt = parts[1].toLong().takeIf { it > 0L } ?: return@runCatching null
+                val planned = parts[2].toInt().coerceIn(0, 10_800)
+                val actual = parts[3].toInt().coerceIn(0, planned)
+                val completed = parts[4] == "1" && actual >= planned
+                val activity = runCatching {
+                    String(decoder.decode(parts[5]), StandardCharsets.UTF_8)
+                }.getOrDefault("Study")
+                val task = runCatching {
+                    String(decoder.decode(parts[6]), StandardCharsets.UTF_8)
+                }.getOrDefault("")
+                LegacySession(startedAt, planned, actual, completed, activity, task)
+            }.getOrNull()
+        }.sortedBy { it.startedAt }
+
+        if (parsed.isEmpty()) return
+        val zone = ZoneId.systemDefault()
+        val dailyTotals = mutableMapOf<Long, Int>()
+        parsed.forEach { session ->
+            val day = Instant.ofEpochMilli(session.startedAt).atZone(zone).toLocalDate().toEpochDay()
+            val minutes = ((session.actualSeconds + 30) / 60).coerceAtLeast(0)
+            dailyTotals[day] = (dailyTotals[day] ?: 0) + minutes
+        }
+        val completedDays = parsed.filter { it.completed }
+            .map { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate().toEpochDay() }
+            .distinct()
+            .sorted()
+        var streak = 0
+        var bestStreak = 0
+        var previousDay = -1L
+        completedDays.forEach { day ->
+            streak = FocusProgress.nextStreak(previousDay, day, streak)
+            bestStreak = maxOf(bestStreak, streak)
+            previousDay = day
+        }
+        val today = LocalDate.now().toEpochDay()
+        val currentStreak = if (previousDay >= today - 1L) streak else 0
+        val last = parsed.last()
+        val category = last.activity.takeIf { it in setOf("Study", "Revision", "Practice", "Reading", "Planning") } ?: "Study"
+        val selectedMinutes = ((last.plannedSeconds + 59) / 60).coerceIn(5, 120)
+        val totalMinutes = dailyTotals.values.sum()
+
+        context.focusDataStore.edit { p ->
+            p[Keys.SELECTED_MINUTES] = selectedMinutes
+            p[Keys.COMPLETED_SESSIONS] = completedDays.size
+            p[Keys.TOTAL_FOCUS_MINUTES] = totalMinutes
+            p[Keys.CURRENT_STREAK] = currentStreak
+            p[Keys.BEST_STREAK] = bestStreak
+            p[Keys.LAST_COMPLETION_DAY] = previousDay
+            p[Keys.DAILY_FOCUS_MINUTES] = FocusProgress.encodeDailyFocusMinutes(dailyTotals, today)
+            p[Keys.SELECTED_TASK] = last.task.take(100)
+            p[Keys.ACTIVITY_CATEGORY] = category
+            p[Keys.END_AT] = 0L
+            p[Keys.PAUSED_REMAINING] = 0L
+        }
     }
 
     suspend fun setSelectedTask(task: String) {
