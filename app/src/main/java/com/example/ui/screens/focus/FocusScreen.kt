@@ -194,6 +194,8 @@ fun FocusScreen() {
                     isRunning = isRunning,
                     isPaused = isPaused,
                     justCompleted = justCompleted,
+                    onTaskChange = { value -> scope.launch { preferences.setSelectedTask(value) } },
+                    onCategoryChange = { value -> scope.launch { preferences.setActivityCategory(value) } },
                     onSelectMinutes = {
                         scope.launch { preferences.setSelectedMinutes(it) }
                         justCompleted = false
