@@ -61,7 +61,7 @@ fun AntiBypassGuideScreen(
                         Text(
                             text = "Security Architecture",
                             style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -88,7 +88,7 @@ fun AntiBypassGuideScreen(
                             Text(
                                 text = "Standard Android Platform Guarantees",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -126,7 +126,7 @@ fun AntiBypassGuideScreen(
                             Text(
                                 text = "Honest Platform Limitations",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -160,7 +160,7 @@ fun AntiBypassGuideScreen(
                             Text(
                                 text = "Optional: Enterprise Device Owner Mode",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
