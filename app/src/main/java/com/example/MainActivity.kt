@@ -56,8 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
@@ -220,7 +219,7 @@ fun MainAppScaffold(
                     modifier = Modifier.testTag("tablet_navigation_rail"),
                     containerColor = MaterialTheme.colorScheme.surface,
                     header = {
-                        BunnyCompanion(size = 52.dp, mood = BunnyMood.Resting)
+                        StrictBlockerLogo(size = 52.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 ) {
