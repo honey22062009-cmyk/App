@@ -49,8 +49,8 @@ fun BunnyCompanion(
     val earInner = Color(0xFFE9AFA2)
     val ink = Color(0xFF3F4038)
     val blush = Color(0xFFE8B5A9)
-    val scarf = Color(0xFF637A5C)
-    val book = Color(0xFF3E5542)
+    val scarf = Color(0xFF7651C8)
+    val book = Color(0xFF49336E)
 
     var blinking by remember { mutableStateOf(false) }
     var earTwitch by remember { mutableStateOf(false) }
