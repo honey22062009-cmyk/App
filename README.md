@@ -1,188 +1,70 @@
-# Strict Blocker (Android)
+# Strict Blocker 2.1.0
 
-A production-grade, native Android application engineered for **strict scheduled application blocking** with non-root enforcement. Designed and optimized for phones and tablets, including the **Samsung Galaxy Tab A9+** running modern Samsung One UI and Android 13+.
+Strict Blocker is a native Android app for scheduled app blocking, focus sessions and private habit progress. It uses Kotlin, Jetpack Compose, Room and DataStore, with layouts for phones and tablets.
 
----
+## What is new in 2.1.0
 
-## Core Purpose
+- Replaced the green-heavy interface with a plum, rose and warm-ivory theme.
+- Added a new bunny-and-shield launcher mark, used across the splash screen, dashboard, tablet rail and Focus companion panel.
+- Removed the DNS controls, DNS preferences, VPN service registration, reboot startup and unused DNS tunnel implementation. Browser Guard now describes its supported on-device browser checks and their limitations honestly.
+- Added a local profile name. It is stored on the device and shown on the dashboard; it is not a cloud account.
+- Added a guided first-run tour with five short steps and a replay action in Settings.
+- Added a Progress destination with an editable personal-goal title, a daily status chart, current and best day counts, check-ins, resets, milestones and private daily notes.
+- Improved Focus with a saved task name, activity category, goal progress and a daily focus target.
+- Rebuilt Settings with clearer sections, local profile settings, appearance controls, focus targets, backup and restore, permission links and an expanded About section.
+- Added ZIP export and restore for the local Room database and known DataStore files, including personal progress.
+- Reduced accessibility-event scanning frequency by ignoring continuous scroll/content-change events and sampling text/focus events at most once every 700 ms. App-launch events remain immediate.
 
-Strict Blocker allows device owners to manage installed applications and define precise recurring time windows when those applications are allowed to run.
+## Ten useful additions
 
-- **Strict Enforcement**: Outside an allowed schedule window, managed applications are strictly blocked.
-- **Immediate Interruption**: When an unallowed application is opened, an immediate fullscreen interrupt shield (`BlockerActivity`) intercepts access.
-- **No Compromise UI**: Does not display "Ignore", "Use Anyway", "5 More Minutes", or "Snooze" buttons.
-- **Local-first design**: Schedules, preferences, and enforcement records are stored locally. No analytics or ad SDKs are configured. If optional DNS filtering is enabled, DNS queries are sent to the configured resolver, which can observe the queried domains.
+1. First-run walkthrough and replay.
+2. On-device display profile.
+3. Editable personal-goal tracker.
+4. Thirty-day day-by-day progress graph.
+5. Current day count and longest streak.
+6. Goal-kept check-ins and reset history.
+7. Milestone markers.
+8. Private daily notes.
+9. Focus task names and activity categories.
+10. Export/import backup for app schedules, settings, focus records and progress.
 
----
+## Data, privacy and sign-in
 
-## Architecture & Technology Stack
+The app's core features remain local-first. App rules, schedules and blocked events are stored with Room. Preferences, focus history and personal progress use separate DataStore files. The new profile is a local display name only.
 
-- **Language**: 100% Kotlin
-- **UI Framework**: Jetpack Compose with Material Design 3 (M3)
-- **Architecture**: Clean Architecture / MVVM with pure Kotlin decoupled evaluation engine
-- **Local Persistence**: Room SQLite Database for managed apps, schedules, and enforcement logs
-- **Configuration**: Jetpack DataStore Preferences for strict delay locks and runtime settings
-- **Dual-Pane Tablet Support**: Responsive layout featuring Navigation Rail and side-by-side app/schedule management on Samsung Galaxy Tab A9+ (and screens >= 720dp)
+There is **no cloud login, account backend or cross-device sync** configured in this build. No fake sign-in screen is used. DNS/VPN filtering has been removed; Browser Guard only checks visible accessibility information in supported browser contexts and cannot guarantee coverage of every browser, embedded view or page. Page text is not uploaded.
 
-### Strict Blocking Engine
-1. **Accessibility Service (`AppBlockerAccessibilityService`)**:
-   - Zero-latency (<50ms) window state change detection (`TYPE_WINDOW_STATE_CHANGED`).
-   - Privacy boundary: `canRetrieveWindowContent` is enabled because browser protection evaluates visible accessibility text. Inspection is limited to browser context; password fields and unrelated editable values are excluded from text evaluation. The app does not upload page text, although blocked attempts may be recorded locally.
-2. **Usage Access Fallback (`BlockerMonitoringService`)**:
-   - Persistent foreground service monitoring active apps via `UsageStatsManager.queryEvents`.
-3. **Exact Schedule Cutoffs (`AlarmManager`)**:
-   - `RTC_WAKEUP` exact alarms trigger at the exact minute an allowed window ends, guaranteeing immediate cutoff even if the user is already inside the application.
-4. **Resilience & Reboot (`BootReceiver`, `TimeChangeReceiver`)**:
-   - Restores monitoring and alarms upon `BOOT_COMPLETED`, `LOCKED_BOOT_COMPLETED`, and `MY_PACKAGE_REPLACED`.
-   - Automatically recalculates schedule boundaries on `TIMEZONE_CHANGED`, `TIME_SET`, and `DATE_CHANGED`.
-5. **Safety Whitelist (`SafetyWhitelist`)**:
-   - Automatically excludes system-critical components from being blocked: Android System UI, Android Settings, Default Launcher, Samsung Telephony/Dialer, and Strict Blocker itself.
+Personal progress is a user-entered, editable goal tracker. It does not monitor device activity or claim to automatically detect private behaviour. The user controls check-ins and reset entries. Records remain on-device unless the user exports a backup.
 
----
+## Backup and restore
 
-## Project Structure
+Open **Settings → Backup and restore**.
 
-```
-app/src/main/
-├── AndroidManifest.xml
-├── java/com/example/
-│   ├── StrictBlockerApplication.kt
-│   ├── MainActivity.kt
-│   ├── core/
-│   │   ├── model/ (SchedulePeriod, BlockEvaluationResult, TimeRange)
-│   │   ├── evaluator/ (ScheduleEvaluator - pure testable evaluation engine)
-│   │   └── system/ (AlarmScheduler, PermissionHelper, SafetyWhitelist)
-│   ├── data/
-│   │   ├── db/ (AppDatabase, DAOs, Entities)
-│   │   ├── preferences/ (SettingsPreferences with DataStore)
-│   │   └── repository/ (AppBlockerRepository)
-│   ├── receiver/ (BootReceiver, ScheduleAlarmReceiver, TimeChangeReceiver)
-│   ├── service/ (AppBlockerAccessibilityService, BlockerMonitoringService)
-│   └── ui/
-│       ├── blocker/ (BlockerActivity - Fullscreen interrupt shield)
-│       ├── navigation/ (Screen routes and definitions)
-│       ├── screens/
-│       │   ├── focus/ (FocusScreen with a persistent local timer and session summary)
-│       │   ├── dashboard/ (DashboardScreen)
-│       │   ├── apps/ (AppsScreen with search and multi-select)
-│       │   ├── schedules/ (SchedulesScreen with timeline and ScheduleEditorDialog)
-│       │   ├── onboarding/ (PermissionsScreen with WHY/WHAT/HOW guides)
-│       │   ├── settings/ (SettingsScreen with delay lock)
-│       │   └── antibypass/ (AntiBypassGuideScreen)
-│       └── theme/ (Color, Theme, Type)
-└── res/
-    ├── drawable/ (App icons and layer-list foregrounds)
-    ├── values/ (strings.xml, themes.xml, colors.xml)
-    └── xml/ (accessibility_service_config.xml, backup rules)
-```
+- **Create backup** writes a ZIP containing the local database and supported DataStore files.
+- **Import previous version data** accepts a Strict Blocker ZIP containing the supported database/preferences files.
+- The restore flow checks the SQLite database before copying the supported files.
+- Export a current backup before importing. Restoring replaces matching local app data. After a restore, fully close and reopen Strict Blocker so the database and preferences are reopened from disk.
+- Backups can contain schedules, app choices, blocked events, focus totals, a local profile, notes and personal progress. Store the file somewhere private.
 
----
+This importer is not a general Android device-backup reader. It accepts this app's supported ZIP format and matching legacy file names. Older files with incompatible database schemas may still need a version-specific migration.
 
-## Permissions & Onboarding
+## Build and validation
 
-Strict Blocker requires the following permissions for reliable enforcement:
-
-| Permission | Purpose | Why Required |
-| :--- | :--- | :--- |
-| `BIND_ACCESSIBILITY_SERVICE` | Real-time window state detection | Provides instant (<50ms) blocking reaction when a restricted app is launched. |
-| `PACKAGE_USAGE_STATS` | Usage Access query | Acts as a secondary verification engine to monitor foreground transitions. |
-| `SYSTEM_ALERT_WINDOW` | Display over other apps | Allows full-screen shield overlay to interrupt running unallowed apps. |
-| `POST_NOTIFICATIONS` | Foreground service notification | Required on Android 13+ to maintain active background protection status. |
-| `SCHEDULE_EXACT_ALARM` | Precise cutoff alarms | Guarantees exact to-the-minute schedule cutoff transitions. |
-| `RECEIVE_BOOT_COMPLETED` | System startup handling | Restores schedules and alarm triggers immediately upon tablet reboot. |
-
-### Samsung Galaxy Tab A9+ / One UI Optimization
-On Samsung One UI devices:
-1. Open **Settings** > **Apps** > **Strict Blocker**.
-2. Tap **Battery** and select **Unrestricted**.
-3. Under **Accessibility** > **Installed Apps**, switch **Strict Blocker** to **ON**.
-
----
-
-## Build Instructions
-
-### Prerequisites
-- JDK 17 or higher
-- Android SDK 36 (compileSdk = 36, minSdk = 26)
-
-### Build Debug APK
-To compile the project and generate the debug APK:
+Requirements: JDK 17 and Android SDK 36.
 
 ```bash
-gradle assembleDebug
-```
-
-The resulting APK will be located at:
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-### Run Unit and Robolectric Tests
-```bash
+gradle :app:assembleDebug
 gradle :app:testDebugUnitTest
 ```
 
-### Release Build
-To generate a signed release APK or Android App Bundle (AAB):
-```bash
-gradle assembleRelease
-# or for Play Store bundle:
-gradle bundleRelease
-```
+CI builds the installable debug APK, verifies its Android APK signature with `apksigner`, uploads the artifact and runs JVM/Robolectric tests. A successful CI run does not replace installation and runtime testing on the Samsung tablet.
 
-The release build uses the signing configuration defined in `app/build.gradle.kts` via environment variables (`KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD`).
+## Android limitations
 
----
+Strict Blocker is a regular Android app, not a device-owner/MDM controller. Android can revoke permissions, stop background work or uninstall the app. Scheduled blocking reliability depends on Accessibility, Usage Access, overlay, exact-alarm and battery settings remaining correctly configured.
 
-## Anti-Bypass & Enterprise Device Owner (Optional)
+The application ID remains `com.aistudio.strictblocker.kzvwpq`. Version 2.1.0 uses versionCode 12. Updating an existing install in place still requires the same signing certificate as the installed version. The debug APK is signed with the Gradle debug key; a permanent release update requires the retained release signing bundle to be configured in repository Actions secrets.
 
-In compliance with standard Android security architecture, non-root applications cannot prevent a physical device owner from uninstalling apps or revoking permissions in Settings. Strict Blocker provides an optional **Schedule Change Delay** (e.g. 15 or 30 minutes) to eliminate impulsive bypassing.
+## License
 
-For enterprise environments, dedicated kiosks, or educational Samsung Galaxy Tab A9+ tablets requiring strict uninstall prevention:
-```bash
-adb shell dpm set-device-owner com.aistudio.strictblocker.kzvwpq/.receiver.DeviceAdmin
-```
-*(Note: Device Owner mode requires setting upon a fresh factory reset or zero-accounts setup.)*
-
----
-
-## Privacy Policy, Terms & Legal Compliance
-
-- **Data flows**: Schedules, preferences, and enforcement records are stored locally via Room/DataStore. No analytics or cloud-sync backend is configured. Optional VPN-based DNS filtering forwards DNS queries to the configured resolver (Cloudflare Family DNS by default, or the user's custom resolver); that resolver can observe queried domains. Blocked attempts may be recorded locally.
-- **Data Minimization**: Stores only the minimum package identifiers and local hour/minute schedule intervals.
-- **Accessibility Safeguards**: `canRetrieveWindowContent` is enabled in `accessibility_service_config.xml` for scheduled blocking and browser-context adult-content checks. Text evaluation is restricted to browser windows; password fields and unrelated editable values are skipped. No page text is uploaded. Blocked attempts can be recorded locally, so users should review the privacy behavior before enabling these features.
-- **Terms of Service**: Personal productivity utility software provided as-is without warranty; distribution terms should be reviewed before commercial release.
-- **Pricing and payments**: The Android app has no checkout SDK or purchase-verification backend. The optional static storefront in the website folder is a separate manual UPI workflow and is disabled by default. Any price must be made clear before payment.
-- **Refund Policy**: A real support contact and clear refund terms must be published before accepting payment. The repository does not implement automated refunds.
-- **Cookie Policy**: The native Android application does not use HTTP cookies, tracking pixels, or web beacons. Review the hosting provider's behavior for the optional website.
-- **Third-Party SDKs**: Zero advertising, tracking, or analytics SDKs bundled in the APK.
-- **Children's Privacy (COPPA / GDPR-K)**: Safe for all ages; no personal data collected from children under 13/16.
-- **Data Deletion (Right to Erasure)**: Fully functional "Delete All Data" feature available directly in app settings.
-- **License**: Apache License, Version 2.0.
-
-
-
-## UI Design System
-
-The native UI uses a warm paper, graphite and leaf-green palette, consistent 4dp spacing, restrained Material 3 surfaces, one icon family, and adaptive phone/tablet layouts. The visual signature is a small study-rabbit companion with a green journal. Rich visual detail is reserved for the mascot and focus timer; navigation, cards and controls stay quiet and legible.
-
-The dashboard, app manager, schedules, settings, adult-content protection, permission guide, legal screens and blocker interrupt use the same design tokens. The Focus screen adds a dedicated timer and a companion panel without changing the app-blocking engine.
-
-
-## UX redesign and release boundaries
-
-The native app remains local-first: managed applications and schedules are stored with Room, and app preferences are stored with DataStore. The overview uses the saved protection setting together with current Accessibility, Usage Access, overlay and exact-alarm permission checks; it does not label enforcement as healthy when a required permission is missing. Permission state is re-checked when the activity resumes from Android Settings.
-
-Focus sessions use a separate local DataStore file. A session deadline is saved as an absolute timestamp, so a running timer can resume accurately after the app process is stopped or the device restarts. Completed-session count, focused minutes and the current consecutive-day streak are stored locally. The timer does not require a network connection or a continuously running service.
-
-First-run users are sent to the existing permission/setup guide. Continuing from that guide records onboarding completion locally, so returning users are not sent through setup again.
-
-### Authentication and billing status
-
-This repository currently has no configured authentication provider, account backend, purchase SDK, or entitlement-verification service. The app's established behavior is on-device and does not require an account. This redesign intentionally does not add mock sign-in, a fake checkout, client-only Premium unlock flags, or claims that a purchase has been verified.
-
-A live Premium offer must remain disabled until the distribution channel and provider are confirmed, the features included in Premium are implemented, and the purchase flow can verify and restore entitlements. The suggested `₹99` one-time amount is provisional and is not a live price or an offer in this build. If Play Store distribution is intended, evaluate Google Play Billing and the supported entitlement-verification path before taking payments. Adding cloud accounts or synchronization would also change the current privacy and data-flow model and needs an explicit provider/privacy review.
-
-### Verification
-
-The repository's Android CI workflow builds the debug APK and runs `gradle :app:testDebugUnitTest`. A branch/PR CI result should be treated as the build/test evidence; no physical-device test is implied by a successful CI run.
+Apache License 2.0.
