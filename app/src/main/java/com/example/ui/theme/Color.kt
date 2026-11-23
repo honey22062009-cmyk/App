@@ -5,8 +5,8 @@ import androidx.compose.ui.graphics.Color
 // Plum, rose and warm ivory replace the previous green-heavy palette.
 val BrandPrimary = Color(0xFF7651C8)
 val BrandPrimaryDark = Color(0xFFD0B9FF)
-val BrandEmerald = Color(0xFF279B83)
-val BrandEmeraldDark = Color(0xFF83D4BE)
+val BrandEmerald = Color(0xFFD16D8D)
+val BrandEmeraldDark = Color(0xFFF0A8BD)
 val BrandAmber = Color(0xFFB77832)
 val BrandCrimson = Color(0xFFD85E78)
 
