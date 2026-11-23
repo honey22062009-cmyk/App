@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.preferences.FocusSessionPreferences
 import com.example.data.preferences.FocusSessionSnapshot
+import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.AppSurface
 import com.example.ui.components.StrictBlockerLogo
 import com.example.ui.components.BunnyMood
@@ -67,6 +70,8 @@ import kotlin.math.max
 fun FocusScreen() {
     val context = LocalContext.current
     val preferences = remember(context) { FocusSessionPreferences(context.applicationContext) }
+    val settings = remember(context) { SettingsPreferences(context.applicationContext) }
+    val dailyGoal by settings.focusDailyGoalFlow.collectAsState(initial = 120)
     val snapshot by preferences.snapshotFlow.collectAsState(initial = FocusSessionSnapshot())
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -154,6 +159,8 @@ fun FocusScreen() {
                         isRunning = isRunning,
                         isPaused = isPaused,
                         justCompleted = justCompleted,
+                        onTaskChange = { value -> scope.launch { preferences.setSelectedTask(value) } },
+                        onCategoryChange = { value -> scope.launch { preferences.setActivityCategory(value) } },
                         onSelectMinutes = {
                             scope.launch { preferences.setSelectedMinutes(it) }
                             justCompleted = false
@@ -215,6 +222,7 @@ fun FocusScreen() {
                 snapshot = snapshot,
                 todayIndex = todayIndex,
                 currentStreak = currentStreak,
+                dailyGoal = dailyGoal,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -231,6 +239,8 @@ private fun TimerPanel(
     isRunning: Boolean,
     isPaused: Boolean,
     justCompleted: Boolean,
+    onTaskChange: (String) -> Unit,
+    onCategoryChange: (String) -> Unit,
     onSelectMinutes: (Int) -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
@@ -273,6 +283,31 @@ private fun TimerPanel(
                     )
                 }
                 Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("What are you working on?", style = MaterialTheme.typography.titleSmall)
+                OutlinedTextField(
+                    value = snapshot.selectedTask,
+                    onValueChange = onTaskChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Add a task or chapter") },
+                    enabled = !isRunning
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Study", "Revision", "Practice", "Reading", "Planning").forEach { category ->
+                        FilterChip(
+                            selected = snapshot.activityCategory == category,
+                            onClick = { onCategoryChange(category) },
+                            enabled = !isRunning,
+                            label = { Text(category) }
+                        )
+                    }
+                }
             }
 
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -422,6 +457,7 @@ private fun ProgressPanel(
     snapshot: FocusSessionSnapshot,
     todayIndex: Int,
     currentStreak: Int,
+    dailyGoal: Int,
     modifier: Modifier = Modifier
 ) {
     val highestDay = (snapshot.dailyFocusMinutes.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -437,6 +473,22 @@ private fun ProgressPanel(
             modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Daily target", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("A gentle goal, not a deadline", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("${snapshot.dailyFocusMinutes.getOrNull(todayIndex) ?: 0}/$dailyGoal min", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                }
+                LinearProgressIndicator(
+                    progress = { ((snapshot.dailyFocusMinutes.getOrNull(todayIndex) ?: 0).toFloat() / dailyGoal.coerceAtLeast(1)).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("Your progress", style = MaterialTheme.typography.titleLarge)
