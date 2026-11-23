@@ -122,7 +122,7 @@ fun PermissionsScreen(
                     Text(
                         text = "Permissions",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -181,7 +181,7 @@ fun PermissionsScreen(
                                     Text(
                                         text = if (allCriticalGranted) "Protection is ready" else "Setup needs attention",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
@@ -221,7 +221,7 @@ fun PermissionsScreen(
                 Text(
                     text = "Required",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -280,7 +280,7 @@ fun PermissionsScreen(
                 Text(
                     text = "Recommended",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -350,7 +350,7 @@ fun PermissionsScreen(
                     Text(
                         text = if (allCriticalGranted) "Return to Dashboard" else "Continue for now",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -413,7 +413,7 @@ fun PermissionSetupCard(
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -437,7 +437,7 @@ fun PermissionSetupCard(
                             Text(
                                 text = "REQUIRED",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -498,7 +498,7 @@ fun PermissionSetupCard(
                         Text(
                             text = "WHY IT IS NEEDED:",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
@@ -512,7 +512,7 @@ fun PermissionSetupCard(
                         Text(
                             text = "WHAT HAPPENS WITHOUT IT:",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error
                         )
                         Text(
@@ -526,7 +526,7 @@ fun PermissionSetupCard(
                         Text(
                             text = "HOW TO ENABLE:",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.secondary
                         )
                         Text(
@@ -553,7 +553,7 @@ fun PermissionSetupCard(
                     Text(
                         text = "Allow in Settings",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             } else {
@@ -577,7 +577,7 @@ fun PermissionSetupCard(
                         Text(
                             text = "Allowed",
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.tertiary
                         )
                     }
