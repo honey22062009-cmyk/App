@@ -56,10 +56,13 @@ import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.ui.navigation.Screen
+import com.example.ui.components.BunnyCompanion
+import com.example.ui.components.BunnyMood
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.focus.FocusScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
@@ -206,14 +209,7 @@ fun MainAppScaffold(
                     modifier = Modifier.testTag("tablet_navigation_rail"),
                     containerColor = MaterialTheme.colorScheme.surface,
                     header = {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = "Strict Blocker",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .padding(vertical = 4.dp)
-                        )
+                        BunnyCompanion(size = 52.dp, mood = BunnyMood.Resting)
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 ) {
@@ -232,7 +228,7 @@ fun MainAppScaffold(
                                 Text(
                                     screen.title,
                                     fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                                 )
                             },
                             colors = NavigationRailItemDefaults.colors(
@@ -294,7 +290,7 @@ fun MainAppScaffold(
                                     Text(
                                         screen.title,
                                         fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
@@ -358,8 +354,12 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
+                onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
+        }
+        Screen.Focus -> {
+            FocusScreen()
         }
         Screen.Apps -> {
             AppsScreen(

@@ -21,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.CornerRadii
 
 enum class GlassVariant {
     Standard,
@@ -79,7 +81,7 @@ object GlassDefaults {
         }
         return GlassSpec(
             backgroundColor = background,
-            borderBrush = Brush.linearGradient(listOf(border, border)),
+            borderBrush = SolidColor(border),
             specularBrush = null,
             blurRadius = customBlur ?: 0.dp,
             borderWidth = borderWidth
@@ -93,7 +95,7 @@ object GlassDefaults {
 @Composable
 fun AppSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(14.dp),
+    shape: Shape = RoundedCornerShape(CornerRadii.card),
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
     borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
     borderWidth: Dp = 1.dp,

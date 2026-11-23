@@ -2,37 +2,37 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand: one restrained blue accent across both themes.
-val BrandPrimary = Color(0xFF3458D4)
-val BrandPrimaryDark = Color(0xFF9CB0FF)
+// The app's world is a quiet study desk: paper, graphite and a restrained leaf-green accent.
+val BrandPrimary = Color(0xFF526B50)
+val BrandPrimaryDark = Color(0xFFB4C9AA)
 
-// Semantic colors. Use only for state, never decoration.
-val BrandEmerald = Color(0xFF187A67)
-val BrandEmeraldDark = Color(0xFF6CC9B5)
-val BrandAmber = Color(0xFFB56A00)
-val BrandCrimson = Color(0xFFBA1A1A)
+// Semantic colors are reserved for actual states, not decoration.
+val BrandEmerald = Color(0xFF347456)
+val BrandEmeraldDark = Color(0xFF94C5A4)
+val BrandAmber = Color(0xFF9A6429)
+val BrandCrimson = Color(0xFFA84F43)
 
-// Dark theme: neutral, not cyber-blue.
-val DarkBackground = Color(0xFF101114)
-val DarkSurface = Color(0xFF181A1E)
-val DarkSurfaceVariant = Color(0xFF202227)
-val DarkSurfaceBorder = Color(0xFF2B2E34)
-val DarkOnBackground = Color(0xFFF3F4F6)
-val DarkOnSurface = Color(0xFFF3F4F6)
-val DarkOnSurfaceVariant = Color(0xFFA6ABB4)
-val DarkOutline = Color(0xFF464A52)
+// Dark theme: deep green-charcoal rather than blue-black.
+val DarkBackground = Color(0xFF191E1A)
+val DarkSurface = Color(0xFF222923)
+val DarkSurfaceVariant = Color(0xFF2B332D)
+val DarkSurfaceBorder = Color(0xFF39443B)
+val DarkOnBackground = Color(0xFFF0F1E9)
+val DarkOnSurface = Color(0xFFF0F1E9)
+val DarkOnSurfaceVariant = Color(0xFFB0B8AC)
+val DarkOutline = Color(0xFF737D70)
 
-// Light theme: warm-neutral and readable.
-val LightBackground = Color(0xFFF7F8FA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF0F2F5)
-val LightSurfaceBorder = Color(0xFFE1E4E9)
-val LightOnBackground = Color(0xFF17191D)
-val LightOnSurface = Color(0xFF17191D)
-val LightOnSurfaceVariant = Color(0xFF626871)
-val LightOutline = Color(0xFFB8BEC7)
+// Light theme: warm paper and graphite ink.
+val LightBackground = Color(0xFFF4F1E8)
+val LightSurface = Color(0xFFFCFAF4)
+val LightSurfaceVariant = Color(0xFFECE8DD)
+val LightSurfaceBorder = Color(0xFFDDD8CB)
+val LightOnBackground = Color(0xFF292D27)
+val LightOnSurface = Color(0xFF292D27)
+val LightOnSurfaceVariant = Color(0xFF6C7369)
+val LightOutline = Color(0xFFADB4A7)
 
-// Compatibility aliases retained for older screens while the UI migrates.
+// Compatibility aliases retained for older screens during the visual migration.
 val CyberCyan = BrandPrimary
 val SapphireBlue = BrandPrimary
 val DarkNavy = DarkSurface

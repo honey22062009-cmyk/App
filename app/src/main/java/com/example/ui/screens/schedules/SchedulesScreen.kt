@@ -140,7 +140,7 @@ fun SchedulesScreen(
                     Text(
                         text = "No Applications Managed",
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -178,7 +178,7 @@ fun SchedulesScreen(
                         Text(
                             text = "Managed Apps",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -205,7 +205,7 @@ fun SchedulesScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = app.appName,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 style = MaterialTheme.typography.titleSmall,
                                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                             )
@@ -269,7 +269,7 @@ fun SchedulesScreen(
                     Text(
                         text = "Schedules",
                         style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -299,7 +299,7 @@ fun SchedulesScreen(
                                 Text(
                                     text = app.appName,
                                     fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -394,7 +394,7 @@ fun ScheduleDetailPane(
                         Text(
                             text = app.appName,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -412,7 +412,7 @@ fun ScheduleDetailPane(
                     ) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Period", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Add Period", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -443,7 +443,7 @@ fun ScheduleDetailPane(
                             Text(
                                 text = "Overlapping Allowed Periods",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
@@ -463,7 +463,7 @@ fun ScheduleDetailPane(
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.CallMerge, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Merge", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Merge", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -509,7 +509,7 @@ fun DayScheduleCard(
                 Text(
                     text = day.name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) },
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
@@ -571,7 +571,7 @@ fun PeriodItemRow(
                 Text(
                     text = period.timeSpanDisplay,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = if (period.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(

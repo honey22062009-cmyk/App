@@ -82,7 +82,7 @@ fun LegalComplianceScreen(
                         Text(
                             text = "Privacy & Legal Compliance",
                             style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -208,7 +208,7 @@ fun LegalComplianceScreen(
                             Text(
                                 text = "Data Deletion Request (Right to Erasure)",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -244,7 +244,7 @@ fun LegalComplianceScreen(
                             Text(
                                 text = "Permanently Delete All Data & Reset",
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -273,7 +273,7 @@ fun LegalComplianceScreen(
                 Text(
                     text = "Confirm Complete Data Erasure",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             },
             text = {
@@ -294,7 +294,7 @@ fun LegalComplianceScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete Everything", fontWeight = FontWeight.Bold)
+                    Text("Delete Everything", fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -326,7 +326,7 @@ fun LegalSectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }

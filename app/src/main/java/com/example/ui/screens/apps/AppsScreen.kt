@@ -148,7 +148,7 @@ fun AppsScreen(
                     Text(
                         text = "Apps",
                         style = if (isTablet) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -244,7 +244,7 @@ fun AppsScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { selectedFilter = filter },
-                        label = { Text(filter, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(filter, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
                         shape = RoundedCornerShape(10.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -259,7 +259,7 @@ fun AppsScreen(
                     Text(
                         text = "${selectedPackages.size} selected",
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -586,7 +586,7 @@ fun AppItemCard(
                 Text(
                     text = app.appName,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
