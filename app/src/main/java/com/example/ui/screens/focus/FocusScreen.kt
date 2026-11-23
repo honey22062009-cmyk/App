@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -98,6 +99,7 @@ fun FocusScreen() {
     val todayEpochDay = LocalDate.now().toEpochDay()
     val visibleStreak = if (snapshot.lastCompletionDay >= todayEpochDay - 1L) snapshot.currentStreak else 0
     val todayIndex = LocalDate.now().dayOfWeek.value - 1
+    val currentStreak = if (snapshot.lastCompletionDay >= todayEpochDay - 1L) snapshot.currentStreak else 0
     val mascotMood = when {
         justCompleted -> BunnyMood.Celebrating
         isRunning -> BunnyMood.Focused
@@ -114,7 +116,7 @@ fun FocusScreen() {
         val contentWidth = when {
             maxWidth >= 1280.dp -> 1200.dp
             maxWidth >= 900.dp -> maxWidth - 64.dp
-            else -> maxWidth
+            else -> maxWidth - horizontalInset * 2
         }
 
         Column(
@@ -212,6 +214,7 @@ fun FocusScreen() {
             ProgressPanel(
                 snapshot = snapshot,
                 todayIndex = todayIndex,
+                currentStreak = currentStreak,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -306,7 +309,10 @@ private fun TimerPanel(
             if (!isRunning && !isPaused) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Session length", style = MaterialTheme.typography.titleSmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         listOf(15, 25, 45, 60, 90).forEach { value ->
                             FilterChip(
                                 selected = snapshot.selectedMinutes == value,
@@ -415,6 +421,7 @@ private fun BunnyPanel(
 private fun ProgressPanel(
     snapshot: FocusSessionSnapshot,
     todayIndex: Int,
+    currentStreak: Int,
     modifier: Modifier = Modifier
 ) {
     val highestDay = (snapshot.dailyFocusMinutes.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -446,7 +453,7 @@ private fun ProgressPanel(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                FocusMetric("Current streak", snapshot.currentStreak.toString())
+                FocusMetric("Current streak", currentStreak.toString())
                 FocusMetric("Best streak", snapshot.bestStreak.toString())
                 FocusMetric("Sessions", snapshot.completedSessions.toString())
             }

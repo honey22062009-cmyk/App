@@ -352,7 +352,7 @@ private fun SettingsSectionContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
-            SettingsDescription("Version 2.0.0")
+            SettingsDescription("Version 2.0.1")
             Spacer(modifier = Modifier.height(12.dp))
             SettingsDescription("Schedules, preferences and focus-session data are stored on this device")
             Spacer(modifier = Modifier.height(8.dp))

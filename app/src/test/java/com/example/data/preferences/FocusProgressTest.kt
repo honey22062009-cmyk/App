@@ -33,7 +33,7 @@ class FocusProgressTest {
     @Test
     fun dailyTotalsRoundTripAndDropOldEntries() {
         val encoded = FocusProgress.encodeDailyFocusMinutes(
-            mapOf(10L to 5, 50L to 35, 70L to 45),
+            mapOf(9L to 5, 50L to 35, 70L to 45),
             todayEpochDay = 70L
         )
         assertEquals(mapOf(50L to 35, 70L to 45), FocusProgress.parseDailyFocusMinutes(encoded))
