@@ -79,7 +79,7 @@ fun ScheduleEditorDialog(
                 Text(
                     text = if (initialPeriod == null) "Add Allowed Time Window" else "Edit Allowed Time Window",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
@@ -135,7 +135,7 @@ fun ScheduleEditorDialog(
                             Text(
                                 text = label,
                                 fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -226,7 +226,7 @@ fun ScheduleEditorDialog(
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.testTag("schedule_save_button")
             ) {
-                Text("Save Schedule", fontWeight = FontWeight.Bold)
+                Text("Save Schedule", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
@@ -268,7 +268,7 @@ fun TimeSelectorRow(
                 Text(
                     text = formatted,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
