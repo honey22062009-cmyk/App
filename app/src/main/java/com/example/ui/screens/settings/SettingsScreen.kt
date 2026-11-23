@@ -1,6 +1,5 @@
 package com.example.ui.screens.settings
 
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -77,8 +76,7 @@ fun SettingsScreen(
             scope.launch {
                 try {
                     BackupManager.export(context, repository, uri)
-                    message = "Backup saved. Reopening the app so the database connection is fresh."
-                    (context as? Activity)?.recreate()
+                    message = "Backup saved successfully. Your existing app session remains open."
                 } catch (error: Exception) {
                     message = "Backup failed: ${error.message ?: "unknown error"}"
                 }
@@ -248,8 +246,10 @@ fun SettingsScreen(
                     if (selected != null) scope.launch {
                         try {
                             val count = BackupManager.restore(context, selected)
-                            message = "Imported $count backup items. The app will restart to reopen its local database."
-                            (context as? Activity)?.recreate()
+                            android.widget.Toast.makeText(context, "Restored $count items. Reopen Strict Blocker.", android.widget.Toast.LENGTH_LONG).show()
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            }, 1_500L)
                         } catch (error: Exception) {
                             message = "Restore failed: ${error.message ?: "unsupported backup"}"
                         }
