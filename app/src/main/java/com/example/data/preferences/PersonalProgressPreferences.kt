@@ -81,9 +81,12 @@ class PersonalProgressPreferences(private val context: Context) {
     suspend fun markGoalKept(day: Long = LocalDate.now().toEpochDay()) {
         context.habitDataStore.edit { p ->
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
+            val alreadyCheckedIn = statuses[day] == 1
             statuses[day] = 1
             p[Keys.DAILY_STATUS] = encodeStatus(statuses, day)
-            p[Keys.CHECK_IN_COUNT] = (p[Keys.CHECK_IN_COUNT] ?: 0) + 1
+            if (!alreadyCheckedIn) {
+                p[Keys.CHECK_IN_COUNT] = (p[Keys.CHECK_IN_COUNT] ?: 0) + 1
+            }
         }
     }
 
