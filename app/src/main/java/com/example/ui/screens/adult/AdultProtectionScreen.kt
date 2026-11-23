@@ -24,8 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +41,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -53,9 +56,20 @@ fun AdultProtectionScreen(
     val blockIncognito by repository.settings.isBlockIncognitoEnabledFlow.collectAsState(initial = true)
     val safeSearch by repository.settings.isForceSafeSearchEnabledFlow.collectAsState(initial = true)
     val blockedCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
+    val unlockNotBefore by repository.settings.adultUnlockNotBeforeFlow.collectAsState(initial = 0L)
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val remainingSeconds = ((unlockNotBefore - now) / 1000L).coerceAtLeast(0L)
     var accessibilityAllowed by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
     var showDisableDialog by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(unlockNotBefore) {
+        while (unlockNotBefore > 0L && System.currentTimeMillis() < unlockNotBefore) {
+            now = System.currentTimeMillis()
+            delay(1_000L)
+        }
+        now = System.currentTimeMillis()
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -132,6 +146,27 @@ fun AdultProtectionScreen(
                 )
             }
         }
+        if (unlockNotBefore > 0L) {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (remainingSeconds > 0L) "Pause request: ${remainingSeconds / 60L}m ${remainingSeconds % 60L}s remaining"
+                        else "The pause delay is complete.",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text("After the delay, confirm once more to finish pausing Browser Guard.", style = MaterialTheme.typography.bodySmall)
+                    if (remainingSeconds == 0L) {
+                        Button(onClick = {
+                            scope.launch {
+                                repository.settings.markAdultUnlockVerificationPassed()
+                                val completed = repository.settings.completeAdultProtectionDisable(false)
+                                notice = if (completed) "Browser Guard is paused." else "The pause could not be completed. Check the timer and try again."
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Complete pause") }
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(4.dp))
         OutlinedButton(onClick = onNavigateToPermissions, modifier = Modifier.fillMaxWidth()) { Text("Review app permissions") }
         if (notice != null) Text(notice!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
@@ -146,7 +181,7 @@ fun AdultProtectionScreen(
                 TextButton(onClick = {
                     scope.launch {
                         repository.settings.requestAdultProtectionDisable(10)
-                        notice = "A disable request was saved. The existing cooldown flow controls when it can be completed."
+                        notice = "Pause request saved. The 10-minute delay is now running."
                     }
                     showDisableDialog = false
                 }) { Text("Request pause") }
