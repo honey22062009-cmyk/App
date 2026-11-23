@@ -47,7 +47,6 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
@@ -165,27 +164,6 @@ fun AdultBlockerScreen(
         }
     }
 
-    val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
-    val backgroundBrush = remember(isDark) {
-        if (isDark) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFF090D16),
-                    Color(0xFF0F172A),
-                    Color(0xFF070A10)
-                )
-            )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFFF8FAFC),
-                    Color(0xFFF1F5F9),
-                    Color(0xFFE2E8F0)
-                )
-            )
-        }
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -205,7 +183,7 @@ fun AdultBlockerScreen(
                 modifier = Modifier
                     .size(92.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE0F2FE))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
                     .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -219,7 +197,7 @@ fun AdultBlockerScreen(
                     Text(
                         text = "BLOCKED",
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 1.sp
                     )
@@ -362,27 +340,6 @@ fun BlockerScreen(
     onGoHome: () -> Unit,
     onViewSchedule: () -> Unit
 ) {
-    val isDark = com.example.ui.components.GlassDefaults.isDarkTheme()
-    val backgroundBrush = remember(isDark) {
-        if (isDark) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFF090D16),
-                    Color(0xFF0D1424),
-                    Color(0xFF070A10)
-                )
-            )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFFF8FAFC),
-                    Color(0xFFF1F5F9),
-                    Color(0xFFE2E8F0)
-                )
-            )
-        }
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -596,13 +553,13 @@ private fun FallbackIcon() {
         modifier = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF334155)),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.Default.Lock,
             contentDescription = null,
-            tint = Color(0xFF94A3B8),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp)
         )
     }
