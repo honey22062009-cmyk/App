@@ -31,7 +31,9 @@ object BackupManager {
 
     suspend fun export(context: Context, repository: AppBlockerRepository, destination: Uri) =
         withContext(Dispatchers.IO) {
-            repository.database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { }
+            repository.database.openHelper.writableDatabase
+                .query("PRAGMA wal_checkpoint(FULL)")
+                .use { it.moveToFirst() }
             // Checkpoint WAL before snapshotting; keep Room open so the live app container remains valid.
             val candidates = listOf(
                 context.getDatabasePath("strict_blocker.db"),
@@ -66,12 +68,16 @@ object BackupManager {
             val jsonBytes = ByteArrayOutputStream()
             val buffer = ByteArray(8192)
             var totalJsonBytes = 0
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                totalJsonBytes += count
-                require(totalJsonBytes <= 10 * 1024 * 1024) { "JSON backup is larger than 10 MB." }
-                jsonBytes.write(buffer, 0, count)
+            try {
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    totalJsonBytes += count
+                    require(totalJsonBytes <= 10 * 1024 * 1024) { "JSON backup is larger than 10 MB." }
+                    jsonBytes.write(buffer, 0, count)
+                }
+            } finally {
+                input.close()
             }
             val json = String(jsonBytes.toByteArray(), StandardCharsets.UTF_8)
             val entries = SettingsPreferences(context).importLegacyBackupJson(json)
