@@ -349,6 +349,12 @@ fun MainAppScaffold(
         }
     }
     }
+    if (showTour) {
+        AppTourDialog(onFinish = {
+            scope.launch { repository.settings.setTourCompleted(true) }
+            showTour = false
+        })
+    }
 }
 
 @Composable
@@ -369,8 +375,7 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
                 onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
-                onReplayTour = onReplayTour
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
         }
         Screen.Progress -> {
@@ -414,7 +419,8 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onReplayTour = onReplayTour
             )
         }
         Screen.AntiBypassGuide -> {
