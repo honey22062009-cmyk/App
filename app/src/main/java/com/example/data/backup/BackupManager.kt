@@ -2,8 +2,13 @@ package com.example.data.backup
 
 import android.content.Context
 import android.net.Uri
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import android.database.sqlite.SQLiteDatabase
 import com.example.data.db.AppDatabase
+import com.example.data.preferences.FocusSessionPreferences
+import com.example.data.preferences.PersonalProgressPreferences
+import com.example.data.preferences.SettingsPreferences
 import com.example.data.repository.AppBlockerRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,6 +16,8 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import org.json.JSONObject
+import java.nio.charset.StandardCharsets
 
 object BackupManager {
     private val allowedFiles = setOf(
@@ -49,12 +56,46 @@ object BackupManager {
         }
 
     suspend fun restore(context: Context, source: Uri): Int = withContext(Dispatchers.IO) {
+        val rawInput = context.contentResolver.openInputStream(source) ?: error("Could not read the selected backup.")
+        val input = BufferedInputStream(rawInput)
+        input.mark(8)
+        val firstByte = input.read()
+        input.reset()
+
+        if (firstByte == '{'.code) {
+            val jsonBytes = ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            var totalJsonBytes = 0
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                totalJsonBytes += count
+                require(totalJsonBytes <= 10 * 1024 * 1024) { "JSON backup is larger than 10 MB." }
+                jsonBytes.write(buffer, 0, count)
+            }
+            val json = String(jsonBytes.toByteArray(), StandardCharsets.UTF_8)
+            val entries = SettingsPreferences(context).importLegacyBackupJson(json)
+            PersonalProgressPreferences(context).importLegacyBackup(entries)
+            val focusEntry = entries.optJSONObject("focus_session_records_v1")
+            val focusRecords = if (focusEntry?.optString("type") == "string_set") {
+                val values = focusEntry.optJSONArray("value")
+                buildSet {
+                    if (values != null) {
+                        for (index in 0 until values.length()) {
+                            values.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                        }
+                    }
+                }
+            } else emptySet()
+            FocusSessionPreferences(context).importLegacyRecords(focusRecords)
+            return@withContext entries.length()
+        }
+
         val staging = File(context.cacheDir, "strict-blocker-restore-${System.currentTimeMillis()}").apply { mkdirs() }
         var totalBytes = 0L
         var imported = 0
         try {
-            val input = context.contentResolver.openInputStream(source) ?: error("Could not read the selected backup.")
-            ZipInputStream(input.buffered()).use { zip ->
+            ZipInputStream(input).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     val name = entry.name
