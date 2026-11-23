@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -13,6 +15,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_settings")
 
@@ -144,6 +147,65 @@ class SettingsPreferences(private val context: Context) {
     suspend fun incrementAdultBlocksCount() {
         context.dataStore.edit { p -> p[PreferencesKeys.ADULT_BLOCKS_COUNT] = (p[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0) + 1 }
     }
+    /**
+     * Imports the exact JSON format written by the older 1.8.x app.
+     * Cloud-account identifiers, device PIN material and retired DNS settings are not restored.
+     * The old tracker and focus summaries are migrated into their new local stores by BackupManager.
+     */
+    suspend fun importLegacyBackupJson(json: String): JSONObject {
+        val root = JSONObject(json)
+        require(root.optString("format") == "no-goon-data-backup") { "This is not a supported Strict Blocker backup." }
+        require(root.optInt("schema") == 1) { "This backup version is not supported." }
+        require(root.optString("applicationId") == "com.aistudio.strictblocker.kzvwpq") {
+            "This backup belongs to a different app."
+        }
+        val entries = root.getJSONObject("entries")
+        val userName = entries.optJSONObject("user_name")
+            ?.takeIf { it.optString("type") == "string" }
+            ?.optString("value").orEmpty()
+        val rememberedName = entries.optJSONObject("account_display_name")
+            ?.takeIf { it.optString("type") == "string" }
+            ?.optString("value").orEmpty()
+        val displayName = userName.ifBlank { rememberedName }.trim().take(40)
+
+        val retiredOrSensitiveKeys = setOf(
+            "dns_filter_enabled", "custom_dns_primary", "custom_dns_secondary",
+            "account_signed_in", "account_id", "account_email", "account_photo_uri",
+            "user_age", "user_gender",
+            "tracker_started_at", "last_fap_at", "previous_fap_streak_days",
+            "best_fap_streak_days", "fap_log_count", "fap_event_timestamps",
+            "tracker_reset_records_v2", "daily_check_ins", "tracker_goal_days",
+            "seen_tracker_milestones", "focus_session_records_v1", "daily_focus_tasks_v1"
+        )
+
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+            val iterator = entries.keys()
+            while (iterator.hasNext()) {
+                val name = iterator.next()
+                if (name.startsWith("local_security_pin_") || name in retiredOrSensitiveKeys) continue
+                val item = entries.getJSONObject(name)
+                when (item.getString("type")) {
+                    "boolean" -> preferences[booleanPreferencesKey(name)] = item.getBoolean("value")
+                    "int" -> preferences[intPreferencesKey(name)] = item.getInt("value")
+                    "long" -> preferences[longPreferencesKey(name)] = item.getLong("value")
+                    "float" -> preferences[floatPreferencesKey(name)] = item.getDouble("value").toFloat()
+                    "double" -> preferences[doublePreferencesKey(name)] = item.getDouble("value")
+                    "string" -> preferences[stringPreferencesKey(name)] = item.getString("value")
+                    "string_set" -> {
+                        val values = item.getJSONArray("value")
+                        preferences[stringSetPreferencesKey(name)] = buildSet {
+                            for (index in 0 until values.length()) add(values.getString(index))
+                        }
+                    }
+                    else -> error("Unknown preference type in the selected backup.")
+                }
+            }
+            if (displayName.isNotBlank()) preferences[PreferencesKeys.PROFILE_NAME] = displayName
+        }
+        return entries
+    }
+
     suspend fun clearAllUserPreferences() {
         context.dataStore.edit { it.clear() }
     }
