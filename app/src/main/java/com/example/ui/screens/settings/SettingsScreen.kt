@@ -162,7 +162,7 @@ fun SettingsScreen(
         item {
             SettingsCard(title = "Backup and restore", icon = Icons.Default.Backup) {
                 Text(
-                    "Export schedules, app rules, settings, focus totals, your local profile and personal progress into one ZIP file. You can import a backup from an earlier Strict Blocker version.",
+                    "Create a ZIP backup of schedules, app rules, settings, focus history, your local profile and personal progress. You can also import the JSON backup format used by Strict Blocker 1.8.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -171,13 +171,13 @@ fun SettingsScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Create backup")
                 }
-                OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/json", "application/octet-stream", "text/*")) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Import previous version data")
                 }
                 Text(
-                    "Import replaces matching local databases and settings. Export a fresh backup first. Restoring app data may require a restart.",
+                    "A 1.8 JSON backup restores preferences, profile name, tracker dates and focus totals; it did not include the Room app-list/schedule database. New ZIP backups can include the database. Export a fresh backup before importing; restore restarts the app process.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -207,7 +207,7 @@ fun SettingsScreen(
                 AboutRow("Focus", "Run a distraction-free timer with saved sessions, daily goals and focus history.")
                 AboutRow("Progress", "Track a private personal goal with day counts, check-ins, milestones and notes.")
                 AboutRow("Storage", "Schedules and app records use a local Room database; preferences and progress use on-device DataStore files.")
-                AboutRow("Backups", "You control when a ZIP backup is exported or restored. Backups may contain private activity and should be stored securely.")
+                AboutRow("Backups", "Export a ZIP or import supported 1.8 JSON backups. Legacy JSON does not contain the Room app-list/schedule database. Backups may contain private activity and should be stored securely.")
                 AboutRow("Network", "No DNS filtering or local VPN service is included. This build does not require a cloud account for its core features.")
                 AboutRow("Limitations", "Android can stop background work, revoke permissions or uninstall regular apps. Scheduled enforcement depends on the permissions remaining enabled.")
                 AboutRow("Support", "Review Privacy & Legal for data-handling details and platform limitations.")
@@ -246,7 +246,7 @@ fun SettingsScreen(
                     if (selected != null) scope.launch {
                         try {
                             val count = BackupManager.restore(context, selected)
-                            android.widget.Toast.makeText(context, "Restored $count items. Reopen Strict Blocker.", android.widget.Toast.LENGTH_LONG).show()
+                            android.widget.Toast.makeText(context, "Restore completed. Reopen Strict Blocker.", android.widget.Toast.LENGTH_LONG).show()
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                                 android.os.Process.killProcess(android.os.Process.myPid())
                             }, 1_500L)
