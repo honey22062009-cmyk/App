@@ -25,7 +25,9 @@ data class FocusSessionSnapshot(
     val bestStreak: Int = 0,
     val lastCompletionDay: Long = -1L,
     val dailyFocusMinutes: List<Int> = List(7) { 0 },
-    val weeklyFocusMinutes: Int = 0
+    val weeklyFocusMinutes: Int = 0,
+    val selectedTask: String = "",
+    val activityCategory: String = "Study"
 ) {
     val isRunning: Boolean get() = endAtMillis > 0L
     val isPaused: Boolean get() = !isRunning && pausedRemainingMillis > 0L
@@ -42,6 +44,8 @@ class FocusSessionPreferences(private val context: Context) {
         val BEST_STREAK = intPreferencesKey("best_streak")
         val LAST_COMPLETION_DAY = longPreferencesKey("last_completion_day")
         val DAILY_FOCUS_MINUTES = stringPreferencesKey("daily_focus_minutes")
+        val SELECTED_TASK = stringPreferencesKey("selected_task")
+        val ACTIVITY_CATEGORY = stringPreferencesKey("activity_category")
     }
 
     val snapshotFlow: Flow<FocusSessionSnapshot> = context.focusDataStore.data.map { p ->
@@ -57,8 +61,19 @@ class FocusSessionPreferences(private val context: Context) {
             bestStreak = p[Keys.BEST_STREAK] ?: 0,
             lastCompletionDay = p[Keys.LAST_COMPLETION_DAY] ?: -1L,
             dailyFocusMinutes = weeklyTotals,
-            weeklyFocusMinutes = weeklyTotals.sum()
+            weeklyFocusMinutes = weeklyTotals.sum(),
+            selectedTask = p[Keys.SELECTED_TASK] ?: "",
+            activityCategory = p[Keys.ACTIVITY_CATEGORY] ?: "Study"
         )
+    }
+
+    suspend fun setSelectedTask(task: String) {
+        context.focusDataStore.edit { p -> p[Keys.SELECTED_TASK] = task.trim().take(100) }
+    }
+
+    suspend fun setActivityCategory(category: String) {
+        val safe = category.takeIf { it in setOf("Study", "Revision", "Practice", "Reading", "Planning") } ?: "Study"
+        context.focusDataStore.edit { p -> p[Keys.ACTIVITY_CATEGORY] = safe }
     }
 
     suspend fun setSelectedMinutes(minutes: Int) {
