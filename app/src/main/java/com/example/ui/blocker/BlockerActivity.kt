@@ -208,7 +208,7 @@ fun AdultBlockerScreen(
             Text(
                 text = "Content blocked",
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("blocker_screen_title")
@@ -262,7 +262,7 @@ fun AdultBlockerScreen(
                             Text(
                                 text = "On device",
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -274,7 +274,7 @@ fun AdultBlockerScreen(
                     Text(
                         text = layer,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
@@ -323,7 +323,7 @@ fun AdultBlockerScreen(
                 Text(
                     text = if (remainingSeconds > 0) "Please wait" else "Close & Return to Home",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -376,7 +376,7 @@ fun BlockerScreen(
             Text(
                 text = stringResource(R.string.blocker_title),
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("blocker_screen_title")
@@ -433,7 +433,7 @@ fun BlockerScreen(
                         Text(
                             text = appName,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (packageName.isNotEmpty()) {
@@ -482,7 +482,7 @@ fun BlockerScreen(
                     Text(
                         text = nextAllowed,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
@@ -513,7 +513,7 @@ fun BlockerScreen(
                 Text(
                     text = stringResource(R.string.blocker_btn_home),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
