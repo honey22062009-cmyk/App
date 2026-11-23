@@ -13,7 +13,7 @@ android {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
     minSdk = 26
     targetSdk = 36
-    versionCode = 4
+    versionCode = 11
     versionName = "2.0.1"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -32,7 +32,7 @@ android {
       create("release") {
         storeFile = file(releaseKeystorePath!!)
         storePassword = releaseStorePassword
-        keyAlias = "upload"
+        keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
         keyPassword = releaseKeyPassword
       }
     }
