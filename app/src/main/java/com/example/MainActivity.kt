@@ -63,6 +63,8 @@ import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.focus.FocusScreen
+import com.example.ui.screens.progress.ProgressScreen
+import com.example.ui.screens.onboarding.AppTourDialog
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
@@ -156,6 +158,9 @@ fun MainAppScaffold(
         mutableStateOf(initialTargetPackage)
     }
     var isInitialRouteResolved by remember { mutableStateOf(false) }
+    var showTour by remember { mutableStateOf(false) }
+    val tourCompleted by repository.settings.hasSeenTourFlow.collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
@@ -170,6 +175,12 @@ fun MainAppScaffold(
             currentScreen = Screen.Permissions
         }
         isInitialRouteResolved = true
+    }
+
+    LaunchedEffect(currentScreen, isInitialRouteResolved, tourCompleted) {
+        if (isInitialRouteResolved && currentScreen == Screen.Dashboard && !tourCompleted) {
+            showTour = true
+        }
     }
 
     // On first launch, Back should leave the permission guide rather than silently
@@ -260,7 +271,8 @@ fun MainAppScaffold(
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
-                            }
+                            },
+                            onReplayTour = { showTour = true }
                         )
                     }
                 }
@@ -328,7 +340,8 @@ fun MainAppScaffold(
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
-                            }
+                            },
+                            onReplayTour = { showTour = true }
                         )
                     }
                 }
@@ -344,7 +357,8 @@ fun ScreenContent(
     repository: AppBlockerRepository,
     selectedSchedulePackage: String?,
     onNavigateToScreen: (Screen) -> Unit,
-    onConfigureScheduleForApp: (String) -> Unit
+    onConfigureScheduleForApp: (String) -> Unit,
+    onReplayTour: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     when (currentScreen) {
@@ -355,8 +369,12 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
                 onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onReplayTour = onReplayTour
             )
+        }
+        Screen.Progress -> {
+            ProgressScreen()
         }
         Screen.Focus -> {
             FocusScreen()
