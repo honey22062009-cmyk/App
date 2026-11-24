@@ -276,6 +276,7 @@ fun MainAppScaffold(
                         val isSelected = currentScreen.route == screen.route
                         NavigationRailItem(
                             selected = isSelected,
+                            enabled = currentScreen != Screen.Permissions || isSelected,
                             onClick = { currentScreen = screen },
                             icon = {
                                 Icon(
@@ -339,6 +340,7 @@ fun MainAppScaffold(
                             val isSelected = currentScreen.route == screen.route
                             NavigationBarItem(
                                 selected = isSelected,
+                                enabled = currentScreen != Screen.Permissions || isSelected,
                                 onClick = { currentScreen = screen },
                                 icon = {
                                     Icon(
