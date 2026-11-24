@@ -345,6 +345,7 @@ fun PermissionsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = onContinue,
+                    enabled = allCriticalGranted,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -355,7 +356,7 @@ fun PermissionsScreen(
                     )
                 ) {
                     Text(
-                        text = if (allCriticalGranted) "Return to Dashboard" else "Continue for now",
+                        text = if (allCriticalGranted) "Continue to app" else "6 access items needed",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
