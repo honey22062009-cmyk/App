@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.preferences.LocalProfileAuthStore
+import com.example.data.preferences.PersonalProgressPreferences
 import com.example.ui.navigation.Screen
 import com.example.ui.components.StrictBlockerLogo
 import com.example.ui.screens.adult.AdultProtectionScreen
@@ -64,6 +66,7 @@ import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.focus.FocusScreen
 import com.example.ui.screens.progress.ProgressScreen
 import com.example.ui.screens.onboarding.AppTourDialog
+import com.example.ui.screens.onboarding.LocalProfileGateScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
@@ -131,14 +134,58 @@ fun MainAppContent(
     var isSplashVisible by remember { mutableStateOf(true) }
 
     if (isSplashVisible) {
-        SplashScreen(
-            onSplashComplete = { isSplashVisible = false }
-        )
+        SplashScreen(onSplashComplete = { isSplashVisible = false })
     } else {
-        MainAppScaffold(
-            repository = repository,
-            initialTargetPackage = initialTargetPackage
+        LocalProfileEntryGate(repository = repository) {
+            MainAppScaffold(repository = repository, initialTargetPackage = initialTargetPackage)
+        }
+    }
+}
+
+@Composable
+private fun LocalProfileEntryGate(
+    repository: AppBlockerRepository,
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val authStore = remember(context) { LocalProfileAuthStore(context.applicationContext) }
+    val progressStore = remember(context) { PersonalProgressPreferences(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    var savedName by remember { mutableStateOf("") }
+    var hasPin by remember { mutableStateOf(false) }
+    var isReady by remember { mutableStateOf(false) }
+    var isAuthenticated by remember { mutableStateOf(false) }
+
+    LaunchedEffect(repository) {
+        savedName = repository.settings.profileNameFlow.first()
+        hasPin = authStore.hasPin()
+        isReady = true
+    }
+
+    when {
+        !isReady -> Box(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) { CircularProgressIndicator() }
+
+        !isAuthenticated -> LocalProfileGateScreen(
+            existingName = savedName,
+            hasPin = hasPin,
+            onCreateProfile = { name, pin ->
+                authStore.savePin(pin)
+                scope.launch {
+                    repository.settings.setProfileName(name)
+                    progressStore.setProfileName(name)
+                    savedName = name
+                    hasPin = true
+                    isAuthenticated = true
+                }
+            },
+            onUnlock = authStore::verifyPin,
+            onAuthenticated = { isAuthenticated = true }
         )
+
+        else -> content()
     }
 }
 
@@ -163,21 +210,23 @@ fun MainAppScaffold(
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
+    val context = LocalContext.current
     LaunchedEffect(repository, initialTargetPackage) {
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
-        if (!initialTargetPackage.isNullOrEmpty()) {
+        val requiredPermissionsGranted = PermissionHelper.hasRequiredProtectionPermissions(context)
+        if (!requiredPermissionsGranted || !onboardingCompleted) {
+            currentScreen = Screen.Permissions
+        } else if (!initialTargetPackage.isNullOrEmpty()) {
             selectedSchedulePackage = initialTargetPackage
             currentScreen = Screen.Schedules
-        } else if (onboardingCompleted) {
-            currentScreen = Screen.Dashboard
         } else {
-            currentScreen = Screen.Permissions
+            currentScreen = Screen.Dashboard
         }
         isInitialRouteResolved = true
     }
 
     LaunchedEffect(currentScreen, isInitialRouteResolved, tourCompleted) {
-        if (isInitialRouteResolved && !tourCompleted && initialTargetPackage.isNullOrEmpty()) {
+        if (isInitialRouteResolved && currentScreen == Screen.Dashboard && !tourCompleted && initialTargetPackage.isNullOrEmpty()) {
             showTour = true
         }
     }
@@ -373,6 +422,7 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
+                onNavigateToProgress = { onNavigateToScreen(Screen.Progress) },
                 onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
