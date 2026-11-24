@@ -28,17 +28,6 @@ android {
     file(releaseKeystorePath).exists()
 
   signingConfigs {
-    if (hasReleaseSigning) {
-      create("release") {
-        storeFile = file(releaseKeystorePath!!)
-        storePassword = releaseStorePassword
-        keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
-        keyPassword = releaseKeyPassword
-      }
-    }
-  }
-
-  signingConfigs {
     getByName("debug") {
       enableV1Signing = true
       enableV2Signing = true
