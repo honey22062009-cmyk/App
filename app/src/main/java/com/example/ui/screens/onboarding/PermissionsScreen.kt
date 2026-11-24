@@ -101,8 +101,15 @@ fun PermissionsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val criticalGrantedCount = listOf(isAccessibilityGranted, isUsageGranted, isOverlayGranted).count { it }
-    val totalCritical = 3
+    val criticalGrantedCount = listOf(
+        isAccessibilityGranted,
+        isUsageGranted,
+        isOverlayGranted,
+        isBatteryOptIgnored,
+        isExactAlarmGranted,
+        isNotificationGranted
+    ).count { it }
+    val totalCritical = 6
     val allCriticalGranted = criticalGrantedCount == totalCritical
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -278,7 +285,7 @@ fun PermissionsScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Recommended",
+                    text = "Required",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -292,7 +299,7 @@ fun PermissionsScreen(
                     technicalName = "Ignore Battery Optimizations",
                     icon = Icons.Default.BatteryAlert,
                     isGranted = isBatteryOptIgnored,
-                    isRequired = false,
+                    isRequired = true,
                     summary = "Helps protection keep running when Android limits background activity.",
                     why = stringResource(R.string.perm_battery_why),
                     whatStops = stringResource(R.string.perm_battery_what),
@@ -308,7 +315,7 @@ fun PermissionsScreen(
                     technicalName = "SCHEDULE_EXACT_ALARM",
                     icon = Icons.Default.Alarm,
                     isGranted = isExactAlarmGranted,
-                    isRequired = false,
+                    isRequired = true,
                     summary = "Helps schedule changes happen at the expected time.",
                     why = stringResource(R.string.perm_alarm_why),
                     whatStops = stringResource(R.string.perm_alarm_what),
@@ -324,7 +331,7 @@ fun PermissionsScreen(
                     technicalName = "POST_NOTIFICATIONS",
                     icon = Icons.Default.Notifications,
                     isGranted = isNotificationGranted,
-                    isRequired = false,
+                    isRequired = true,
                     summary = "Shows important protection and background-service information.",
                     why = stringResource(R.string.perm_notification_why),
                     whatStops = stringResource(R.string.perm_notification_what),
