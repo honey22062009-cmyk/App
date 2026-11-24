@@ -24,4 +24,16 @@ class PersonalProgressCalculatorTest {
         assertEquals(12, HabitStreakCalculator.bestAfterReset(12, day, day - 5))
         assertEquals(5, HabitStreakCalculator.bestAfterReset(3, day, day - 5))
     }
+
+    @Test
+    fun sameDayCheckInCountsAsFirstDayWhenResetIsLoggedLater() {
+        val day = LocalDate.of(2026, 11, 23).toEpochDay()
+        assertEquals(1, HabitStreakCalculator.bestAfterReset(0, day, day, checkedInToday = true))
+    }
+
+    @Test
+    fun checkInDoesNotDoubleCountAnElapsedDay() {
+        val day = LocalDate.of(2026, 11, 23).toEpochDay()
+        assertEquals(1, HabitStreakCalculator.bestAfterReset(0, day, day - 1, checkedInToday = true))
+    }
 }
