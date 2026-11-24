@@ -201,7 +201,7 @@ fun SettingsScreen(
 
         item {
             SettingsCard(title = "About Strict Blocker", icon = Icons.Default.Info) {
-                Text("Strict Blocker 2.1.0", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Strict Blocker 2.1.1", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text("A local-first Android focus and app-scheduling tool.", style = MaterialTheme.typography.bodyMedium)
                 AboutRow("App scheduling", "Choose apps and recurring allowed time windows. A local Accessibility Service checks app launches.")
                 AboutRow("Focus", "Run a distraction-free timer with saved sessions, daily goals and focus history.")
