@@ -25,6 +25,7 @@ data class PersonalProgressSnapshot(
     val lastResetDay: Long = LocalDate.now().toEpochDay(),
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
+    val previousBestStreak: Int = 0,
     val resetCount: Int = 0,
     val checkInCount: Int = 0,
     val dailyStatus: Map<Long, Int> = emptyMap(),
@@ -35,8 +36,16 @@ object HabitStreakCalculator {
     fun currentDays(today: Long, lastResetDay: Long): Int =
         (today - lastResetDay).coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-    fun bestAfterReset(previousBest: Int, today: Long, lastResetDay: Long): Int =
-        maxOf(previousBest, currentDays(today, lastResetDay))
+    fun bestAfterReset(
+        previousBest: Int,
+        today: Long,
+        lastResetDay: Long,
+        checkedInToday: Boolean = false
+    ): Int {
+        val completedCurrentRun = currentDays(today, lastResetDay) +
+            if (checkedInToday && today == lastResetDay) 1 else 0
+        return maxOf(previousBest, completedCurrentRun)
+    }
 }
 
 class PersonalProgressPreferences(private val context: Context) {
@@ -58,13 +67,17 @@ class PersonalProgressPreferences(private val context: Context) {
         val lastReset = p[Keys.LAST_RESET_DAY] ?: start
         val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "")
         val notes = parseNotes(p[Keys.DAILY_NOTES] ?: "")
+        val previousBest = (p[Keys.BEST_STREAK] ?: 0).coerceAtLeast(0)
+        val elapsedDays = HabitStreakCalculator.currentDays(today, lastReset)
+        val current = if (statuses[today] == 1 && today == lastReset) 1 else elapsedDays
         PersonalProgressSnapshot(
             profileName = p[Keys.PROFILE_NAME] ?: "",
             goalTitle = p[Keys.GOAL_TITLE] ?: "My personal goal",
             startDay = start,
             lastResetDay = lastReset,
-            currentStreak = HabitStreakCalculator.currentDays(today, lastReset),
-            bestStreak = maxOf(p[Keys.BEST_STREAK] ?: 0, HabitStreakCalculator.currentDays(today, lastReset)),
+            currentStreak = current,
+            bestStreak = maxOf(previousBest, current),
+            previousBestStreak = previousBest,
             resetCount = p[Keys.RESET_COUNT] ?: 0,
             checkInCount = p[Keys.CHECK_IN_COUNT] ?: statuses.count { it.value == 1 },
             dailyStatus = statuses,
@@ -84,6 +97,7 @@ class PersonalProgressPreferences(private val context: Context) {
     suspend fun markGoalKept(day: Long = LocalDate.now().toEpochDay()) {
         context.habitDataStore.edit { p ->
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
+            if (statuses[day] == 0) return@edit
             val alreadyCheckedIn = statuses[day] == 1
             statuses[day] = 1
             p[Keys.DAILY_STATUS] = encodeStatus(statuses, day)
@@ -95,13 +109,15 @@ class PersonalProgressPreferences(private val context: Context) {
 
     suspend fun recordReset(day: Long = LocalDate.now().toEpochDay()) {
         context.habitDataStore.edit { p ->
-            val start = p[Keys.START_DAY] ?: day
-            val previousReset = p[Keys.LAST_RESET_DAY] ?: start
-            val best = HabitStreakCalculator.bestAfterReset(p[Keys.BEST_STREAK] ?: 0, day, previousReset)
+            val previousReset = p[Keys.LAST_RESET_DAY] ?: (p[Keys.START_DAY] ?: day)
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
+            val alreadyCheckedIn = statuses[day] == 1
+            val best = HabitStreakCalculator.bestAfterReset(
+                p[Keys.BEST_STREAK] ?: 0, day, previousReset, alreadyCheckedIn
+            )
             val alreadyResetToday = statuses[day] == 0
             statuses[day] = 0
-            p[Keys.START_DAY] = start
+            p[Keys.START_DAY] = day
             p[Keys.LAST_RESET_DAY] = day
             p[Keys.BEST_STREAK] = best
             if (!alreadyResetToday) p[Keys.RESET_COUNT] = (p[Keys.RESET_COUNT] ?: 0) + 1
