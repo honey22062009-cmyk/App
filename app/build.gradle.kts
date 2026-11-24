@@ -38,6 +38,23 @@ android {
     }
   }
 
+  signingConfigs {
+    getByName("debug") {
+      enableV1Signing = true
+      enableV2Signing = true
+    }
+    if (hasReleaseSigning) {
+      create("release") {
+        storeFile = file(releaseKeystorePath!!)
+        storePassword = releaseStorePassword
+        keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
+        keyPassword = releaseKeyPassword
+        enableV1Signing = true
+        enableV2Signing = true
+      }
+    }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
@@ -46,7 +63,8 @@ android {
       if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Uses the standard Gradle debug signing key.
+      // Enable both signature schemes for broad Android package-installer compatibility.
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {
