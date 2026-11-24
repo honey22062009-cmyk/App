@@ -1,5 +1,6 @@
 package com.example.ui.screens.progress
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,8 +54,6 @@ import com.example.data.preferences.PersonalProgressPreferences
 import com.example.data.preferences.PersonalProgressSnapshot
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun ProgressScreen() {
@@ -64,11 +67,6 @@ fun ProgressScreen() {
     var showResetConfirm by remember { mutableStateOf(false) }
     var editingTitle by remember { mutableStateOf(false) }
 
-    val last30 = (29L downTo 0L).map { offset ->
-        val day = today - offset
-        val clean = snapshot.dailyStatus[day] ?: if (day > snapshot.lastResetDay) 1 else 0
-        day to clean
-    }
     val milestones = listOf(1, 3, 7, 14, 30, 60, 90)
     val achieved = milestones.filter { snapshot.bestStreak >= it }
 
@@ -80,7 +78,7 @@ fun ProgressScreen() {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("Progress", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Your private progress, one day at a time. No judgement and no lost progress hidden from you.",
+                    "A clear view of your current run and the record you are working towards.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -103,7 +101,11 @@ fun ProgressScreen() {
                                 Text("days", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(bottom = 9.dp))
                             }
                             Text(
-                                if (snapshot.currentStreak == 0) "Your next day starts now." else "Keep going at your own pace.",
+                                when {
+                                    snapshot.currentStreak > snapshot.previousBestStreak && snapshot.previousBestStreak > 0 -> "New personal record. Keep building at your pace."
+                                    snapshot.currentStreak == 0 -> "Your next day starts now."
+                                    else -> "Every day adds to your progress."
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -116,7 +118,7 @@ fun ProgressScreen() {
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MetricPill("Best", "${snapshot.bestStreak} days")
+                        MetricPill("Personal best", "${snapshot.bestStreak} days")
                         MetricPill("Resets", snapshot.resetCount.toString())
                         MetricPill("Check-ins", snapshot.checkInCount.toString())
                     }
@@ -146,10 +148,7 @@ fun ProgressScreen() {
                     }
                     Text("This label stays on this device. Choose wording that feels useful and private to you.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = { scope.launch { store.markGoalKept(today) } },
-                            modifier = Modifier.weight(1f)
-                        ) {
+                        Button(onClick = { scope.launch { store.markGoalKept(today) } }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Check, contentDescription = null)
                             Spacer(Modifier.width(5.dp))
                             Text("Goal kept")
@@ -160,10 +159,10 @@ fun ProgressScreen() {
                             Text("Log reset")
                         }
                     }
-                    if (snapshot.dailyStatus[today] == 1) {
-                        Text("Today's check-in is saved.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
-                    } else if (snapshot.dailyStatus[today] == 0) {
-                        Text("A reset is recorded for today. Your next day is a fresh start.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                    when (snapshot.dailyStatus[today]) {
+                        1 -> Text("Today's check-in is saved.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                        0 -> Text("A reset is recorded for today. Your next day is a fresh start.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                        else -> Unit
                     }
                 }
             }
@@ -171,39 +170,19 @@ fun ProgressScreen() {
 
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(22.dp)) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Column {
-                        Text("Last 30 days", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Text("Each bar represents one calendar day in your current record.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Streak trend", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "The solid line is your current run. The dashed line keeps your previous best visible, even after a reset.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(112.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        last30.forEach { (day, status) ->
-                            val isFuture = day > today
-                            val color = when {
-                                isFuture -> MaterialTheme.colorScheme.surfaceVariant
-                                status == 1 -> MaterialTheme.colorScheme.tertiary
-                                day == snapshot.lastResetDay -> MaterialTheme.colorScheme.secondary
-                                day < snapshot.startDay -> MaterialTheme.colorScheme.surfaceVariant
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                            Box(
-                                modifier = Modifier.weight(1f).height(if (status == 1) 86.dp else if (day == snapshot.lastResetDay) 42.dp else 16.dp)
-                                    .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
-                                    .background(color)
-                            )
-                        }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("30 days ago", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        LegendDot(MaterialTheme.colorScheme.tertiary, "Goal kept / active streak")
-                        LegendDot(MaterialTheme.colorScheme.secondary, "Reset day")
+                    StreakLineChart(snapshot.currentStreak, snapshot.previousBestStreak)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LineLegend(MaterialTheme.colorScheme.primary, "Current · ${snapshot.currentStreak}d")
+                        LineLegend(MaterialTheme.colorScheme.secondary, "Previous best · ${snapshot.previousBestStreak}d")
                     }
                 }
             }
@@ -256,7 +235,7 @@ fun ProgressScreen() {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
             title = { Text("Record a reset?") },
-            text = { Text("This updates your personal day count. Your older history and best streak remain saved.") },
+            text = { Text("Your previous best stays saved. The current line will restart from day zero.") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { store.recordReset(today) }
@@ -269,21 +248,82 @@ fun ProgressScreen() {
 }
 
 @Composable
+private fun StreakLineChart(currentDays: Int, previousBestDays: Int) {
+    val currentColor = MaterialTheme.colorScheme.primary
+    val previousColor = MaterialTheme.colorScheme.secondary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val chartMax = maxOf(7, currentDays, previousBestDays).let { ((it + 6) / 7) * 7 }
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(204.dp)) {
+        val left = 18.dp.toPx()
+        val right = 12.dp.toPx()
+        val top = 14.dp.toPx()
+        val bottom = 12.dp.toPx()
+        val plotWidth = (size.width - left - right).coerceAtLeast(1f)
+        val plotHeight = (size.height - top - bottom).coerceAtLeast(1f)
+
+        for (tick in 0..4) {
+            val ratio = tick / 4f
+            val y = top + plotHeight * (1f - ratio)
+            drawLine(
+                color = gridColor.copy(alpha = 0.65f),
+                start = androidx.compose.ui.geometry.Offset(left, y),
+                end = androidx.compose.ui.geometry.Offset(left + plotWidth, y),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+        fun xFor(day: Int) = left + plotWidth * (day.toFloat() / chartMax.toFloat())
+        fun yFor(day: Int) = top + plotHeight - plotHeight * (day.toFloat() / chartMax.toFloat())
+
+        if (previousBestDays > 0) {
+            val recordY = yFor(previousBestDays.coerceAtMost(chartMax))
+            drawLine(
+                color = previousColor,
+                start = androidx.compose.ui.geometry.Offset(left, recordY),
+                end = androidx.compose.ui.geometry.Offset(left + plotWidth, recordY),
+                strokeWidth = 2.5.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
+            )
+        }
+
+        val currentPath = Path().apply {
+            moveTo(xFor(0), yFor(0))
+            lineTo(xFor(currentDays.coerceAtMost(chartMax)), yFor(currentDays.coerceAtMost(chartMax)))
+        }
+        drawPath(currentPath, currentColor, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round))
+        drawCircle(
+            color = currentColor,
+            radius = 5.dp.toPx(),
+            center = androidx.compose.ui.geometry.Offset(
+                xFor(currentDays.coerceAtMost(chartMax)),
+                yFor(currentDays.coerceAtMost(chartMax))
+            )
+        )
+    }
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("0 days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$chartMax days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 private fun MetricPill(label: String, value: String) {
     Column(
-        modifier = Modifier.weightlessForMetric().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.52f)).padding(horizontal = 10.dp, vertical = 8.dp)
+        modifier = Modifier.clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.52f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
-private fun Modifier.weightlessForMetric() = this
-
 @Composable
-private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+private fun LineLegend(color: androidx.compose.ui.graphics.Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.width(18.dp).height(3.dp).clip(RoundedCornerShape(4.dp)).background(color))
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
