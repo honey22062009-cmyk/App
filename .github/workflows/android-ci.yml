@@ -86,7 +86,7 @@ jobs:
           aapt="$(find "$sdk_root/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -x "$apksigner" && test -x "$aapt"
           "$apksigner" verify --verbose --print-certs "$apk"
-          "$aapt" dump badging "$apk" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='12' versionName='2.1.0'"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='14' versionName='2.2.0'"
       - name: Upload signed release APK
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
