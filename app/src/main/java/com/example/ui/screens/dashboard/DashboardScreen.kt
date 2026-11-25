@@ -52,11 +52,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.preferences.PersonalProgressPreferences
+import com.example.data.preferences.PersonalProgressSnapshot
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -70,11 +71,16 @@ fun DashboardScreen(
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
+    onNavigateToProgress: () -> Unit = {},
     onNavigateToFocus: () -> Unit = {},
     onNavigateToAdultProtection: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val profileName by repository.settings.profileNameFlow.collectAsState(initial = "")
+    val progressSnapshot by remember(context) {
+        PersonalProgressPreferences(context.applicationContext).snapshotFlow
+    }.collectAsState(initial = PersonalProgressSnapshot())
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
     val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
@@ -89,10 +95,7 @@ fun DashboardScreen(
 
     DisposableEffect(context, lifecycleOwner) {
         fun refreshPermissions() {
-            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.canScheduleExactAlarms(context)
+            permissionsHealthy = PermissionHelper.hasRequiredProtectionPermissions(context)
         }
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
@@ -130,10 +133,19 @@ fun DashboardScreen(
         ) {
             item {
                 Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Your day, protected", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+                    Text(if (profileName.isBlank()) "Your day, protected" else "Welcome back, $profileName", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(4.dp))
                     Text("Choose what gets your attention and when", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+
+            item {
+                MomentumPanel(
+                    modifier = Modifier.width(contentWidth).fillMaxWidth(),
+                    currentStreak = progressSnapshot.currentStreak,
+                    bestStreak = progressSnapshot.bestStreak,
+                    onClick = onNavigateToProgress
+                )
             }
 
             item {
@@ -350,7 +362,7 @@ private fun CompanionPanel(modifier: Modifier, onFocus: () -> Unit) {
                     Text("Open focus")
                 }
             }
-            BunnyCompanion(size = 128.dp, mood = BunnyMood.Resting)
+            StrictBlockerLogo(size = 128.dp)
         }
     }
 }
@@ -428,6 +440,38 @@ private fun InfoLine(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun MomentumPanel(
+    modifier: Modifier,
+    currentStreak: Int,
+    bestStreak: Int,
+    onClick: () -> Unit
+) {
+    AppSurface(modifier = modifier, shape = RoundedCornerShape(20.dp), onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Your progress", style = MaterialTheme.typography.titleLarge)
+                Text("Current run and personal best", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column {
+                        Text("$currentStreak days", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("Current", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Column {
+                        Text("$bestStreak days", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                        Text("Personal best", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Icon(Icons.Default.CheckCircle, contentDescription = "Open progress", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
         }
     }
 }

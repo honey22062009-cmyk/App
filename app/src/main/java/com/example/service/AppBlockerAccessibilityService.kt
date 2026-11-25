@@ -39,6 +39,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private var adultBlockedPackage: String? = null
     private var adultBlockedUntil: Long = 0L
     private var lastAdultReassertTimestamp: Long = 0L
+    private var lastDetailInspectionTimestamp: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -49,11 +50,11 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         if (event == null) return
 
         val eventType = event.eventType
+        // Avoid expensive full-window tree walks on every content/scroll event.
+        // App launch events remain immediate; detail events are sampled at most once per 700ms.
         if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
             eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
-            eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED &&
-            eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED) {
             return
         }
 
@@ -63,6 +64,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         if (SafetyWhitelist.isSystemCritical(this, packageName)) return
 
         val now = System.currentTimeMillis()
+        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (now - lastDetailInspectionTimestamp < 700L) return
+            lastDetailInspectionTimestamp = now
+        }
 
         serviceScope.launch {
             // If explicit content was just detected in this app, keep the offending app

@@ -12,24 +12,24 @@ import androidx.compose.ui.unit.dp
 private val AppShapes = Shapes(
     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
     small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
 )
 
 private val DarkColorScheme = darkColorScheme(
     primary = BrandPrimaryDark,
-    onPrimary = Color(0xFF1E2B1D),
-    primaryContainer = Color(0xFF344733),
-    onPrimaryContainer = Color(0xFFE1EBDD),
-    secondary = Color(0xFFC4C9B9),
-    onSecondary = Color(0xFF30372E),
-    secondaryContainer = Color(0xFF394338),
-    onSecondaryContainer = Color(0xFFE4E8DB),
+    onPrimary = Color(0xFF25163F),
+    primaryContainer = Color(0xFF49336E),
+    onPrimaryContainer = Color(0xFFF0E5FF),
+    secondary = Color(0xFFFFA2B5),
+    onSecondary = Color(0xFF3A1524),
+    secondaryContainer = Color(0xFF603143),
+    onSecondaryContainer = Color(0xFFFFE0E7),
     tertiary = BrandEmeraldDark,
-    onTertiary = Color(0xFF143624),
-    tertiaryContainer = Color(0xFF254C35),
-    onTertiaryContainer = Color(0xFFD8EBDD),
+    onTertiary = Color(0xFF082E25),
+    tertiaryContainer = Color(0xFF1B5144),
+    onTertiaryContainer = Color(0xFFCDF6E9),
     background = DarkBackground,
     onBackground = DarkOnBackground,
     surface = DarkSurface,
@@ -38,25 +38,25 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
     outlineVariant = DarkSurfaceBorder,
-    error = Color(0xFFFFB4A8),
-    onError = Color(0xFF561E19),
-    errorContainer = Color(0xFF6F302A),
-    onErrorContainer = Color(0xFFFFDAD3)
+    error = Color(0xFFFFB4C1),
+    onError = Color(0xFF561D2A),
+    errorContainer = Color(0xFF713042),
+    onErrorContainer = Color(0xFFFFD9E0)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE7D7),
-    onPrimaryContainer = Color(0xFF243A26),
-    secondary = Color(0xFF646B5F),
+    primaryContainer = Color(0xFFE8DDFB),
+    onPrimaryContainer = Color(0xFF321B55),
+    secondary = Color(0xFFCA5C78),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE2E6D9),
-    onSecondaryContainer = Color(0xFF343B31),
+    secondaryContainer = Color(0xFFFFE0E8),
+    onSecondaryContainer = Color(0xFF511C2D),
     tertiary = BrandEmerald,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD9EBDD),
-    onTertiaryContainer = Color(0xFF1E4931),
+    tertiaryContainer = Color(0xFFD4F2E9),
+    onTertiaryContainer = Color(0xFF123E33),
     background = LightBackground,
     onBackground = LightOnBackground,
     surface = LightSurface,
@@ -67,8 +67,8 @@ private val LightColorScheme = lightColorScheme(
     outlineVariant = LightSurfaceBorder,
     error = BrandCrimson,
     onError = Color.White,
-    errorContainer = Color(0xFFF4DCD6),
-    onErrorContainer = Color(0xFF53251F)
+    errorContainer = Color(0xFFFFE1E7),
+    onErrorContainer = Color(0xFF641F32)
 )
 
 @Composable
@@ -77,7 +77,6 @@ fun StrictBlockerTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    // Keep the product palette consistent. Android dynamic colors remain opt-in.
     val scheme = if (darkTheme) DarkColorScheme else LightColorScheme
     MaterialTheme(
         colorScheme = scheme,

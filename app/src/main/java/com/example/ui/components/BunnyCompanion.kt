@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-enum class BunnyMood { Resting, Focused, Celebrating }
+enum class BunnyMood { Resting, Focused, Celebrating, Running }
 
 /**
  * Original study companion made from native Compose shapes.
@@ -49,8 +49,8 @@ fun BunnyCompanion(
     val earInner = Color(0xFFE9AFA2)
     val ink = Color(0xFF3F4038)
     val blush = Color(0xFFE8B5A9)
-    val scarf = Color(0xFF637A5C)
-    val book = Color(0xFF3E5542)
+    val scarf = Color(0xFF7651C8)
+    val book = Color(0xFF49336E)
 
     var blinking by remember { mutableStateOf(false) }
     var earTwitch by remember { mutableStateOf(false) }
@@ -78,30 +78,41 @@ fun BunnyCompanion(
     )
 
     LaunchedEffect(mood) {
-        while (true) {
-            delay(Random.nextLong(2_800L, 6_200L))
-            blinking = true
-            delay(130L)
-            blinking = false
-
-            if (Random.nextFloat() < 0.38f) {
-                earTwitch = true
-                delay(460L)
-                earTwitch = false
-            }
-
-            if (mood == BunnyMood.Celebrating || Random.nextFloat() < 0.32f) {
+        if (mood == BunnyMood.Running) {
+            while (true) {
                 pawWave = true
-                delay(520L)
+                earTwitch = true
+                delay(145L)
                 pawWave = false
+                earTwitch = false
+                delay(145L)
+            }
+        } else {
+            while (true) {
+                delay(Random.nextLong(2_800L, 6_200L))
+                blinking = true
+                delay(130L)
+                blinking = false
+
+                if (Random.nextFloat() < 0.38f) {
+                    earTwitch = true
+                    delay(460L)
+                    earTwitch = false
+                }
+
+                if (mood == BunnyMood.Celebrating || Random.nextFloat() < 0.32f) {
+                    pawWave = true
+                    delay(520L)
+                    pawWave = false
+                }
             }
         }
     }
 
-    val movementY = if (mood == BunnyMood.Celebrating) {
-        (-3.5f + breath * 5f).dp
-    } else {
-        (-breath * 2f).dp
+    val movementY = when (mood) {
+        BunnyMood.Running -> if (pawWave) -size * 0.045f else size * 0.012f
+        BunnyMood.Celebrating -> (-3.5f + breath * 5f).dp
+        else -> (-breath * 2f).dp
     }
     val eyeSize = if (mood == BunnyMood.Focused) size * 0.038f else size * 0.046f
     val eyeHeight = if (blinking) size * 0.012f else eyeSize
@@ -114,6 +125,7 @@ fun BunnyCompanion(
                     BunnyMood.Resting -> "Study bunny, resting"
                     BunnyMood.Focused -> "Study bunny, focusing"
                     BunnyMood.Celebrating -> "Study bunny, celebrating"
+                    BunnyMood.Running -> "Study bunny, running"
                 }
             },
         contentAlignment = Alignment.Center

@@ -51,6 +51,14 @@ object PermissionHelper {
         return Settings.canDrawOverlays(context)
     }
 
+    fun hasRequiredProtectionPermissions(context: Context): Boolean =
+        isAccessibilityServiceEnabled(context) &&
+            isUsageAccessGranted(context) &&
+            canDrawOverlays(context) &&
+            isIgnoringBatteryOptimizations(context) &&
+            canScheduleExactAlarms(context) &&
+            isNotificationPermissionGranted(context)
+
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
