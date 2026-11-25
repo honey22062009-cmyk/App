@@ -36,4 +36,17 @@ class PersonalProgressCalculatorTest {
         val day = LocalDate.of(2026, 11, 23).toEpochDay()
         assertEquals(1, HabitStreakCalculator.bestAfterReset(0, day, day - 1, checkedInToday = true))
     }
+
+    @Test
+    fun elapsedDaysAdvancesOnlyAfterEachFullTwentyFourHours() {
+        val start = 1_000_000L
+        assertEquals(0, HabitStreakCalculator.elapsedDays(start + 23L * 60L * 60L * 1000L, start))
+        assertEquals(1, HabitStreakCalculator.elapsedDays(start + 24L * 60L * 60L * 1000L, start))
+        assertEquals(2, HabitStreakCalculator.elapsedDays(start + 48L * 60L * 60L * 1000L, start))
+    }
+
+    @Test
+    fun elapsedDaysNeverGoesNegativeWhenDeviceClockMovesBackwards() {
+        assertEquals(0, HabitStreakCalculator.elapsedDays(500L, 1_000L))
+    }
 }
