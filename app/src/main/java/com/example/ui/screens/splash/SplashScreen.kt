@@ -1,5 +1,6 @@
 package com.example.ui.screens.splash
 
+import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
@@ -39,6 +40,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     var bunnyEntered by remember { mutableStateOf(false) }
     var revealedCharacters by remember { mutableIntStateOf(0) }
     var taglineVisible by remember { mutableStateOf(false) }
+    val motionEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
 
     val bunnyOffset by animateDpAsState(
         targetValue = if (bunnyEntered) 0.dp else (-150).dp,
@@ -46,7 +48,14 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
         label = "splash_bunny_entry"
     )
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(motionEnabled) {
+        if (!motionEnabled) {
+            bunnyEntered = true
+            revealedCharacters = title.length
+            taglineVisible = true
+            onSplashComplete()
+            return@LaunchedEffect
+        }
         bunnyEntered = true
         delay(220L)
         for (count in 1..title.length) {
@@ -73,7 +82,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
             BunnyCompanion(
                 modifier = Modifier.offset(x = bunnyOffset),
                 size = 154.dp,
-                mood = BunnyMood.Celebrating
+                mood = BunnyMood.Running
             )
             Spacer(Modifier.height(14.dp))
             Text(
