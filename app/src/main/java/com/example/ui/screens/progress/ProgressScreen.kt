@@ -71,6 +71,7 @@ private enum class StreakGraphRange(val label: String, val days: Long?) {
 }
 
 private data class GraphPoint(val timestampMillis: Long, val streakDays: Int)
+private data class GraphSegment(val points: List<GraphPoint>, val isCurrent: Boolean)
 
 @Composable
 fun ProgressScreen() {
@@ -258,7 +259,7 @@ fun ProgressScreen() {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        StreakGraphRange.entries.forEach { range ->
+                        StreakGraphRange.values().forEach { range ->
                             FilterChip(
                                 selected = selectedRange == range,
                                 onClick = { selectedRange = range },
@@ -369,7 +370,7 @@ private fun StreakLineChart(
     val visibleSegments = remember(runs, rangeStart, nowMillis) {
         buildGraphSegments(runs, rangeStart, nowMillis)
     }
-    val historicalMaximum = visibleSegments.flatten().maxOfOrNull { it.streakDays } ?: 0
+    val historicalMaximum = visibleSegments.flatMap { it.points }.maxOfOrNull { it.streakDays } ?: 0
     val chartMax = maxOf(7, currentDays, previousBestDays, historicalMaximum)
         .let { ((it + 6) / 7) * 7 }
 
@@ -415,25 +416,23 @@ private fun StreakLineChart(
         }
 
         visibleSegments.forEach { segment ->
-            if (segment.size < 2) return@forEach
-            val isCurrent = segment.lastOrNull()?.let { point ->
-                runs.lastOrNull()?.endAtMillis == null &&
-                    point.timestampMillis == nowMillis
-            } == true
+            val points = segment.points
+            if (points.size < 2) return@forEach
             val path = Path().apply {
-                moveTo(xFor(segment.first().timestampMillis), yFor(segment.first().streakDays))
-                segment.drop(1).forEach { point ->
+                moveTo(xFor(points.first().timestampMillis), yFor(points.first().streakDays))
+                points.drop(1).forEach { point ->
                     lineTo(xFor(point.timestampMillis), yFor(point.streakDays))
                 }
             }
             drawPath(
                 path = path,
-                color = if (isCurrent) currentColor else historyColor,
+                color = if (segment.isCurrent) currentColor else historyColor,
                 style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
             )
         }
 
-        val lastCurrent = visibleSegments.lastOrNull()
+        val lastCurrent = visibleSegments.lastOrNull { it.isCurrent }
+            ?.points
             ?.lastOrNull { it.timestampMillis == nowMillis && it.streakDays == currentDays }
         if (lastCurrent != null) {
             drawCircle(
@@ -458,8 +457,8 @@ private fun buildGraphSegments(
     runs: List<StreakRun>,
     rangeStart: Long,
     nowMillis: Long
-): List<List<GraphPoint>> {
-    val result = mutableListOf<List<GraphPoint>>()
+): List<GraphSegment> {
+    val result = mutableListOf<GraphSegment>()
     runs.forEach { run ->
         val runEnd = minOf(run.endAtMillis ?: nowMillis, nowMillis)
         if (runEnd < rangeStart || run.startAtMillis > nowMillis) return@forEach
@@ -490,7 +489,7 @@ private fun buildGraphSegments(
                 points += GraphPoint(runEnd, 0)
             }
         }
-        if (points.size >= 2) result += points
+        if (points.isNotEmpty()) result += GraphSegment(points, isCurrent = run.endAtMillis == null)
     }
     return result
 }
