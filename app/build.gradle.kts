@@ -13,8 +13,8 @@ android {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
     minSdk = 26
     targetSdk = 36
-    versionCode = 13
-    versionName = "2.1.1"
+    versionCode = 14
+    versionName = "2.2.0"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
@@ -52,7 +52,6 @@ android {
       if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Enable both signature schemes for broad Android package-installer compatibility.
       signingConfig = signingConfigs.getByName("debug")
     }
   }
