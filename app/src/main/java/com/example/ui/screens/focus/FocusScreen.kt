@@ -432,6 +432,7 @@ private fun BunnyPanel(
                 when (mood) {
                     BunnyMood.Celebrating -> "A good stretch of work"
                     BunnyMood.Focused -> "I'll keep the time"
+                    BunnyMood.Running -> "Getting things ready"
                     BunnyMood.Resting -> "Ready when you are"
                 },
                 style = MaterialTheme.typography.titleLarge
@@ -440,6 +441,7 @@ private fun BunnyPanel(
                 when (mood) {
                     BunnyMood.Celebrating -> "Your effort is now part of your progress"
                     BunnyMood.Focused -> "One task. No need to rush."
+                    BunnyMood.Running -> "A fresh session is starting"
                     BunnyMood.Resting -> "Pick a duration, then settle into one task"
                 },
                 style = MaterialTheme.typography.bodyMedium,
