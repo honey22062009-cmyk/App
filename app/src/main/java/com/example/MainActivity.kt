@@ -157,8 +157,9 @@ private fun LocalProfileEntryGate(
     var isAuthenticated by remember { mutableStateOf(false) }
 
     LaunchedEffect(repository) {
-        savedName = repository.settings.profileNameFlow.first()
         hasPin = authStore.hasPin()
+        if (hasPin) progressStore.ensureInitialized()
+        savedName = repository.settings.profileNameFlow.first()
         isReady = true
     }
 
@@ -176,6 +177,7 @@ private fun LocalProfileEntryGate(
                 scope.launch {
                     repository.settings.setProfileName(name)
                     progressStore.setProfileName(name)
+                    progressStore.ensureInitialized()
                     savedName = name
                     hasPin = true
                     isAuthenticated = true
