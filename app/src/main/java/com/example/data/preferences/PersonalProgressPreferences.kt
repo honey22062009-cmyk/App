@@ -18,6 +18,11 @@ import java.time.ZoneId
 
 private val Context.habitDataStore: DataStore<Preferences> by preferencesDataStore(name = "strict_blocker_habits")
 
+data class StreakRun(
+    val startAtMillis: Long,
+    val endAtMillis: Long? = null
+)
+
 data class PersonalProgressSnapshot(
     val profileName: String = "",
     val goalTitle: String = "My personal goal",
@@ -29,10 +34,24 @@ data class PersonalProgressSnapshot(
     val resetCount: Int = 0,
     val checkInCount: Int = 0,
     val dailyStatus: Map<Long, Int> = emptyMap(),
-    val todayNote: String = ""
+    val todayNote: String = "",
+    val startAtMillis: Long = 0L,
+    val lastResetAtMillis: Long = 0L,
+    val streakRuns: List<StreakRun> = emptyList()
 )
 
 object HabitStreakCalculator {
+    const val DAY_MILLIS: Long = 86_400_000L
+
+    /** Completed full 24-hour periods since the saved start timestamp. */
+    fun elapsedDays(nowMillis: Long, startAtMillis: Long): Int {
+        if (startAtMillis <= 0L || nowMillis <= startAtMillis) return 0
+        return ((nowMillis - startAtMillis) / DAY_MILLIS)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+    }
+
+    // Kept for compatibility with existing data/tests that only contain calendar days.
     fun currentDays(today: Long, lastResetDay: Long): Int =
         (today - lastResetDay).coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
@@ -54,6 +73,9 @@ class PersonalProgressPreferences(private val context: Context) {
         val GOAL_TITLE = stringPreferencesKey("goal_title")
         val START_DAY = longPreferencesKey("start_day")
         val LAST_RESET_DAY = longPreferencesKey("last_reset_day")
+        val START_AT_MILLIS = longPreferencesKey("start_at_millis")
+        val LAST_RESET_AT_MILLIS = longPreferencesKey("last_reset_at_millis")
+        val STREAK_RUNS = stringPreferencesKey("streak_runs")
         val BEST_STREAK = intPreferencesKey("best_streak")
         val RESET_COUNT = intPreferencesKey("reset_count")
         val CHECK_IN_COUNT = intPreferencesKey("check_in_count")
@@ -62,26 +84,38 @@ class PersonalProgressPreferences(private val context: Context) {
     }
 
     val snapshotFlow: Flow<PersonalProgressSnapshot> = context.habitDataStore.data.map { p ->
-        val today = LocalDate.now().toEpochDay()
-        val start = p[Keys.START_DAY] ?: today
-        val lastReset = p[Keys.LAST_RESET_DAY] ?: start
+        val now = System.currentTimeMillis()
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone).toEpochDay()
+        val startDay = p[Keys.START_DAY] ?: today
+        val lastResetDay = p[Keys.LAST_RESET_DAY] ?: startDay
+
+        // Older installs stored only epoch days. Migrate those values to the
+        // start of that local day once, then keep exact millisecond timestamps.
+        val startAt = p[Keys.START_AT_MILLIS] ?: dayStartMillis(startDay, zone)
+        val lastResetAt = p[Keys.LAST_RESET_AT_MILLIS] ?: dayStartMillis(lastResetDay, zone)
         val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "")
         val notes = parseNotes(p[Keys.DAILY_NOTES] ?: "")
         val previousBest = (p[Keys.BEST_STREAK] ?: 0).coerceAtLeast(0)
-        val elapsedDays = HabitStreakCalculator.currentDays(today, lastReset)
-        val current = if (statuses[today] == 1 && today == lastReset) 1 else elapsedDays
+        val current = HabitStreakCalculator.elapsedDays(now, startAt)
+        val closedRuns = parseRuns(p[Keys.STREAK_RUNS] ?: "")
+        val runs = closedRuns + StreakRun(startAtMillis = startAt)
+
         PersonalProgressSnapshot(
             profileName = p[Keys.PROFILE_NAME] ?: "",
             goalTitle = p[Keys.GOAL_TITLE] ?: "My personal goal",
-            startDay = start,
-            lastResetDay = lastReset,
+            startDay = startDay,
+            lastResetDay = lastResetDay,
             currentStreak = current,
             bestStreak = maxOf(previousBest, current),
             previousBestStreak = previousBest,
             resetCount = p[Keys.RESET_COUNT] ?: 0,
             checkInCount = p[Keys.CHECK_IN_COUNT] ?: statuses.count { it.value == 1 },
             dailyStatus = statuses,
-            todayNote = notes[today] ?: ""
+            todayNote = notes[today] ?: "",
+            startAtMillis = startAt,
+            lastResetAtMillis = lastResetAt,
+            streakRuns = runs
         )
     }
 
@@ -94,6 +128,7 @@ class PersonalProgressPreferences(private val context: Context) {
         context.habitDataStore.edit { it[Keys.GOAL_TITLE] = safe }
     }
 
+    /** Optional legacy check-in API, retained so older backups remain readable. */
     suspend fun markGoalKept(day: Long = LocalDate.now().toEpochDay()) {
         context.habitDataStore.edit { p ->
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
@@ -107,24 +142,44 @@ class PersonalProgressPreferences(private val context: Context) {
         }
     }
 
-    suspend fun recordReset(day: Long = LocalDate.now().toEpochDay()) {
+    /**
+     * Closes the current timestamp-based run, saves its endpoint, and starts
+     * a new run at the reset time. Calling without an argument uses the exact
+     * current instant; a supplied epoch day remains supported for old callers.
+     */
+    suspend fun recordReset(day: Long? = null) {
+        val now = System.currentTimeMillis()
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone).toEpochDay()
+        val requestedAt = if (day == null || day == today) now else dayStartMillis(day, zone)
         context.habitDataStore.edit { p ->
-            val previousReset = p[Keys.LAST_RESET_DAY] ?: (p[Keys.START_DAY] ?: day)
+            val startDay = p[Keys.START_DAY] ?: today
+            val oldStartAt = p[Keys.START_AT_MILLIS] ?: dayStartMillis(startDay, zone)
+            val resetAt = maxOf(requestedAt, oldStartAt)
+            val resetDay = Instant.ofEpochMilli(resetAt).atZone(zone).toLocalDate().toEpochDay()
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
-            val alreadyCheckedIn = statuses[day] == 1
-            val best = HabitStreakCalculator.bestAfterReset(
-                p[Keys.BEST_STREAK] ?: 0, day, previousReset, alreadyCheckedIn
-            )
-            val alreadyResetToday = statuses[day] == 0
-            statuses[day] = 0
-            p[Keys.START_DAY] = day
-            p[Keys.LAST_RESET_DAY] = day
+            val alreadyResetToday = statuses[resetDay] == 0
+            val runs = parseRuns(p[Keys.STREAK_RUNS] ?: "").toMutableList()
+            if (resetAt > oldStartAt) {
+                runs += StreakRun(startAtMillis = oldStartAt, endAtMillis = resetAt)
+            }
+
+            val completedRun = HabitStreakCalculator.elapsedDays(resetAt, oldStartAt)
+            val best = maxOf(p[Keys.BEST_STREAK] ?: 0, completedRun).coerceAtLeast(0)
+            statuses[resetDay] = 0
+
+            p[Keys.START_DAY] = resetDay
+            p[Keys.LAST_RESET_DAY] = resetDay
+            p[Keys.START_AT_MILLIS] = resetAt
+            p[Keys.LAST_RESET_AT_MILLIS] = resetAt
+            p[Keys.STREAK_RUNS] = encodeRuns(runs)
             p[Keys.BEST_STREAK] = best
             if (!alreadyResetToday) p[Keys.RESET_COUNT] = (p[Keys.RESET_COUNT] ?: 0) + 1
-            p[Keys.DAILY_STATUS] = encodeStatus(statuses, day)
+            p[Keys.DAILY_STATUS] = encodeStatus(statuses, resetDay)
         }
     }
 
+    /** Retained for backward compatibility; the Progress screen no longer shows notes. */
     suspend fun saveTodayNote(note: String, day: Long = LocalDate.now().toEpochDay()) {
         context.habitDataStore.edit { p ->
             val notes = parseNotes(p[Keys.DAILY_NOTES] ?: "").toMutableMap()
@@ -135,8 +190,8 @@ class PersonalProgressPreferences(private val context: Context) {
     }
 
     /**
-     * Migrates date-only tracker history from the legacy JSON backup into the
-     * new neutral personal-goal timeline. Free-text legacy notes are not copied.
+     * Imports the legacy 1.8 JSON backup. Exact event timestamps are converted
+     * into closed runs; unsupported legacy free-text notes are not restored.
      */
     suspend fun importLegacyBackup(entries: JSONObject) {
         fun longValue(name: String): Long =
@@ -157,7 +212,7 @@ class PersonalProgressPreferences(private val context: Context) {
             }
         }
 
-        fun toEpochDay(timestamp: Long): Long? = if (timestamp > 0L) {
+        fun timestampToDay(timestamp: Long): Long? = if (timestamp > 0L) {
             runCatching {
                 Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
             }.getOrNull()
@@ -171,17 +226,30 @@ class PersonalProgressPreferences(private val context: Context) {
             longValue("last_fap_at").takeIf { it > 0L }?.let(::add)
         }.filter { it > 0L }.sorted()
 
-        val today = LocalDate.now().toEpochDay()
-        val startDay = toEpochDay(longValue("tracker_started_at"))
-            ?: resetTimestamps.firstOrNull()?.let(::toEpochDay)
-            ?: today
-        val lastResetDay = resetTimestamps.lastOrNull()?.let(::toEpochDay) ?: startDay
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone).toEpochDay()
+        val originalStartAt = longValue("tracker_started_at").takeIf { it > 0L }
+            ?: dayStartMillis(today, zone)
 
+        val importedRuns = mutableListOf<StreakRun>()
+        var currentStartAt = originalStartAt
+        resetTimestamps.forEach { resetAt ->
+            if (resetAt >= currentStartAt) {
+                if (resetAt > currentStartAt) {
+                    importedRuns += StreakRun(currentStartAt, resetAt)
+                }
+                currentStartAt = resetAt
+            }
+        }
+
+        val currentStartDay = timestampToDay(currentStartAt) ?: today
         val dailyStatus = mutableMapOf<Long, Int>()
-        resetTimestamps.mapNotNull(::toEpochDay).forEach { dailyStatus[it] = 0 }
+        resetTimestamps.mapNotNull(::timestampToDay).forEach { dailyStatus[it] = 0 }
         stringSet("daily_check_ins").forEach { raw ->
-            val date = raw.substringBefore("|").let { runCatching { LocalDate.parse(it).toEpochDay() }.getOrNull() }
-            if (date != null) dailyStatus[date] = 1
+            val date = raw.substringBefore("|").let {
+                runCatching { LocalDate.parse(it).toEpochDay() }.getOrNull()
+            }
+            if (date != null && dailyStatus[date] != 0) dailyStatus[date] = 1
         }
 
         val best = maxOf(
@@ -192,14 +260,35 @@ class PersonalProgressPreferences(private val context: Context) {
         val checkIns = dailyStatus.values.count { it == 1 }
 
         context.habitDataStore.edit { p ->
-            p[Keys.START_DAY] = startDay
-            p[Keys.LAST_RESET_DAY] = lastResetDay
+            p[Keys.START_DAY] = currentStartDay
+            p[Keys.LAST_RESET_DAY] = currentStartDay
+            p[Keys.START_AT_MILLIS] = currentStartAt
+            p[Keys.LAST_RESET_AT_MILLIS] = currentStartAt
+            p[Keys.STREAK_RUNS] = encodeRuns(importedRuns)
             p[Keys.BEST_STREAK] = best
             p[Keys.RESET_COUNT] = resetCount
             p[Keys.CHECK_IN_COUNT] = checkIns
             p[Keys.DAILY_STATUS] = encodeStatus(dailyStatus, today)
         }
     }
+
+    private fun dayStartMillis(epochDay: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+        LocalDate.ofEpochDay(epochDay).atStartOfDay(zone).toInstant().toEpochMilli()
+
+    private fun parseRuns(value: String): List<StreakRun> {
+        if (value.isBlank()) return emptyList()
+        return value.split(";").mapNotNull { entry ->
+            val pair = entry.split(",", limit = 2)
+            val start = pair.getOrNull(0)?.toLongOrNull() ?: return@mapNotNull null
+            val end = pair.getOrNull(1)?.toLongOrNull() ?: return@mapNotNull null
+            if (start <= 0L || end < start) null else StreakRun(start, end)
+        }
+    }
+
+    private fun encodeRuns(values: List<StreakRun>): String =
+        values.filter { it.endAtMillis != null && it.endAtMillis >= it.startAtMillis }
+            .takeLast(500)
+            .joinToString(";") { it.startAtMillis.toString() + "," + it.endAtMillis }
 
     private fun parseStatus(value: String): Map<Long, Int> {
         if (value.isBlank()) return emptyMap()
@@ -213,7 +302,7 @@ class PersonalProgressPreferences(private val context: Context) {
 
     private fun encodeStatus(values: Map<Long, Int>, today: Long): String =
         values.filterKeys { it >= today - 365L }.toSortedMap()
-            .entries.joinToString(";") { "${it.key}:${it.value}" }
+            .entries.joinToString(";") { "\${it.key}:\${it.value}" }
 
     private fun parseNotes(value: String): Map<Long, String> {
         if (value.isBlank()) return emptyMap()
@@ -222,7 +311,9 @@ class PersonalProgressPreferences(private val context: Context) {
             val day = pair.getOrNull(0)?.toLongOrNull() ?: return@mapNotNull null
             val note = try {
                 String(Base64.decode(pair.getOrNull(1).orEmpty(), Base64.URL_SAFE or Base64.NO_WRAP))
-            } catch (_: Exception) { return@mapNotNull null }
+            } catch (_: Exception) {
+                return@mapNotNull null
+            }
             day to note
         }.toMap()
     }
@@ -230,6 +321,6 @@ class PersonalProgressPreferences(private val context: Context) {
     private fun encodeNotes(values: Map<Long, String>, today: Long): String =
         values.filterKeys { it >= today - 365L }.toSortedMap().entries.joinToString(";") {
             val encoded = Base64.encodeToString(it.value.toByteArray(), Base64.URL_SAFE or Base64.NO_WRAP)
-            "${it.key}:$encoded"
+            "\${it.key}:\$encoded"
         }
 }
