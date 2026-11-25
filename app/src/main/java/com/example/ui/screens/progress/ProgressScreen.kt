@@ -171,7 +171,7 @@ fun ProgressScreen() {
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MetricPill("Previous best", "\${snapshot.previousBestStreak} days")
+                        MetricPill("Previous best", "${snapshot.previousBestStreak} days")
                         MetricPill("Resets", snapshot.resetCount.toString())
                     }
                 }
@@ -298,7 +298,7 @@ fun ProgressScreen() {
                             FilterChip(
                                 selected = true,
                                 onClick = {},
-                                label = { Text("\${days}d") }
+                                label = { Text("${days}d") }
                             )
                         }
                         if (achieved.isEmpty()) {
@@ -310,7 +310,7 @@ fun ProgressScreen() {
                         }
                     }
                     Text(
-                        "Next milestone: " + (milestones.firstOrNull { it > personalBest }?.let { "\$it days" }
+                        "Next milestone: " + (milestones.firstOrNull { it > personalBest }?.let { "$it days" }
                             ?: "All milestones reached"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
