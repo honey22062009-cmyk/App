@@ -119,6 +119,32 @@ class PersonalProgressPreferences(private val context: Context) {
         )
     }
 
+
+    /**
+     * Persists the first exact start instant. Existing date-only records migrate
+     * to local midnight; brand-new profiles begin at the actual setup time.
+     */
+    suspend fun ensureInitialized(nowMillis: Long = System.currentTimeMillis()) {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone).toEpochDay()
+        context.habitDataStore.edit { p ->
+            val savedDay = p[Keys.START_DAY]
+            val startAt = p[Keys.START_AT_MILLIS]
+                ?: savedDay?.let { dayStartMillis(it, zone) }
+                ?: nowMillis
+            val startDay = savedDay
+                ?: Instant.ofEpochMilli(startAt).atZone(zone).toLocalDate().toEpochDay()
+            val lastResetDay = p[Keys.LAST_RESET_DAY] ?: startDay
+            val lastResetAt = p[Keys.LAST_RESET_AT_MILLIS]
+                ?: if (lastResetDay == startDay) startAt else dayStartMillis(lastResetDay, zone)
+
+            p[Keys.START_DAY] = startDay
+            p[Keys.LAST_RESET_DAY] = lastResetDay
+            p[Keys.START_AT_MILLIS] = startAt
+            p[Keys.LAST_RESET_AT_MILLIS] = lastResetAt
+        }
+    }
+
     suspend fun setProfileName(name: String) {
         context.habitDataStore.edit { it[Keys.PROFILE_NAME] = name.trim().take(40) }
     }
