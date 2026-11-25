@@ -302,7 +302,7 @@ class PersonalProgressPreferences(private val context: Context) {
 
     private fun encodeStatus(values: Map<Long, Int>, today: Long): String =
         values.filterKeys { it >= today - 365L }.toSortedMap()
-            .entries.joinToString(";") { "\${it.key}:\${it.value}" }
+            .entries.joinToString(";") { "${it.key}:${it.value}" }
 
     private fun parseNotes(value: String): Map<Long, String> {
         if (value.isBlank()) return emptyMap()
@@ -321,6 +321,6 @@ class PersonalProgressPreferences(private val context: Context) {
     private fun encodeNotes(values: Map<Long, String>, today: Long): String =
         values.filterKeys { it >= today - 365L }.toSortedMap().entries.joinToString(";") {
             val encoded = Base64.encodeToString(it.value.toByteArray(), Base64.URL_SAFE or Base64.NO_WRAP)
-            "\${it.key}:\$encoded"
+            "${it.key}:$encoded"
         }
 }
