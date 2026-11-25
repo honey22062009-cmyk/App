@@ -110,7 +110,7 @@ fun BunnyCompanion(
     }
 
     val movementY = when (mood) {
-        BunnyMood.Running -> (if (pawWave) -size * 0.045f else size * 0.012f).dp
+        BunnyMood.Running -> if (pawWave) -size * 0.045f else size * 0.012f
         BunnyMood.Celebrating -> (-3.5f + breath * 5f).dp
         else -> (-breath * 2f).dp
     }
