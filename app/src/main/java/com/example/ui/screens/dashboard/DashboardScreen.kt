@@ -59,8 +59,7 @@ import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
 import com.example.ui.components.StrictBlockerLogo
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.CompanionScene
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -366,7 +365,14 @@ private fun CompanionPanel(modifier: Modifier, onFocus: () -> Unit) {
                     Text("Open focus")
                 }
             }
-            BunnyCompanion(size = 128.dp, mood = BunnyMood.Resting)
+            CompanionScene(
+                characterId = "luna",
+                modifier = Modifier.size(128.dp),
+                interactive = true,
+                reduceMotion = false,
+                reaction = "idle",
+                reactionKey = 1
+            )
         }
     }
 }
