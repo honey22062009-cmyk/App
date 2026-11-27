@@ -61,7 +61,7 @@ import com.example.data.preferences.FocusSessionSnapshot
 import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.AppSurface
 import com.example.ui.components.StrictBlockerLogo
-import com.example.ui.components.BunnyCompanion
+import com.example.ui.components.CompanionScene
 import com.example.ui.components.BunnyMood
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -486,7 +486,24 @@ private fun BunnyPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            BunnyCompanion(size = 176.dp, mood = mood)
+            CompanionScene(
+                characterId = "luna",
+                modifier = Modifier.size(176.dp),
+                interactive = true,
+                reduceMotion = false,
+                reaction = when (mood) {
+                    BunnyMood.Resting -> "idle"
+                    BunnyMood.Focused -> "look_around"
+                    BunnyMood.Celebrating -> "jump"
+                    BunnyMood.Running -> "dance"
+                },
+                reactionKey = when (mood) {
+                    BunnyMood.Resting -> 1
+                    BunnyMood.Focused -> 2
+                    BunnyMood.Celebrating -> 3
+                    BunnyMood.Running -> 4
+                }
+            )
             Text(
                 when (mood) {
                     BunnyMood.Celebrating -> "A good stretch of work"
