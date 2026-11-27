@@ -23,11 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -55,6 +58,7 @@ fun BunnyCompanion(
     var blinking by remember { mutableStateOf(false) }
     var earTwitch by remember { mutableStateOf(false) }
     var pawWave by remember { mutableStateOf(false) }
+    var curiousTilt by remember { mutableStateOf(false) }
 
     val breathing = rememberInfiniteTransition(label = "bunny_breathing")
     val breath by breathing.animateFloat(
@@ -75,6 +79,11 @@ fun BunnyCompanion(
         targetValue = if (pawWave) -25f else 8f,
         animationSpec = tween(260),
         label = "bunny_paw_wave"
+    )
+    val bodyTilt by animateFloatAsState(
+        targetValue = if (curiousTilt) -5f else 0f,
+        animationSpec = tween(420, easing = FastOutSlowInEasing),
+        label = "bunny_body_tilt"
     )
 
     LaunchedEffect(mood) {
@@ -104,6 +113,14 @@ fun BunnyCompanion(
                     pawWave = true
                     delay(520L)
                     pawWave = false
+                }
+
+                if (Random.nextFloat() < 0.42f) {
+                    curiousTilt = true
+                    earTwitch = true
+                    delay(480L)
+                    curiousTilt = false
+                    earTwitch = false
                 }
             }
         }
@@ -147,7 +164,14 @@ fun BunnyCompanion(
         )
 
         Box(
-            modifier = Modifier.size(size).offset(y = movementY),
+            modifier = Modifier
+                .size(size)
+                .offset(y = movementY)
+                .graphicsLayer {
+                    rotationY = bodyTilt
+                    rotationZ = bodyTilt * 0.22f
+                    cameraDistance = 12f * density
+                },
             contentAlignment = Alignment.Center
         ) {
             BunnyPart(
@@ -306,5 +330,18 @@ private fun BunnyPart(
     color: Color,
     shape: androidx.compose.ui.graphics.Shape
 ) {
-    Box(modifier = modifier.clip(shape).background(color))
+    Box(
+        modifier = modifier
+            .shadow(elevation = 2.5.dp, shape = shape, clip = false)
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.36f),
+                        color,
+                        color.copy(alpha = 0.84f)
+                    )
+                )
+            )
+    )
 }
