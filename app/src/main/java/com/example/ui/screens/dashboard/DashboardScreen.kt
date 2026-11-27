@@ -58,6 +58,8 @@ import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
 import com.example.ui.components.StrictBlockerLogo
+import com.example.ui.components.BunnyCompanion
+import com.example.ui.components.BunnyMood
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -362,7 +364,7 @@ private fun CompanionPanel(modifier: Modifier, onFocus: () -> Unit) {
                     Text("Open focus")
                 }
             }
-            StrictBlockerLogo(size = 128.dp)
+            BunnyCompanion(size = 128.dp, mood = BunnyMood.Resting)
         }
     }
 }
