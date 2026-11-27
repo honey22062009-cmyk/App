@@ -59,6 +59,7 @@ import com.example.data.preferences.FocusSessionSnapshot
 import com.example.data.preferences.SettingsPreferences
 import com.example.ui.components.AppSurface
 import com.example.ui.components.StrictBlockerLogo
+import com.example.ui.components.BunnyCompanion
 import com.example.ui.components.BunnyMood
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -427,7 +428,7 @@ private fun BunnyPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            StrictBlockerLogo(size = 176.dp)
+            BunnyCompanion(size = 176.dp, mood = mood)
             Text(
                 when (mood) {
                     BunnyMood.Celebrating -> "A good stretch of work"
