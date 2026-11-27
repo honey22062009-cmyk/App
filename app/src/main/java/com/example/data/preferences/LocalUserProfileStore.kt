@@ -48,6 +48,13 @@ abstract class LocalUserDatabase : RoomDatabase() {
     companion object {
         @Volatile private var instance: LocalUserDatabase? = null
 
+        fun closeInstance() {
+            synchronized(this) {
+                instance?.close()
+                instance = null
+            }
+        }
+
         fun getInstance(context: Context): LocalUserDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
