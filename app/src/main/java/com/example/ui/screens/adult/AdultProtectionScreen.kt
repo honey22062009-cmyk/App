@@ -21,6 +21,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.evaluator.AdultContentEvaluator
 import com.example.core.system.PermissionHelper
+import com.example.core.system.PrivateDnsVerifier
 import com.example.data.repository.AppBlockerRepository
 import com.example.service.BrowserGuardStatus
 import com.example.ui.components.AccessibilityDisclosure
@@ -33,6 +34,12 @@ fun AdultProtectionScreen(repository: AppBlockerRepository, onNavigateToPermissi
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val enabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
     val consent by repository.settings.browserInspectionConsentFlow.collectAsState(initial = false)
+    val blockPrivateMode by repository.settings.blockIncognitoEnabledFlow.collectAsState(initial = false)
+    val dnsFilterEnabled by repository.settings.dnsFilterEnabledFlow.collectAsState(initial = false)
+    val forceSafeSearchEnabled by repository.settings.forceSafeSearchEnabledFlow.collectAsState(initial = false)
+    val customDnsHost by repository.settings.customDnsPrimaryFlow.collectAsState(
+        initial = PrivateDnsVerifier.FAMILY_FILTER_HOSTNAME
+    )
     val serviceConnected by BrowserGuardStatus.isConnected.collectAsState()
     val inspections by BrowserGuardStatus.inspections.collectAsState()
     val totalBlocks by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
@@ -41,8 +48,13 @@ fun AdultProtectionScreen(repository: AppBlockerRepository, onNavigateToPermissi
     var showDisclosure by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
+    var dnsHostDraft by remember(customDnsHost) { mutableStateOf(customDnsHost) }
+    var dnsStatus by remember(customDnsHost) {
+        mutableStateOf(PrivateDnsVerifier.read(context, customDnsHost))
+    }
     fun refresh() {
         accessibility = PermissionHelper.isAccessibilityServiceEnabled(context)
+        dnsStatus = PrivateDnsVerifier.read(context, customDnsHost)
         browsers = runCatching {
             context.packageManager.queryIntentActivities(
                 Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")).addCategory(Intent.CATEGORY_BROWSABLE),
@@ -97,14 +109,153 @@ fun AdultProtectionScreen(repository: AppBlockerRepository, onNavigateToPermissi
                         })
                     }
                     Text("Restricted domains and explicit words such as porn, sex and sexual are checked in visible address or search fields. A match returns you to Home and shows a reason.")
-                    Text("Opening Chrome, Opera, Firefox or a private tab is allowed. Ordinary page paragraphs, menus and unrelated form fields cannot trigger Browser Guard.")
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Private browsing guard", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Interrupt private tabs when the browser exposes a clear private-mode label in its toolbar.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = blockPrivateMode,
+                            enabled = enabled,
+                            onCheckedChange = { on ->
+                                scope.launch { repository.settings.setBlockIncognitoEnabled(on) }
+                            }
+                        )
+                    }
+                    Text("Private-mode detection reads non-editable browser chrome only. It ignores text typed into search fields. Some browsers hide private-mode state from Accessibility, so detection cannot be guaranteed in every browser.")
                     Text("An app you added to a blocking schedule still follows that schedule.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             item {
+                GuardCard("Private DNS and SafeSearch") {
+                    Text(
+                        "Option B uses Android Private DNS. Strict Blocker only reads the system mode and hostname; it does not change network settings, install a VPN, or prevent the device owner from changing DNS.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Verify family-filter DNS", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                if (dnsFilterEnabled) "Status checks are enabled" else "Status checks are disabled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = dnsFilterEnabled,
+                            onCheckedChange = { on ->
+                                scope.launch { repository.settings.setDnsFilterEnabled(on) }
+                                if (on) PrivateDnsVerifier.openSettings(context)
+                            }
+                        )
+                    }
+                    OutlinedTextField(
+                        value = dnsHostDraft,
+                        onValueChange = { dnsHostDraft = it.take(253) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Private DNS provider hostname") },
+                        supportingText = { Text("Android supports one Private DNS hostname, not primary and secondary entries.") }
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                runCatching { repository.settings.setCustomDnsPrimary(dnsHostDraft) }
+                                    .onSuccess {
+                                        dnsStatus = PrivateDnsVerifier.read(context, dnsHostDraft)
+                                        result = "Private DNS hostname saved for verification."
+                                    }
+                                    .onFailure { result = it.message ?: "Invalid hostname." }
+                            }
+                        },
+                        enabled = dnsHostDraft.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Save hostname") }
+
+                    val dnsStateText = when (dnsStatus.state) {
+                        PrivateDnsVerifier.State.CONFIGURED ->
+                            "Configured: Android's Private DNS hostname matches. DNS connectivity has not been tested."
+                        PrivateDnsVerifier.State.NEEDS_SETUP ->
+                            "Needs setup: Android Private DNS is off or using opportunistic mode."
+                        PrivateDnsVerifier.State.WRONG_HOSTNAME ->
+                            "Not active: Android is using a different Private DNS hostname."
+                        PrivateDnsVerifier.State.UNSUPPORTED ->
+                            "Not supported on this Android version."
+                        PrivateDnsVerifier.State.UNREADABLE ->
+                            "Unable to read the current Android Private DNS setting."
+                    }
+                    Text(
+                        dnsStateText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (dnsStatus.hostnameMatches) MaterialTheme.colorScheme.tertiary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Report SafeSearch as configured", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Only reports configured when the Family Filter hostname matches; this does not test live search results.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = forceSafeSearchEnabled,
+                            onCheckedChange = { on ->
+                                scope.launch { repository.settings.setForceSafeSearchEnabled(on) }
+                            }
+                        )
+                    }
+                    val isFamilyFilterHost = dnsStatus.hostnameMatches &&
+                        dnsStatus.expectedHostname == PrivateDnsVerifier.FAMILY_FILTER_HOSTNAME
+                    Text(
+                        when {
+                            !forceSafeSearchEnabled -> "SafeSearch status reporting is off."
+                            isFamilyFilterHost -> "Family Filter hostname matches. Its provider documents SafeSearch enforcement for Google, Bing and YouTube; this app has not tested DNS reachability."
+                            dnsStatus.hostnameMatches -> "Custom DNS hostname matches, but its SafeSearch behavior is not verified by this app."
+                            else -> "SafeSearch is not confirmed until the expected Private DNS hostname is configured."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = { PrivateDnsVerifier.openSettings(context) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Open Android Private DNS settings") }
+                    TextButton(
+                        onClick = { refresh() },
+                        modifier = Modifier.align(Alignment.End)
+                    ) { Text("Re-check system setting") }
+                    if (result != null) {
+                        Text(result.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(
+                        "Recommended Family Filter hostname: family-filter-dns.cleanbrowsing.org. Android Private DNS must be set manually in system Settings. The device owner can change or disable it at any time.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            item {
                 GuardCard("Start a filtered search") {
-                    Text("These shortcuts request the search engine's filter mode. This app cannot lock SafeSearch across every browser without network or managed-device controls.")
+                    Text("These shortcuts request SafeSearch for that search URL. Device-wide enforcement depends on the configured Private DNS provider; the shortcuts alone do not lock filtering.")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         FilledTonalButton(onClick = { openWeb("https://www.google.com/search?safe=active&q=") }, modifier = Modifier.weight(1f)) { Text("Google · filtered") }
                         FilledTonalButton(onClick = { openWeb("https://www.bing.com/search?adlt=strict&q=") }, modifier = Modifier.weight(1f)) { Text("Bing · strict") }
