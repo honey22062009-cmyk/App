@@ -12,7 +12,11 @@ object AdultContentEvaluator {
     // Common Android Web Browser Packages
     val BROWSER_PACKAGES = setOf(
         "com.android.chrome",
+        "com.chrome.beta",
+        "com.chrome.dev",
+        "com.chrome.canary",
         "org.mozilla.firefox",
+        "org.mozilla.fenix",
         "com.sec.android.app.sbrowser", // Samsung Internet
         "com.microsoft.emmx", // Microsoft Edge
         "com.brave.browser",
@@ -30,6 +34,8 @@ object AdultContentEvaluator {
         "com.kiwibrowser.browser",
         "com.mi.globalbrowser",
         "com.coloros.browser",
+        "com.heytap.browser",
+        "com.vivo.browser",
         "org.torproject.torbrowser"
     )
 
@@ -56,18 +62,40 @@ object AdultContentEvaluator {
         "simpcity.su", "leakgirls.com", "leaklinks.com"
     )
 
-    // Explicit root terms that indicate pornographic intent in URLs or search queries
-    private val EXPLICIT_KEYWORDS = listOf(
-        "porn", "porno", "pornography", "pornographic", "xxx", "xvideos", "xnxx",
-        "xhamster", "pornhub", "redtube", "youporn", "chaturbate", "stripchat",
-        "camsoda", "brazzers", "bangbros", "spankbang", "hentai", "rule34",
-        "erotic video", "hardcore sex", "blowjob", "gangbang", "creampie", "milf sex",
-        "anal sex", "incest porn", "threesome sex", "shemale porn", "trans porn",
-        "camgirl live", "fetish porn", "nsfw video", "nude leak", "onlyfans leak",
-        "fapello", "sex tape", "adult video", "adult webcam", "live sex cam",
-        "nude cam", "erome leak", "naked girls", "naked women", "free porn",
-        "adult tube", "sex video", "hardcore video", "sex", "sexual", "nudes", "nude", "naked", "erotic", "erotica", "nsfw", "sexy", "chudai", "chut", "चुदाई", "पोर्न", "सेक्स"
+    // High-confidence terms score immediately. Ambiguous single words are
+    // deliberately lower-weight to reduce false positives on health/education pages.
+    private val HIGH_SIGNAL_TERMS = listOf(
+        "porn", "porno", "pornography", "pornographic", "porn video", "free porn",
+        "pornhub", "xvideos", "xnxx", "xhamster", "redtube", "youporn",
+        "chaturbate", "stripchat", "camsoda", "brazzers", "bangbros", "spankbang",
+        "hentai", "rule34", "sex tape", "nude leak", "onlyfans leak", "camgirl live",
+        "fetish porn", "adult webcam", "live sex cam", "free adult video",
+        "p0rn", "p0rno", "p0rnography", "s3x video", "n5fw video",
+        "पोर्न", "अश्लील"
     )
+    private val MEDIUM_SIGNAL_TERMS = listOf(
+        "erotic video", "hardcore video", "adult video", "adult tube",
+        "nude cam", "naked girls", "naked women", "erome leak",
+        "blowjob", "gangbang", "creampie", "milf sex", "anal sex",
+        "incest porn", "threesome sex", "chudai", "चुदाई"
+    )
+    private val AMBIGUOUS_TERMS = listOf(
+        "sex", "sexual", "nudes", "nude", "naked", "erotic", "erotica", "nsfw", "sexy", "सेक्स"
+    )
+    private val SAFE_EDUCATIONAL_DOMAINS = setOf(
+        "nhs.uk", "mayoclinic.org", "clevelandclinic.org", "kidshealth.org",
+        "healthline.com", "medlineplus.gov", "plannedparenthood.org",
+        "who.int", "cdc.gov", "ncbi.nlm.nih.gov", "medscape.com",
+        "britannica.com", "khanacademy.org", "openstax.org"
+    )
+
+    private fun tokenPattern(terms: List<String>): Regex {
+        val alternation = terms.joinToString("|") { Regex.escape(it) }
+        return Regex("(^|[^\\p{L}\\p{N}])(?:$alternation)(?=$|[^\\p{L}\\p{N}])", RegexOption.IGNORE_CASE)
+    }
+    private val highSignalPattern = tokenPattern(HIGH_SIGNAL_TERMS)
+    private val mediumSignalPattern = tokenPattern(MEDIUM_SIGNAL_TERMS)
+    private val ambiguousPattern = tokenPattern(AMBIGUOUS_TERMS)
 
     sealed class EvaluationResult {
         data object Clean : EvaluationResult()
@@ -87,41 +115,44 @@ object AdultContentEvaluator {
 
     /**
      * Evaluates an actual browser address or search value, never arbitrary page copy.
-     * Private-mode labels and arbitrary page text are not blocking signals.
+     * Ambiguous single words need multiple signals; trusted health/education domains
+     * are exempt from ambiguous-word scoring but not from the explicit domain blocklist.
      */
     fun evaluateText(rawInput: String): EvaluationResult {
         if (rawInput.isBlank()) return EvaluationResult.Clean
 
-        val clean = java.text.Normalizer.normalize(rawInput.take(8192), java.text.Normalizer.Form.NFKC).trim().lowercase(Locale.ROOT)
-
-        // 2. Decode URL if encoded
+        val clean = normalizeForMatching(rawInput)
         val decoded = try {
             URLDecoder.decode(URLDecoder.decode(clean, "UTF-8"), "UTF-8")
         } catch (_: Exception) {
             clean
         }
-
-        // 3. Extract hostname / domain if it looks like a URL
         val domain = extractDomain(decoded)
-        if (domain.isNotEmpty()) {
-            // Exact or subdomain match against known adult domains
-            if (isAdultDomain(domain)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.ADULT_DOMAIN,
-                    layer = "18+ Domain Shield"
-                )
-            }
+        if (domain.isNotEmpty() && isAdultDomain(domain)) {
+            return EvaluationResult.Blocked(BlockCategory.ADULT_DOMAIN, "18+ Domain Shield")
         }
 
-        // Token boundaries prevent matches such as Middlesex, Sussex and Essex.
-        // Browser URL separators represent spaces in multiword search terms.
-        val words = decoded.replace(Regex("[+_\\-]"), " ")
-        if (explicitPatterns.any { it.containsMatchIn(words) }) {
+        val searchText = decoded.replace(Regex("[+_\\-]"), " ")
+        if (highSignalPattern.containsMatchIn(searchText) ||
+            mediumSignalPattern.containsMatchIn(searchText)) {
             return EvaluationResult.Blocked(BlockCategory.EXPLICIT_SEARCH, "Browser search guard")
         }
 
+        val trustedDomain = SAFE_EDUCATIONAL_DOMAINS.any { safe ->
+            domain == safe || domain.endsWith(".$safe")
+        }
+        if (!trustedDomain && ambiguousPattern.findAll(searchText).take(3).count() >= 3) {
+            return EvaluationResult.Blocked(BlockCategory.EXPLICIT_SEARCH, "Multiple restricted search signals")
+        }
         return EvaluationResult.Clean
     }
+
+    fun normalizeForMatching(value: String): String =
+        java.text.Normalizer.normalize(value.take(8192), java.text.Normalizer.Form.NFKC)
+            .filterNot { it == '\u200B' || it == '\u200C' || it == '\u200D' ||
+                it == '\u2060' || it == '\uFEFF' }
+            .trim()
+            .lowercase(Locale.ROOT)
 
     /**
      * Checks if a domain or any of its parent domains match the adult blocklist.
