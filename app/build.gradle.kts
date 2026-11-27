@@ -13,8 +13,8 @@ android {
     applicationId = "com.aistudio.strictblocker.kzvwpq"
     minSdk = 26
     targetSdk = 36
-    versionCode = 11
-    versionName = "2.0.1"
+    versionCode = 15
+    versionName = "2.3.0"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
@@ -28,12 +28,18 @@ android {
     file(releaseKeystorePath).exists()
 
   signingConfigs {
+    getByName("debug") {
+      enableV1Signing = true
+      enableV2Signing = true
+    }
     if (hasReleaseSigning) {
       create("release") {
         storeFile = file(releaseKeystorePath!!)
         storePassword = releaseStorePassword
         keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
         keyPassword = releaseKeyPassword
+        enableV1Signing = true
+        enableV2Signing = true
       }
     }
   }
@@ -46,7 +52,7 @@ android {
       if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Uses the standard Gradle debug signing key.
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {

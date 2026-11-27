@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: ["main", "fix/build-errors", "redesign/unslop-native-ui"]
+    branches: ["main", "fix/build-errors", "redesign/unslop-native-ui", "feature/habit-tracker-redesign", "feature/strict-blocker-2-3-refresh"]
   pull_request:
     branches: ["main", "redesign/unslop-native-ui"]
   workflow_dispatch:
@@ -86,7 +86,7 @@ jobs:
           aapt="$(find "$sdk_root/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -x "$apksigner" && test -x "$aapt"
           "$apksigner" verify --verbose --print-certs "$apk"
-          "$aapt" dump badging "$apk" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='11' versionName='2.0.1'"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.aistudio.strictblocker.kzvwpq' versionCode='15' versionName='2.3.0'"
       - name: Upload signed release APK
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4

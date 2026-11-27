@@ -11,7 +11,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -48,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -55,14 +59,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.preferences.LocalProfileAuthStore
+import com.example.data.preferences.PersonalProgressPreferences
+import com.example.data.preferences.LocalUserProfileStore
 import com.example.ui.navigation.Screen
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
 import com.example.ui.screens.adult.AdultProtectionScreen
 import com.example.ui.screens.antibypass.AntiBypassGuideScreen
 import com.example.ui.screens.apps.AppsScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.focus.FocusScreen
+import com.example.ui.screens.progress.ProgressScreen
+import com.example.ui.screens.onboarding.AppTourDialog
+import com.example.ui.screens.onboarding.LocalProfileGateScreen
 import com.example.ui.screens.legal.LegalComplianceScreen
 import com.example.ui.screens.onboarding.PermissionsScreen
 import com.example.ui.screens.schedules.SchedulesScreen
@@ -130,14 +139,71 @@ fun MainAppContent(
     var isSplashVisible by remember { mutableStateOf(true) }
 
     if (isSplashVisible) {
-        SplashScreen(
-            onSplashComplete = { isSplashVisible = false }
-        )
+        SplashScreen(onSplashComplete = { isSplashVisible = false })
     } else {
-        MainAppScaffold(
-            repository = repository,
-            initialTargetPackage = initialTargetPackage
+        LocalProfileEntryGate(repository = repository) {
+            MainAppScaffold(repository = repository, initialTargetPackage = initialTargetPackage)
+        }
+    }
+}
+
+@Composable
+private fun LocalProfileEntryGate(
+    repository: AppBlockerRepository,
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val authStore = remember(context) { LocalProfileAuthStore(context.applicationContext) }
+    val progressStore = remember(context) { PersonalProgressPreferences(context.applicationContext) }
+    val localUsers = remember(context) { LocalUserProfileStore(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    var savedName by remember { mutableStateOf("") }
+    var hasPin by remember { mutableStateOf(false) }
+    var isReady by remember { mutableStateOf(false) }
+    var isAuthenticated by remember { mutableStateOf(false) }
+
+    LaunchedEffect(repository) {
+        hasPin = authStore.hasPin()
+        savedName = repository.settings.profileNameFlow.first()
+        val storedProfile = localUsers.profileFlow.first()
+        if (savedName.isBlank()) savedName = storedProfile?.displayName.orEmpty()
+        if (savedName.isNotBlank()) localUsers.ensureProfile(savedName)
+        if (hasPin) progressStore.ensureInitialized()
+        isReady = true
+    }
+
+    when {
+        !isReady -> Box(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) { CircularProgressIndicator() }
+
+        !isAuthenticated -> LocalProfileGateScreen(
+            existingName = savedName,
+            hasPin = hasPin,
+            onCreateProfile = { name, pin ->
+                authStore.savePin(pin)
+                scope.launch {
+                    repository.settings.setProfileName(name)
+                    progressStore.setProfileName(name)
+                    progressStore.ensureInitialized()
+                    localUsers.saveProfile(name)
+                    savedName = name
+                    hasPin = true
+                    isAuthenticated = true
+                }
+            },
+            onUnlock = authStore::verifyPin,
+            onAuthenticated = {
+                scope.launch {
+                    localUsers.markSignedIn()
+                    isAuthenticated = true
+                }
+            },
+            onLockoutRemainingSeconds = authStore::remainingLockoutSeconds
         )
+
+        else -> content()
     }
 }
 
@@ -156,20 +222,31 @@ fun MainAppScaffold(
         mutableStateOf(initialTargetPackage)
     }
     var isInitialRouteResolved by remember { mutableStateOf(false) }
+    var showTour by remember { mutableStateOf(false) }
+    val tourCompleted by repository.settings.hasSeenTourFlow.collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
 
     // Resolve persisted onboarding before exposing navigation. A schedule deep link
     // remains the highest-priority destination.
+    val context = LocalContext.current
     LaunchedEffect(repository, initialTargetPackage) {
         val onboardingCompleted = repository.settings.isOnboardingCompletedFlow.first()
-        if (!initialTargetPackage.isNullOrEmpty()) {
+        val requiredPermissionsGranted = PermissionHelper.hasRequiredProtectionPermissions(context)
+        if (!requiredPermissionsGranted || !onboardingCompleted) {
+            currentScreen = Screen.Permissions
+        } else if (!initialTargetPackage.isNullOrEmpty()) {
             selectedSchedulePackage = initialTargetPackage
             currentScreen = Screen.Schedules
-        } else if (onboardingCompleted) {
-            currentScreen = Screen.Dashboard
         } else {
-            currentScreen = Screen.Permissions
+            currentScreen = Screen.Dashboard
         }
         isInitialRouteResolved = true
+    }
+
+    LaunchedEffect(currentScreen, isInitialRouteResolved, tourCompleted) {
+        if (isInitialRouteResolved && currentScreen == Screen.Dashboard && !tourCompleted && initialTargetPackage.isNullOrEmpty()) {
+            showTour = true
+        }
     }
 
     // On first launch, Back should leave the permission guide rather than silently
@@ -209,7 +286,7 @@ fun MainAppScaffold(
                     modifier = Modifier.testTag("tablet_navigation_rail"),
                     containerColor = MaterialTheme.colorScheme.surface,
                     header = {
-                        BunnyCompanion(size = 52.dp, mood = BunnyMood.Resting)
+                        StrictBlockerLogo(size = 52.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 ) {
@@ -217,11 +294,21 @@ fun MainAppScaffold(
                         val isSelected = currentScreen.route == screen.route
                         NavigationRailItem(
                             selected = isSelected,
+                            enabled = currentScreen != Screen.Permissions || isSelected,
                             onClick = { currentScreen = screen },
                             icon = {
+                                val iconScale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.12f else 1f,
+                                    animationSpec = tween(240),
+                                    label = "tablet_nav_scale_${screen.route}"
+                                )
                                 Icon(
                                     imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                    contentDescription = screen.title
+                                    contentDescription = screen.title,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    }
                                 )
                             },
                             label = {
@@ -247,8 +334,8 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(240)) { it / 18 }) togetherWith
+                                (fadeOut(tween(150)) + slideOutHorizontally(tween(180)) { -it / 24 })
                         },
                         label = "tablet_screen_transition"
                     ) { targetScreen ->
@@ -260,7 +347,8 @@ fun MainAppScaffold(
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
-                            }
+                            },
+                            onReplayTour = { showTour = true }
                         )
                     }
                 }
@@ -279,11 +367,21 @@ fun MainAppScaffold(
                             val isSelected = currentScreen.route == screen.route
                             NavigationBarItem(
                                 selected = isSelected,
+                                enabled = currentScreen != Screen.Permissions || isSelected,
                                 onClick = { currentScreen = screen },
                                 icon = {
+                                    val iconScale by animateFloatAsState(
+                                        targetValue = if (isSelected) 1.12f else 1f,
+                                        animationSpec = tween(240),
+                                        label = "phone_nav_scale_${screen.route}"
+                                    )
                                     Icon(
                                         imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                        contentDescription = screen.title
+                                        contentDescription = screen.title,
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        }
                                     )
                                 },
                                 label = {
@@ -315,8 +413,8 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(240)) { it / 18 }) togetherWith
+                                (fadeOut(tween(150)) + slideOutHorizontally(tween(180)) { -it / 24 })
                         },
                         label = "phone_screen_transition"
                     ) { targetScreen ->
@@ -328,13 +426,20 @@ fun MainAppScaffold(
                             onConfigureScheduleForApp = { pkg ->
                                 selectedSchedulePackage = pkg
                                 currentScreen = Screen.Schedules
-                            }
+                            },
+                            onReplayTour = { showTour = true }
                         )
                     }
                 }
             }
         }
     }
+    }
+    if (showTour) {
+        AppTourDialog(onFinish = {
+            scope.launch { repository.settings.setTourCompleted(true) }
+            showTour = false
+        })
     }
 }
 
@@ -344,7 +449,8 @@ fun ScreenContent(
     repository: AppBlockerRepository,
     selectedSchedulePackage: String?,
     onNavigateToScreen: (Screen) -> Unit,
-    onConfigureScheduleForApp: (String) -> Unit
+    onConfigureScheduleForApp: (String) -> Unit,
+    onReplayTour: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     when (currentScreen) {
@@ -354,9 +460,13 @@ fun ScreenContent(
                 onNavigateToApps = { onNavigateToScreen(Screen.Apps) },
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToSchedules = { onNavigateToScreen(Screen.Schedules) },
+                onNavigateToProgress = { onNavigateToScreen(Screen.Progress) },
                 onNavigateToFocus = { onNavigateToScreen(Screen.Focus) },
                 onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
             )
+        }
+        Screen.Progress -> {
+            ProgressScreen()
         }
         Screen.Focus -> {
             FocusScreen()
@@ -396,7 +506,8 @@ fun ScreenContent(
                 onNavigateToPermissions = { onNavigateToScreen(Screen.Permissions) },
                 onNavigateToAntiBypassGuide = { onNavigateToScreen(Screen.AntiBypassGuide) },
                 onNavigateToLegal = { onNavigateToScreen(Screen.Legal) },
-                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) }
+                onNavigateToAdultProtection = { onNavigateToScreen(Screen.AdultProtection) },
+                onReplayTour = onReplayTour
             )
         }
         Screen.AntiBypassGuide -> {

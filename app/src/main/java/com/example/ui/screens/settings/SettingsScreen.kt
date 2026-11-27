@@ -1,10 +1,10 @@
 package com.example.ui.screens.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,23 +17,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,23 +45,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.backup.BackupManager
+import com.example.data.preferences.LocalUserProfileStore
+import com.example.data.preferences.LocalProfileAuthStore
+import com.example.ui.components.BunnyCompanion
+import com.example.ui.components.BunnyMood
 import com.example.data.repository.AppBlockerRepository
-import com.example.ui.components.GlassCard
 import kotlinx.coroutines.launch
-
-private enum class SettingsSection(val title: String, val icon: ImageVector) {
-    Appearance("Appearance", Icons.Default.Palette),
-    Blocking("Blocking", Icons.Default.HourglassBottom),
-    Protection("Protection", Icons.Default.Shield),
-    Permissions("Permissions", Icons.Default.Security),
-    Privacy("Privacy & legal", Icons.Default.PrivacyTip),
-    About("About", Icons.Default.Info)
-}
 
 @Composable
 fun SettingsScreen(
@@ -66,351 +67,354 @@ fun SettingsScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToAntiBypassGuide: () -> Unit,
     onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit = {}
+    onNavigateToAdultProtection: () -> Unit = {},
+    onReplayTour: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
-    val delayMinutes by repository.settings.strictChangeDelayMinutesFlow.collectAsState(initial = 0)
+    val localUsers = remember(context) { LocalUserProfileStore(context.applicationContext) }
+    val authStore = remember(context) { LocalProfileAuthStore(context.applicationContext) }
+    val localProfile by localUsers.profileFlow.collectAsState(initial = null)
     val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
-    var selectedSection by remember { mutableStateOf(SettingsSection.Appearance) }
+    val profileName by repository.settings.profileNameFlow.collectAsState(initial = "")
+    val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
+    val dailyGoal by repository.settings.focusDailyGoalFlow.collectAsState(initial = 120)
+    var editableName by remember(profileName) { mutableStateOf(profileName) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var importUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("settings_screen_root")
-    ) {
-        val isTablet = maxWidth >= 720.dp
-
-        if (isTablet) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Column(modifier = Modifier.width(280.dp)) {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Preferences and protection",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    SettingsSection.entries.forEach { section ->
-                        SettingsSidebarItem(
-                            section = section,
-                            selected = selectedSection == section,
-                            onClick = { selectedSection = section }
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    BackupManager.export(context, repository, uri)
+                    message = "Backup saved successfully. Your existing app session remains open."
+                } catch (error: Exception) {
+                    message = "Backup failed: ${error.message ?: "unknown error"}"
                 }
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> importUri = uri }
 
-                GlassCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    elevation = 0.dp
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Settings", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Text("Make Strict Blocker work the way you do.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        item {
+            SettingsCard(title = "Profile and sign-in", icon = Icons.Default.Person) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    Box(
+                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
-                        item {
-                            Text(
-                                text = selectedSection.title,
-                                style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        item {
-                            SettingsSectionContent(
-                                section = selectedSection,
-                                themeMode = themeMode,
-                                delayMinutes = delayMinutes,
-                                isProtectionEnabled = isProtectionEnabled,
-                                onThemeChange = { mode ->
-                                    scope.launch { repository.settings.setThemeMode(mode) }
-                                },
-                                onDelayChange = { minutes ->
-                                    scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
-                                },
-                                onProtectionChange = { enabled ->
-                                    scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                                },
-                                onNavigateToPermissions = onNavigateToPermissions,
-                                onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
-                                onNavigateToLegal = onNavigateToLegal,
-                                onNavigateToAdultProtection = onNavigateToAdultProtection
-                            )
-                        }
+                        BunnyCompanion(size = 78.dp, mood = BunnyMood.Resting)
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("DEVICE PROFILE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            localProfile?.displayName?.takeIf { it.isNotBlank() } ?: profileName.ifBlank { "Your profile" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text("Private profile · stored on this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            localProfile?.let { "Profile database: active" } ?: "Profile database: waiting for setup",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "App behavior and system controls",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                SettingsSection.entries.forEach { section ->
-                    item {
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = 0.dp
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = section.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                SettingsSectionContent(
-                                    section = section,
-                                    themeMode = themeMode,
-                                    delayMinutes = delayMinutes,
-                                    isProtectionEnabled = isProtectionEnabled,
-                                    onThemeChange = { mode ->
-                                        scope.launch { repository.settings.setThemeMode(mode) }
-                                    },
-                                    onDelayChange = { minutes ->
-                                        scope.launch { repository.settings.setStrictChangeDelayMinutes(minutes) }
-                                    },
-                                    onProtectionChange = { enabled ->
-                                        scope.launch { repository.settings.setProtectionEnabled(enabled) }
-                                    },
-                                    onNavigateToPermissions = onNavigateToPermissions,
-                                    onNavigateToAntiBypassGuide = onNavigateToAntiBypassGuide,
-                                    onNavigateToLegal = onNavigateToLegal,
-                                    onNavigateToAdultProtection = onNavigateToAdultProtection
-                                )
-                            }
+                OutlinedTextField(
+                    value = editableName,
+                    onValueChange = { editableName = it.take(40) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Display name") },
+                    placeholder = { Text("What should the app call you?") }
+                )
+                Button(
+                    onClick = {
+                        scope.launch {
+                            repository.settings.setProfileName(editableName.trim())
+                            localUsers.saveProfile(editableName.trim(), localProfile?.avatarId ?: "bunny")
+                            message = "Your local profile has been saved."
                         }
+                    },
+                    enabled = editableName.trim().length >= 2,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Save profile changes") }
+                OutlinedButton(
+                    onClick = {
+                        currentPin = ""
+                        newPin = ""
+                        confirmPin = ""
+                        pinError = null
+                        showPinDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Change 6-digit PIN") }
+                Text(
+                    "The app keeps a local profile record in Room and a salted PIN verifier on this device. There is no remote account or shared user database.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        item {
+            SettingsCard(title = "Appearance", icon = Icons.Default.Palette) {
+                Text("Choose a calmer plum-and-rose theme. The green palette has been removed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (mode, label) ->
+                        FilterChip(
+                            selected = themeMode == mode,
+                            onClick = { scope.launch { repository.settings.setThemeMode(mode) } },
+                            label = { Text(label) }
+                        )
                     }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun SettingsSidebarItem(
-    section: SettingsSection,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
-    } else {
-        MaterialTheme.colorScheme.background
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(background, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = section.icon,
-            contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = section.title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun SettingsSectionContent(
-    section: SettingsSection,
-    themeMode: String,
-    delayMinutes: Int,
-    isProtectionEnabled: Boolean,
-    onThemeChange: (String) -> Unit,
-    onDelayChange: (Int) -> Unit,
-    onProtectionChange: (Boolean) -> Unit,
-    onNavigateToPermissions: () -> Unit,
-    onNavigateToAntiBypassGuide: () -> Unit,
-    onNavigateToLegal: () -> Unit,
-    onNavigateToAdultProtection: () -> Unit
-) {
-    when (section) {
-        SettingsSection.Appearance -> {
-            SettingsDescription("Choose how the app follows your device theme.")
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    Triple("system", "System", Icons.Default.PhoneAndroid),
-                    Triple("light", "Light", Icons.Default.LightMode),
-                    Triple("dark", "Dark", Icons.Default.DarkMode)
-                ).forEach { (mode, label, icon) ->
-                    FilterChip(
-                        selected = themeMode == mode,
-                        onClick = { onThemeChange(mode) },
-                        leadingIcon = {
-                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                        },
-                        label = { Text(label) }
-                    )
+        item {
+            SettingsCard(title = "Blocking and focus", icon = Icons.Default.Settings) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Scheduled app blocking", style = MaterialTheme.typography.titleMedium)
+                        Text("Apply your saved app schedules.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = isProtectionEnabled, onCheckedChange = { enabled -> scope.launch { repository.settings.setProtectionEnabled(enabled) } })
                 }
+                Spacer(Modifier.height(8.dp))
+                Text("Daily focus target", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(60, 90, 120, 180, 240).forEach { minutes ->
+                        FilterChip(
+                            selected = dailyGoal == minutes,
+                            onClick = { scope.launch { repository.settings.setFocusDailyGoal(minutes) } },
+                            label = { Text("${minutes}m") }
+                        )
+                    }
+                }
+                Text("The target is used in Focus and Progress summaries; it does not force a timer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        SettingsSection.Blocking -> {
-            SettingsToggleRow(
-                title = "App blocking",
-                subtitle = "Apply saved schedules to protected apps.",
-                checked = isProtectionEnabled,
-                onCheckedChange = onProtectionChange
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Change delay",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            SettingsDescription("Adds a waiting period before schedule changes take effect.")
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(0 to "Instant", 5 to "5 min", 15 to "15 min", 30 to "30 min").forEach { (mins, label) ->
-                    FilterChip(
-                        selected = delayMinutes == mins,
-                        onClick = { onDelayChange(mins) },
-                        label = { Text(label) }
-                    )
+        item {
+            SettingsCard(title = "Backup and restore", icon = Icons.Default.Backup) {
+                Text(
+                    "Create a ZIP backup of schedules, app rules, settings, focus history, your local profile and personal progress. You can also import the JSON backup format used by Strict Blocker 1.8.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(onClick = { exportLauncher.launch("strict-blocker-backup.zip") }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Backup, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Create backup")
                 }
+                OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/zip", "application/json", "application/octet-stream", "text/*")) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Import previous version data")
+                }
+                Text(
+                    "A 1.8 JSON backup restores preferences, profile name, tracker dates and focus totals; it did not include the Room app-list/schedule database. New ZIP backups can include the database. Export a fresh backup before importing; restore restarts the app process.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
-        SettingsSection.Protection -> {
-            SettingsLinkRow(
-                title = "18+ content protection",
-                subtitle = "Browser, SafeSearch and DNS controls",
-                onClick = onNavigateToAdultProtection
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsLinkRow(
-                title = "Anti-bypass information",
-                subtitle = "Understand Android limits and stronger device-owner options",
-                onClick = onNavigateToAntiBypassGuide
-            )
+        item {
+            SettingsCard(title = "Protection and permissions", icon = Icons.Default.Security) {
+                SettingsLink("Browser protection", "Supported browser checks only; DNS/VPN has been removed.", onNavigateToAdultProtection)
+                SettingsLink("System permissions", "Accessibility, Usage Access, overlay and battery settings.", onNavigateToPermissions)
+                SettingsLink("Security guide", "Understand Android's app-blocking limits.", onNavigateToAntiBypassGuide)
+            }
         }
 
-        SettingsSection.Permissions -> {
-            SettingsDescription("Review the Android permissions used for blocking and background reliability.")
-            Spacer(modifier = Modifier.height(12.dp))
-            SettingsLinkRow(
-                title = "System permissions",
-                subtitle = "Accessibility, usage access, overlay and battery settings",
-                onClick = onNavigateToPermissions
-            )
+        item {
+            SettingsCard(title = "App tour", icon = Icons.Default.CheckCircle) {
+                Text("Replay the walkthrough explaining Dashboard, Focus, Progress, Apps, Schedules and Settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onReplayTour, modifier = Modifier.fillMaxWidth()) { Text("Replay app tour") }
+            }
         }
 
-        SettingsSection.Privacy -> {
-            SettingsLinkRow(
-                title = "Privacy, terms & data controls",
-                subtitle = "Read policies and manage local data",
-                onClick = onNavigateToLegal
-            )
+        item {
+            SettingsCard(title = "About Strict Blocker", icon = Icons.Default.Info) {
+                Text("Strict Blocker 2.3.0", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("A local-first Android focus and app-scheduling tool.", style = MaterialTheme.typography.bodyMedium)
+                AboutRow("App scheduling", "Choose apps and recurring allowed time windows. A local Accessibility Service checks app launches.")
+                AboutRow("Focus", "Run a distraction-free timer with saved sessions, daily goals and focus history.")
+                AboutRow("Progress", "Track a private, self-reported personal goal with timestamp-based runs, milestones and a history graph.")
+                AboutRow("Storage", "Schedules and app records use Room; the device profile is stored in a separate local Room database; preferences and progress stay in DataStore.")
+                AboutRow("Backups", "Export a ZIP or import supported 1.8 JSON backups. Legacy JSON does not contain the Room app-list/schedule database. Backups may contain private activity and should be stored securely.")
+                AboutRow("Network", "No DNS filtering or local VPN service is included. This build does not require a cloud account for its core features.")
+                AboutRow("Limitations", "Android can stop background work, revoke permissions or uninstall regular apps. Scheduled enforcement depends on the permissions remaining enabled.")
+                AboutRow("Support", "Review Privacy & Legal for data-handling details and platform limitations.")
+                OutlinedButton(onClick = onNavigateToLegal, modifier = Modifier.fillMaxWidth()) { Text("Privacy, terms and legal information") }
+            }
         }
 
-        SettingsSection.About -> {
+        item {
             Text(
-                text = "Strict Blocker",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
+                "Local profile only. No real cloud login or cross-device sync is claimed. Keep a backup before reinstalling or switching signing keys.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
-            SettingsDescription("Version 2.0.1")
-            Spacer(modifier = Modifier.height(12.dp))
-            SettingsDescription("Schedules, preferences and focus-session data are stored on this device")
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsDescription("Focus progress stays local and does not require an account")
         }
+    }
+
+    if (showPinDialog) {
+        AlertDialog(
+            onDismissRequest = { showPinDialog = false },
+            title = { Text("Change your PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = currentPin,
+                        onValueChange = { currentPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("Current PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    OutlinedTextField(
+                        value = newPin,
+                        onValueChange = { newPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("New 6-digit PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    OutlinedTextField(
+                        value = confirmPin,
+                        onValueChange = { confirmPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("Confirm new PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (pinError != null) {
+                        Text(pinError.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when {
+                        authStore.remainingLockoutSeconds() > 0L ->
+                            pinError = "Try again in ${authStore.remainingLockoutSeconds()} seconds."
+                        !authStore.verifyPin(currentPin) ->
+                            pinError = if (authStore.remainingLockoutSeconds() > 0L)
+                                "Too many attempts. Wait ${authStore.remainingLockoutSeconds()} seconds."
+                            else "Current PIN is incorrect."
+                        newPin.length != 6 -> pinError = "The new PIN must contain 6 digits."
+                        newPin != confirmPin -> pinError = "The new PINs do not match."
+                        else -> {
+                            authStore.savePin(newPin)
+                            showPinDialog = false
+                            message = "Your PIN has been updated."
+                        }
+                    }
+                }) { Text("Update PIN") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPinDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (message != null) {
+        AlertDialog(
+            onDismissRequest = { message = null },
+            title = { Text("Strict Blocker") },
+            text = { Text(message!!) },
+            confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }
+        )
+    }
+
+    if (importUri != null) {
+        AlertDialog(
+            onDismissRequest = { importUri = null },
+            title = { Text("Restore backup?") },
+            text = { Text("This replaces matching local app data with the contents of the selected backup. Create a backup of the current app first.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val selected = importUri
+                    importUri = null
+                    if (selected != null) scope.launch {
+                        try {
+                            val count = BackupManager.restore(context, selected)
+                            android.widget.Toast.makeText(context, "Restore completed. Reopen Strict Blocker.", android.widget.Toast.LENGTH_LONG).show()
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            }, 1_500L)
+                        } catch (error: Exception) {
+                            message = "Restore failed: ${error.message ?: "unsupported backup"}"
+                        }
+                    }
+                }) { Text("Restore") }
+            },
+            dismissButton = { TextButton(onClick = { importUri = null }) { Text("Cancel") } }
+        )
     }
 }
 
 @Composable
-private fun SettingsDescription(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-@Composable
-private fun SettingsToggleRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
+private fun SettingsCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable () -> Unit) {
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            }
+            content()
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
-private fun SettingsLinkRow(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+private fun AboutRow(title: String, description: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SettingsLink(title: String, subtitle: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Timer
@@ -23,71 +25,19 @@ sealed class Screen(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
-    data object Dashboard : Screen(
-        route = "dashboard",
-        title = "Dashboard",
-        selectedIcon = Icons.Filled.Dashboard,
-        unselectedIcon = Icons.Outlined.Dashboard
-    )
-
-    data object Focus : Screen(
-        route = "focus",
-        title = "Focus",
-        selectedIcon = Icons.Filled.Timer,
-        unselectedIcon = Icons.Outlined.Timer
-    )
-
-    data object Apps : Screen(
-        route = "apps",
-        title = "Apps",
-        selectedIcon = Icons.Filled.Apps,
-        unselectedIcon = Icons.Outlined.Apps
-    )
-
-    data object Schedules : Screen(
-        route = "schedules",
-        title = "Schedules",
-        selectedIcon = Icons.Filled.CalendarMonth,
-        unselectedIcon = Icons.Outlined.CalendarMonth
-    )
-
-    data object AdultProtection : Screen(
-        route = "adult_protection",
-        title = "18+ Shield",
-        selectedIcon = Icons.Filled.Shield,
-        unselectedIcon = Icons.Outlined.Shield
-    )
-
-    data object Permissions : Screen(
-        route = "permissions",
-        title = "Permissions",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
-
-    data object Settings : Screen(
-        route = "settings",
-        title = "Settings",
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings
-    )
-
-    data object AntiBypassGuide : Screen(
-        route = "anti_bypass_guide",
-        title = "Security Guide",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
-
-    data object Legal : Screen(
-        route = "legal",
-        title = "Privacy & Legal",
-        selectedIcon = Icons.Filled.Security,
-        unselectedIcon = Icons.Outlined.Security
-    )
+    data object Dashboard : Screen("dashboard", "Home", Icons.Filled.Dashboard, Icons.Outlined.Dashboard)
+    data object Progress : Screen("progress", "Progress", Icons.Filled.Insights, Icons.Outlined.Insights)
+    data object Focus : Screen("focus", "Focus", Icons.Filled.Timer, Icons.Outlined.Timer)
+    data object Apps : Screen("apps", "Apps", Icons.Filled.Apps, Icons.Outlined.Apps)
+    data object Schedules : Screen("schedules", "Schedules", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
+    data object AdultProtection : Screen("adult_protection", "Browser Guard", Icons.Filled.Shield, Icons.Outlined.Shield)
+    data object Permissions : Screen("permissions", "Permissions", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Settings : Screen("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
+    data object AntiBypassGuide : Screen("anti_bypass_guide", "Security Guide", Icons.Filled.Security, Icons.Outlined.Security)
+    data object Legal : Screen("legal", "Privacy & Legal", Icons.Filled.Security, Icons.Outlined.Security)
 
     companion object {
         val navItems: List<Screen>
-            get() = listOf(Dashboard, Focus, Apps, Schedules, Settings)
+            get() = listOf(Dashboard, Progress, Focus, Apps, Schedules, Settings)
     }
 }

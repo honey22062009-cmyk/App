@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,11 +53,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
+import com.example.data.preferences.PersonalProgressPreferences
+import com.example.data.preferences.PersonalProgressSnapshot
 import com.example.data.repository.NextTransitionInfo
 import com.example.ui.components.AppIconImage
 import com.example.ui.components.AppSurface
-import com.example.ui.components.BunnyCompanion
-import com.example.ui.components.BunnyMood
+import com.example.ui.components.StrictBlockerLogo
+import com.example.ui.components.CompanionScene
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -70,11 +73,16 @@ fun DashboardScreen(
     onNavigateToApps: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToSchedules: () -> Unit,
+    onNavigateToProgress: () -> Unit = {},
     onNavigateToFocus: () -> Unit = {},
     onNavigateToAdultProtection: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val profileName by repository.settings.profileNameFlow.collectAsState(initial = "")
+    val progressSnapshot by remember(context) {
+        PersonalProgressPreferences(context.applicationContext).snapshotFlow
+    }.collectAsState(initial = PersonalProgressSnapshot())
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
     val isAdultProtectionEnabled by repository.settings.isAdultProtectionEnabledFlow.collectAsState(initial = true)
     val adultBlocksCount by repository.settings.adultBlocksCountFlow.collectAsState(initial = 0)
@@ -89,10 +97,7 @@ fun DashboardScreen(
 
     DisposableEffect(context, lifecycleOwner) {
         fun refreshPermissions() {
-            permissionsHealthy = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.isUsageAccessGranted(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.canScheduleExactAlarms(context)
+            permissionsHealthy = PermissionHelper.hasRequiredProtectionPermissions(context)
         }
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refreshPermissions()
@@ -114,7 +119,8 @@ fun DashboardScreen(
         val wide = maxWidth >= 900.dp
         val horizontalPadding = if (maxWidth >= 720.dp) 32.dp else 20.dp
         val contentWidth = when {
-            maxWidth >= 1280.dp -> 1120.dp
+            maxWidth >= 1440.dp -> 1320.dp
+            maxWidth >= 1280.dp -> 1160.dp
             maxWidth >= 900.dp -> maxWidth - 64.dp
             else -> maxWidth
         }
@@ -130,10 +136,19 @@ fun DashboardScreen(
         ) {
             item {
                 Column(modifier = Modifier.width(contentWidth).fillMaxWidth()) {
-                    Text("Your day, protected", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+                    Text(if (profileName.isBlank()) "Your day, protected" else "Welcome back, $profileName", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(4.dp))
                     Text("Choose what gets your attention and when", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+
+            item {
+                MomentumPanel(
+                    modifier = Modifier.width(contentWidth).fillMaxWidth(),
+                    currentStreak = progressSnapshot.currentStreak,
+                    bestStreak = progressSnapshot.bestStreak,
+                    onClick = onNavigateToProgress
+                )
             }
 
             item {
@@ -350,7 +365,14 @@ private fun CompanionPanel(modifier: Modifier, onFocus: () -> Unit) {
                     Text("Open focus")
                 }
             }
-            BunnyCompanion(size = 128.dp, mood = BunnyMood.Resting)
+            CompanionScene(
+                characterId = "luna",
+                modifier = Modifier.size(128.dp),
+                interactive = true,
+                reduceMotion = false,
+                reaction = "idle",
+                reactionKey = 1
+            )
         }
     }
 }
@@ -428,6 +450,89 @@ private fun InfoLine(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun MomentumPanel(
+    modifier: Modifier,
+    currentStreak: Int,
+    bestStreak: Int,
+    onClick: () -> Unit
+) {
+    val milestones = listOf(1, 3, 7, 14, 30, 60, 90)
+    val previousMilestone = milestones.lastOrNull { it <= currentStreak } ?: 0
+    val nextMilestone = milestones.firstOrNull { it > currentStreak } ?: 90
+    val milestoneProgress = if (currentStreak >= 90) 1f else {
+        ((currentStreak - previousMilestone).toFloat() /
+            (nextMilestone - previousMilestone).coerceAtLeast(1)).coerceIn(0f, 1f)
+    }
+
+    AppSurface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(
+                    "YOUR PERSONAL PROGRESS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        currentStreak.toString(),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    Text(
+                        "day run",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(bottom = 7.dp)
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = milestoneProgress,
+                    modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Best: $bestStreak days",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        if (currentStreak >= 90) "All milestones reached" else "Next: $nextMilestone days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier.size(58.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Open progress history",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
         }
     }
 }
