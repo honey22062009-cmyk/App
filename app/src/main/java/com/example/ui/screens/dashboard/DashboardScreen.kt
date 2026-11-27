@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -119,7 +120,8 @@ fun DashboardScreen(
         val wide = maxWidth >= 900.dp
         val horizontalPadding = if (maxWidth >= 720.dp) 32.dp else 20.dp
         val contentWidth = when {
-            maxWidth >= 1280.dp -> 1120.dp
+            maxWidth >= 1440.dp -> 1320.dp
+            maxWidth >= 1280.dp -> 1160.dp
             maxWidth >= 900.dp -> maxWidth - 64.dp
             else -> maxWidth
         }
@@ -453,27 +455,78 @@ private fun MomentumPanel(
     bestStreak: Int,
     onClick: () -> Unit
 ) {
-    AppSurface(modifier = modifier, shape = RoundedCornerShape(20.dp), onClick = onClick) {
+    val milestones = listOf(1, 3, 7, 14, 30, 60, 90)
+    val previousMilestone = milestones.lastOrNull { it <= currentStreak } ?: 0
+    val nextMilestone = milestones.firstOrNull { it > currentStreak } ?: 90
+    val milestoneProgress = if (currentStreak >= 90) 1f else {
+        ((currentStreak - previousMilestone).toFloat() /
+            (nextMilestone - previousMilestone).coerceAtLeast(1)).coerceIn(0f, 1f)
+    }
+
+    AppSurface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f),
+        onClick = onClick
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            modifier = Modifier.fillMaxWidth().padding(22.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Your progress", style = MaterialTheme.typography.titleLarge)
-                Text("Current run and personal best", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Column {
-                        Text("$currentStreak days", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        Text("Current", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column {
-                        Text("$bestStreak days", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                        Text("Personal best", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(
+                    "YOUR PERSONAL PROGRESS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        currentStreak.toString(),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    Text(
+                        "day run",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(bottom = 7.dp)
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = milestoneProgress,
+                    modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Best: $bestStreak days",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        if (currentStreak >= 90) "All milestones reached" else "Next: $nextMilestone days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    )
                 }
             }
-            Icon(Icons.Default.CheckCircle, contentDescription = "Open progress", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
+            Box(
+                modifier = Modifier.size(58.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Open progress history",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
         }
     }
 }
