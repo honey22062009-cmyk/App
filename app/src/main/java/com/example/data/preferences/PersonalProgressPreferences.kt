@@ -184,9 +184,9 @@ class PersonalProgressPreferences(private val context: Context) {
             val resetAt = maxOf(requestedAt, oldStartAt)
             val resetDay = Instant.ofEpochMilli(resetAt).atZone(zone).toLocalDate().toEpochDay()
             val statuses = parseStatus(p[Keys.DAILY_STATUS] ?: "").toMutableMap()
-            val alreadyResetToday = statuses[resetDay] == 0
+            val isNewResetEvent = resetAt > oldStartAt
             val runs = parseRuns(p[Keys.STREAK_RUNS] ?: "").toMutableList()
-            if (resetAt > oldStartAt) {
+            if (isNewResetEvent) {
                 runs += StreakRun(startAtMillis = oldStartAt, endAtMillis = resetAt)
             }
 
@@ -200,7 +200,8 @@ class PersonalProgressPreferences(private val context: Context) {
             p[Keys.LAST_RESET_AT_MILLIS] = resetAt
             p[Keys.STREAK_RUNS] = encodeRuns(runs)
             p[Keys.BEST_STREAK] = best
-            if (!alreadyResetToday) p[Keys.RESET_COUNT] = (p[Keys.RESET_COUNT] ?: 0) + 1
+            // Count each distinct reset event, including multiple events on one local day.
+            if (isNewResetEvent) p[Keys.RESET_COUNT] = (p[Keys.RESET_COUNT] ?: 0) + 1
             p[Keys.DAILY_STATUS] = encodeStatus(statuses, resetDay)
         }
     }
