@@ -39,7 +39,8 @@ fun LocalProfileGateScreen(
     hasPin: Boolean,
     onCreateProfile: (String, String) -> Unit,
     onUnlock: (String) -> Boolean,
-    onAuthenticated: () -> Unit
+    onAuthenticated: () -> Unit,
+    onLockoutRemainingSeconds: () -> Long = { 0L }
 ) {
     var name by remember(existingName) { mutableStateOf(existingName) }
     var pin by remember { mutableStateOf("") }
@@ -89,7 +90,16 @@ fun LocalProfileGateScreen(
                     )
                     Button(
                         onClick = {
-                            if (onUnlock(pin)) onAuthenticated() else error = "That PIN is not correct. Try again."
+                            if (onUnlock(pin)) {
+                                onAuthenticated()
+                            } else {
+                                val waitSeconds = onLockoutRemainingSeconds()
+                                error = if (waitSeconds > 0L) {
+                                    "Too many attempts. Try again in $waitSeconds seconds."
+                                } else {
+                                    "That PIN is not correct. Try again."
+                                }
+                            }
                         },
                         enabled = pin.length == 6,
                         modifier = Modifier.fillMaxWidth()
