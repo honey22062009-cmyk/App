@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function validPlan(data) {
+      return (
+        data.planId == "monthly" &&
+        data.amountRupees == 39 &&
+        data.durationDays == 30
+      ) || (
+        data.planId == "yearly" &&
+        data.amountRupees == 599 &&
+        data.durationDays == 365
+      );
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /payment_requests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "requestId",
+          "userUid",
+          "planId",
+          "amountRupees",
+          "durationDays",
+          "transactionId",
+          "deviceHash",
+          "status",
+          "createdAt",
+          "createdAtClientMillis"
+        ])
+        && request.resource.data.requestId == requestId
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.transactionId is string
+        && request.resource.data.transactionId.size() >= 6
+        && request.resource.data.transactionId.size() <= 64
+        && request.resource.data.deviceHash is string
+        && request.resource.data.deviceHash.size() == 64
+        && validPlan(request.resource.data);
+
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
+
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+  }
+}

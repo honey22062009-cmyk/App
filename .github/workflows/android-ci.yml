@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: ["main", "fix/build-errors"]
+    branches: ["main", "fix/build-errors", "ui/polish-v1-3"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -13,22 +13,34 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
+      - name: Configure optional Google Sign-In
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > .env
+          else
+            printf 'GOOGLE_WEB_CLIENT_ID=CHANGE_ME\n' > .env
+            echo "::warning::Google Sign-In is not configured yet. Firebase manual payments still build and work."
+          fi
       - name: Check storefront JavaScript syntax
         run: node --check website/config.js && node --check website/app.js
+      - name: Run Android lint
+        run: gradle :app:lintDebug --stacktrace --no-daemon
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
       - name: Upload debug APK
@@ -40,3 +52,69 @@ jobs:
           retention-days: 14
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+      - name: Build release bundle
+        run: gradle :app:bundleRelease --stacktrace --no-daemon
+      - name: Upload unsigned release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-blocker-unsigned-release-bundle
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-check-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+
+  tablet-ui:
+    name: UI · ${{ matrix.device }} · API ${{ matrix.api }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: tablet
+            api: 35
+            profile: pixel_c
+          - device: phone
+            api: 36
+            profile: pixel_6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Prepare instrumentation APKs
+        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --no-daemon
+      - name: Run Android UI regressions
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/run-tablet-ui.sh
+      - name: Upload tablet UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-evidence-${{ matrix.device }}
+          path: |
+            tablet-ui-screenshots/
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/

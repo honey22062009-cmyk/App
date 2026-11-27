@@ -3,16 +3,14 @@ package com.example.core.system
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.SystemClock
 
 /**
  * Ensures system-critical applications can NEVER be managed or blocked.
- * Prevents bricking or locking out essential device functionality.
+ * Expensive launcher and dialer resolution is cached instead of running on
+ * every Accessibility event. Package changes can invalidate the cache.
  */
 object SafetyWhitelist {
-
-    /**
-     * Hardcoded package identifiers known to be essential system infrastructure.
-     */
     private val ESSENTIAL_SYSTEM_PACKAGES = setOf(
         "com.android.systemui",
         "com.android.settings",
@@ -25,54 +23,54 @@ object SafetyWhitelist {
         "com.android.permissioncontroller",
         "com.google.android.packageinstaller",
         "com.android.packageinstaller",
-        "com.android.vending", // Google Play Store
-        "com.sec.android.app.launcher", // Samsung One UI Home
+        "com.android.vending",
+        "com.sec.android.app.launcher",
         "com.google.android.apps.nexuslauncher",
         "com.android.launcher3"
     )
 
-    /**
-     * Checks if [packageName] is a system-critical app or the blocker itself.
-     */
+    private data class ResolvedDefaults(
+        val packageNames: Set<String>,
+        val expiresAtElapsed: Long
+    )
+
+    @Volatile
+    private var resolvedDefaults: ResolvedDefaults? = null
+
+    fun invalidateCache() {
+        resolvedDefaults = null
+    }
+
+    fun preload(context: Context) {
+        resolved(context.applicationContext)
+    }
+
     fun isSystemCritical(context: Context, packageName: String): Boolean {
-        // 1. Blocker application itself MUST NOT be blocked
         if (packageName == context.packageName) return true
-
-        // 2. Known essential system components
-        if (ESSENTIAL_SYSTEM_PACKAGES.contains(packageName)) return true
-
-        // 3. Current default Home / Launcher app
-        if (isCurrentLauncher(context, packageName)) return true
-
-        // 4. Default Telephony / Emergency Dialer
-        if (isDefaultDialer(context, packageName)) return true
-
-        return false
+        if (packageName in ESSENTIAL_SYSTEM_PACKAGES) return true
+        return packageName in resolved(context.applicationContext)
     }
 
-    /**
-     * Dynamically identifies the currently active home launcher application.
-     */
-    private fun isCurrentLauncher(context: Context, packageName: String): Boolean {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_HOME)
+    private fun resolved(context: Context): Set<String> {
+        val now = SystemClock.elapsedRealtime()
+        val current = resolvedDefaults
+        if (current != null && now < current.expiresAtElapsed) return current.packageNames
+
+        val packages = buildSet {
+            runCatching {
+                val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                    ?.activityInfo?.packageName?.let(::add)
+            }
+            runCatching {
+                val dialIntent = Intent(Intent.ACTION_DIAL)
+                context.packageManager.resolveActivity(dialIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                    ?.activityInfo?.packageName?.let(::add)
+            }
         }
-        val resolveInfo = context.packageManager.resolveActivity(
-            intent,
-            PackageManager.MATCH_DEFAULT_ONLY
-        )
-        return resolveInfo?.activityInfo?.packageName == packageName
+        resolvedDefaults = ResolvedDefaults(packages, now + CACHE_TTL_MILLIS)
+        return packages
     }
 
-    /**
-     * Dynamically identifies the default dialer application.
-     */
-    private fun isDefaultDialer(context: Context, packageName: String): Boolean {
-        val intent = Intent(Intent.ACTION_DIAL)
-        val resolveInfo = context.packageManager.resolveActivity(
-            intent,
-            PackageManager.MATCH_DEFAULT_ONLY
-        )
-        return resolveInfo?.activityInfo?.packageName == packageName
-    }
+    private const val CACHE_TTL_MILLIS = 60_000L
 }

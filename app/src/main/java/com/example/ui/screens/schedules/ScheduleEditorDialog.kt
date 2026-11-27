@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +77,9 @@ fun ScheduleEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(28.dp),
         title = {
             Column {
                 Text(
@@ -240,6 +246,7 @@ fun ScheduleEditorDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeSelectorRow(
     label: String,
@@ -249,46 +256,64 @@ fun TimeSelectorRow(
 ) {
     val time = LocalTime.of(hour, minute)
     val formatted = time.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+    var showPicker by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(7.dp))
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showPicker = true },
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
             )
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = formatted,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                Icon(
+                    Icons.Default.AccessTime,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
                 )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        formatted,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "Tap to choose exact hour and minute",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(7.dp))
 
-        // Quick hour / minute adjusters
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             QuickTimeButton(label = "-1h") {
-                val newHour = (hour - 1 + 24) % 24
-                onTimeChanged(newHour, minute)
+                onTimeChanged((hour - 1 + 24) % 24, minute)
             }
             QuickTimeButton(label = "+1h") {
-                val newHour = (hour + 1) % 24
-                onTimeChanged(newHour, minute)
+                onTimeChanged((hour + 1) % 24, minute)
             }
             QuickTimeButton(label = "-15m") {
                 var newMinute = minute - 15
@@ -309,6 +334,50 @@ fun TimeSelectorRow(
                 onTimeChanged(newHour, newMinute)
             }
         }
+    }
+
+    if (showPicker) {
+        val pickerState = rememberTimePickerState(
+            initialHour = hour,
+            initialMinute = minute,
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(28.dp),
+            title = {
+                Text(
+                    "Choose exact time",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = pickerState)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onTimeChanged(pickerState.hour, pickerState.minute)
+                        showPicker = false
+                    }
+                ) {
+                    Text("Set time")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showPicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

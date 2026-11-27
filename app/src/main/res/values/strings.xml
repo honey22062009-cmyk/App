@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Strict Blocker</string>
-    <string name="accessibility_service_description">Monitors foreground applications to enforce your scheduled blocking rules. This service only detects the active app package name to block restricted apps outside their allowed time slots. It does NOT read screen content, keystrokes, or private messages.</string>
+    <string name="accessibility_service_description">Detects foreground app names for your blocking schedules. With your consent, reads visible browser address and search fields to interrupt restricted domains or explicit searches. Passwords and other editable fields are excluded. Inspected browser text stays in memory on this device; only generic block counts are saved.</string>
     
     <!-- Navigation -->
     <string name="nav_dashboard">Dashboard</string>
@@ -18,7 +18,7 @@
 
     <!-- Permissions -->
     <string name="perm_accessibility_title">Accessibility Service</string>
-    <string name="perm_accessibility_why">Instant zero-latency detection of foreground apps when they launch.</string>
+    <string name="perm_accessibility_why">Detects active app names and permitted browser fields to apply the rules you choose.</string>
     <string name="perm_accessibility_what">Without it, the blocker cannot immediately detect when you tap a blocked app.</string>
     <string name="perm_accessibility_how">Tap below, select \'Strict Blocker\' under Installed Services, and switch it ON.</string>
 
@@ -43,7 +43,7 @@
     <string name="perm_notification_how">Allow notifications when prompted by the system.</string>
 
     <string name="perm_alarm_title">Exact Alarms</string>
-    <string name="perm_alarm_why">Guarantees precise to-the-minute schedule cutoffs (e.g. blocking right at 7:00 PM).</string>
+    <string name="perm_alarm_why">Allows precise schedule and reminder alarms when Android grants exact-alarm access.</string>
     <string name="perm_alarm_what">Without exact alarms, schedule cutoffs could be delayed by up to 15 minutes by Doze mode.</string>
     <string name="perm_alarm_how">Ensure \'Allow setting alarms and reminders\' is enabled.</string>
 </resources>

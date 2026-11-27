@@ -65,6 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.data.preferences.SettingsPreferences
+import com.example.ui.components.AccessibilityDisclosure
 import com.example.R
 import com.example.core.system.PermissionHelper
 import com.example.ui.components.GlassCard
@@ -72,15 +76,24 @@ import com.example.ui.components.StatusBadge
 
 @Composable
 fun PermissionsScreen(
+    settings: SettingsPreferences,
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    var showDisclosure by remember { mutableStateOf(false) }
+    if (showDisclosure) AccessibilityDisclosure(onAgree = {
+        scope.launch {
+            settings.setBrowserInspectionConsent(true)
+            showDisclosure = false
+            PermissionHelper.openAccessibilitySettings(context)
+        }
+    }, onDismiss = { showDisclosure = false })
 
     // Live permission states
     var isAccessibilityGranted by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
     var isUsageGranted by remember { mutableStateOf(PermissionHelper.isUsageAccessGranted(context)) }
-    var isOverlayGranted by remember { mutableStateOf(PermissionHelper.canDrawOverlays(context)) }
     var isBatteryOptIgnored by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
     var isNotificationGranted by remember { mutableStateOf(PermissionHelper.isNotificationPermissionGranted(context)) }
     var isExactAlarmGranted by remember { mutableStateOf(PermissionHelper.canScheduleExactAlarms(context)) }
@@ -91,7 +104,6 @@ fun PermissionsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAccessibilityGranted = PermissionHelper.isAccessibilityServiceEnabled(context)
                 isUsageGranted = PermissionHelper.isUsageAccessGranted(context)
-                isOverlayGranted = PermissionHelper.canDrawOverlays(context)
                 isBatteryOptIgnored = PermissionHelper.isIgnoringBatteryOptimizations(context)
                 isNotificationGranted = PermissionHelper.isNotificationPermissionGranted(context)
                 isExactAlarmGranted = PermissionHelper.canScheduleExactAlarms(context)
@@ -101,8 +113,8 @@ fun PermissionsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val criticalGrantedCount = listOf(isAccessibilityGranted, isUsageGranted, isOverlayGranted).count { it }
-    val totalCritical = 3
+    val criticalGrantedCount = listOf(isAccessibilityGranted, isUsageGranted).count { it }
+    val totalCritical = 2
     val allCriticalGranted = criticalGrantedCount == totalCritical
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -219,7 +231,7 @@ fun PermissionsScreen(
             // Section 1: Core Protection
             item {
                 Text(
-                    text = "Required",
+                    text = "Core access",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -234,11 +246,11 @@ fun PermissionsScreen(
                     icon = Icons.Default.AccessibilityNew,
                     isGranted = isAccessibilityGranted,
                     isRequired = true,
-                    summary = "Lets Strict Blocker detect when a restricted app opens and show the block screen.",
+                    summary = "Detects scheduled apps and, with consent, visible browser searches. Review the disclosure before enabling.",
                     why = stringResource(R.string.perm_accessibility_why),
                     whatStops = stringResource(R.string.perm_accessibility_what),
                     howToEnable = stringResource(R.string.perm_accessibility_how),
-                    onGrantClick = { PermissionHelper.openAccessibilitySettings(context) }
+                    onGrantClick = { showDisclosure = true }
                 )
             }
 
@@ -255,22 +267,6 @@ fun PermissionsScreen(
                     whatStops = stringResource(R.string.perm_usage_what),
                     howToEnable = stringResource(R.string.perm_usage_how),
                     onGrantClick = { PermissionHelper.openUsageAccessSettings(context) }
-                )
-            }
-
-            // 3. Display Over Other Apps (Overlay)
-            item {
-                PermissionSetupCard(
-                    title = "Display Over Other Apps",
-                    technicalName = "Overlay Shield Window",
-                    icon = Icons.Default.PictureInPicture,
-                    isGranted = isOverlayGranted,
-                    isRequired = true,
-                    summary = "Allows the blocking screen to appear over a restricted app when needed.",
-                    why = stringResource(R.string.perm_overlay_why),
-                    whatStops = stringResource(R.string.perm_overlay_what),
-                    howToEnable = stringResource(R.string.perm_overlay_how),
-                    onGrantClick = { PermissionHelper.openOverlaySettings(context) }
                 )
             }
 

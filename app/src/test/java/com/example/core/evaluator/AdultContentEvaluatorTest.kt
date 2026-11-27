@@ -43,11 +43,25 @@ class AdultContentEvaluatorTest {
     }
 
     @Test
-    fun testEvaluateIncognitoTitle() {
-        val result = AdultContentEvaluator.evaluateText("You've gone Incognito - Chrome")
-        assertTrue(result is AdultContentEvaluator.EvaluationResult.Blocked)
-        val blocked = result as AdultContentEvaluator.EvaluationResult.Blocked
-        assertEquals(AdultContentEvaluator.BlockCategory.INCOGNITO_RESTRICTED, blocked.category)
+    fun openingPrivateWindowsAndOrdinaryBrowserChromeIsAllowed() {
+        for (text in listOf("You've gone Incognito - Chrome", "New private tab", "Search or enter address", "about:blank"))
+            assertEquals(text, AdultContentEvaluator.EvaluationResult.Clean, AdultContentEvaluator.evaluateText(text))
+    }
+
+    @Test fun explicitSearchWordsAndEncodedQueriesAreInterrupted() {
+        for (text in listOf("sex", "sexual videos", "porn", "free_porn", "https://google.com/search?q=sex",
+            "https://bing.com/search?q=%2570%256f%2572%256e", "https://example.com/?q=porn", "सेक्स"))
+            assertTrue(text, AdultContentEvaluator.evaluateText(text) is AdultContentEvaluator.EvaluationResult.Blocked)
+    }
+
+    @Test fun wordBoundariesAndDomainSuffixesDoNotBlockOrdinarySearches() {
+        for (text in listOf("Sussex university", "Essex weather", "Middlesex", "https://example.com", "https://notpornhub.com"))
+            assertEquals(text, AdultContentEvaluator.EvaluationResult.Clean, AdultContentEvaluator.evaluateText(text))
+    }
+
+    @Test fun operaVariantsAndOtherBrowserPackagesAreRecognized() {
+        for (pkg in listOf("com.opera.gx", "com.opera.mini.native.beta", "com.opera.touch", "com.opera.future", "com.chrome.canary", "org.mozilla.firefox_beta"))
+            assertTrue(pkg, AdultContentEvaluator.isBrowserPackage(pkg))
     }
 
     @Test

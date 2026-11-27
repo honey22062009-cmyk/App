@@ -12,19 +12,30 @@ object AdultContentEvaluator {
     // Common Android Web Browser Packages
     val BROWSER_PACKAGES = setOf(
         "com.android.chrome",
+        "com.chrome.beta",
+        "com.chrome.dev",
+        "com.chrome.canary",
         "org.mozilla.firefox",
+        "org.mozilla.fenix",
         "com.sec.android.app.sbrowser", // Samsung Internet
         "com.microsoft.emmx", // Microsoft Edge
         "com.brave.browser",
         "com.opera.browser",
         "com.opera.mini.native",
         "com.opera.touch",
+        "com.opera.gx",
+        "com.opera.mini.native.beta",
+        "com.opera.browser.beta",
+        "org.mozilla.focus",
+        "org.mozilla.klar",
         "com.duckduckgo.mobile.android",
-        "com.UCMobile.intl",
+        "com.ucmobile.intl",
         "com.vivaldi.browser",
         "com.kiwibrowser.browser",
         "com.mi.globalbrowser",
         "com.coloros.browser",
+        "com.heytap.browser",
+        "com.vivo.browser",
         "org.torproject.torbrowser"
     )
 
@@ -51,28 +62,40 @@ object AdultContentEvaluator {
         "simpcity.su", "leakgirls.com", "leaklinks.com"
     )
 
-    // Explicit root terms that indicate pornographic intent in URLs or search queries
-    private val EXPLICIT_KEYWORDS = listOf(
-        "porn", "porno", "pornography", "pornographic", "xxx", "xvideos", "xnxx",
-        "xhamster", "pornhub", "redtube", "youporn", "chaturbate", "stripchat",
-        "camsoda", "brazzers", "bangbros", "spankbang", "hentai", "rule34",
-        "erotic video", "hardcore sex", "blowjob", "gangbang", "creampie", "milf sex",
-        "anal sex", "incest porn", "threesome sex", "shemale porn", "trans porn",
-        "camgirl live", "fetish porn", "nsfw video", "nude leak", "onlyfans leak",
-        "fapello", "sex tape", "adult video", "adult webcam", "live sex cam",
-        "nude cam", "erome leak", "naked girls", "naked women", "free porn",
-        "adult tube", "sex video", "hardcore video"
+    // High-confidence terms score immediately. Ambiguous single words are
+    // deliberately lower-weight to reduce false positives on health/education pages.
+    private val HIGH_SIGNAL_TERMS = listOf(
+        "porn", "porno", "pornography", "pornographic", "porn video", "free porn",
+        "pornhub", "xvideos", "xnxx", "xhamster", "redtube", "youporn",
+        "chaturbate", "stripchat", "camsoda", "brazzers", "bangbros", "spankbang",
+        "hentai", "rule34", "sex tape", "nude leak", "onlyfans leak", "camgirl live",
+        "fetish porn", "adult webcam", "live sex cam", "free adult video",
+        "p0rn", "p0rno", "p0rnography", "s3x video", "n5fw video",
+        "पोर्न", "अश्लील"
+    )
+    private val MEDIUM_SIGNAL_TERMS = listOf(
+        "erotic video", "hardcore video", "adult video", "adult tube",
+        "nude cam", "naked girls", "naked women", "erome leak",
+        "blowjob", "gangbang", "creampie", "milf sex", "anal sex",
+        "incest porn", "threesome sex", "chudai", "चुदाई"
+    )
+    private val AMBIGUOUS_TERMS = listOf(
+        "sex", "sexual", "nudes", "nude", "naked", "erotic", "erotica", "nsfw", "sexy", "सेक्स"
+    )
+    private val SAFE_EDUCATIONAL_DOMAINS = setOf(
+        "nhs.uk", "mayoclinic.org", "clevelandclinic.org", "kidshealth.org",
+        "healthline.com", "medlineplus.gov", "plannedparenthood.org",
+        "who.int", "cdc.gov", "ncbi.nlm.nih.gov", "medscape.com",
+        "britannica.com", "khanacademy.org", "openstax.org"
     )
 
-    // Search Engine hosts
-    private val SEARCH_ENGINES = listOf(
-        "google.", "bing.com", "duckduckgo.com", "yahoo.com", "yandex.", "ecosia.org"
-    )
-
-    // Incognito / Private browsing indicator strings across Android browser UI
-    private val INCOGNITO_INDICATORS = listOf(
-        "incognito", "inprivate", "private browsing", "private tab", "secret mode"
-    )
+    private fun tokenPattern(terms: List<String>): Regex {
+        val alternation = terms.joinToString("|") { Regex.escape(it) }
+        return Regex("(^|[^\\p{L}\\p{N}])(?:$alternation)(?=$|[^\\p{L}\\p{N}])", RegexOption.IGNORE_CASE)
+    }
+    private val highSignalPattern = tokenPattern(HIGH_SIGNAL_TERMS)
+    private val mediumSignalPattern = tokenPattern(MEDIUM_SIGNAL_TERMS)
+    private val ambiguousPattern = tokenPattern(AMBIGUOUS_TERMS)
 
     sealed class EvaluationResult {
         data object Clean : EvaluationResult()
@@ -86,91 +109,50 @@ object AdultContentEvaluator {
         INCOGNITO_RESTRICTED("Private/Incognito Browsing")
     }
 
+    private val explicitPatterns = EXPLICIT_KEYWORDS.map { keyword ->
+        Regex("(^|[^\\p{L}\\p{N}])${Regex.escape(keyword)}([^\\p{L}\\p{N}]|$)", RegexOption.IGNORE_CASE)
+    }
+
     /**
-     * Evaluates a URL, address bar text, or browser page title.
+     * Evaluates an actual browser address or search value, never arbitrary page copy.
+     * Ambiguous single words need multiple signals; trusted health/education domains
+     * are exempt from ambiguous-word scoring but not from the explicit domain blocklist.
      */
     fun evaluateText(rawInput: String): EvaluationResult {
         if (rawInput.isBlank()) return EvaluationResult.Clean
 
-        val clean = rawInput.trim().lowercase(Locale.ROOT)
-
-        // 1. Check Incognito / InPrivate browsing titles or tab indicators
-        for (indicator in INCOGNITO_INDICATORS) {
-            if (clean.contains(indicator)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.INCOGNITO_RESTRICTED,
-                    layer = "Incognito Protection Guard"
-                )
-            }
-        }
-
-        // 2. Decode URL if encoded
+        val clean = normalizeForMatching(rawInput)
         val decoded = try {
-            URLDecoder.decode(clean, "UTF-8")
+            URLDecoder.decode(URLDecoder.decode(clean, "UTF-8"), "UTF-8")
         } catch (_: Exception) {
             clean
         }
-
-        // 3. Extract hostname / domain if it looks like a URL
         val domain = extractDomain(decoded)
-        if (domain.isNotEmpty()) {
-            // Exact or subdomain match against known adult domains
-            if (isAdultDomain(domain)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.ADULT_DOMAIN,
-                    layer = "18+ Domain Shield"
-                )
-            }
+        if (domain.isNotEmpty() && isAdultDomain(domain)) {
+            return EvaluationResult.Blocked(BlockCategory.ADULT_DOMAIN, "18+ Domain Shield")
         }
 
-        // 4. Check for explicit keywords in search queries or URL paths
-        for (keyword in EXPLICIT_KEYWORDS) {
-            // Word boundary match
-            val regex = Regex("(^|[^a-z0-9])${Regex.escape(keyword)}([^a-z0-9]|$)", RegexOption.IGNORE_CASE)
-            if (regex.containsMatchIn(decoded)) {
-                return EvaluationResult.Blocked(
-                    category = BlockCategory.EXPLICIT_SEARCH,
-                    layer = "Real-Time URL & Search Shield"
-                )
-            }
+        val searchText = decoded.replace(Regex("[+_\\-]"), " ")
+        if (highSignalPattern.containsMatchIn(searchText) ||
+            mediumSignalPattern.containsMatchIn(searchText)) {
+            return EvaluationResult.Blocked(BlockCategory.EXPLICIT_SEARCH, "Browser search guard")
         }
 
+        val trustedDomain = SAFE_EDUCATIONAL_DOMAINS.any { safe ->
+            domain == safe || domain.endsWith(".$safe")
+        }
+        if (!trustedDomain && ambiguousPattern.findAll(searchText).take(3).count() >= 3) {
+            return EvaluationResult.Blocked(BlockCategory.EXPLICIT_SEARCH, "Multiple restricted search signals")
+        }
         return EvaluationResult.Clean
     }
 
-    /**
-     * Conservative context scoring for non-browser apps and WebViews.
-     * One ambiguous term is never enough. Inspected text stays in memory only.
-     */
-    fun evaluateVisibleContext(rawInput: String): EvaluationResult {
-        if (rawInput.isBlank()) return EvaluationResult.Clean
-        val clean = rawInput.lowercase(Locale.ROOT).take(12_000)
-
-        val strongTerms = listOf(
-            "porn", "pornography", "xxx", "adult video", "adult webcam",
-            "nsfw video", "explicit video", "nude leak", "sex video"
-        )
-        if (strongTerms.any { clean.contains(it) }) {
-            return EvaluationResult.Blocked(
-                category = BlockCategory.VISIBLE_CONTEXT,
-                layer = "On-Screen Context Shield"
-            )
-        }
-
-        val contextTerms = listOf(
-            "18+", "adult only", "explicit", "nsfw", "uncensored",
-            "nude", "naked", "webcam", "adult content"
-        )
-        val score = contextTerms.count { clean.contains(it) }
-        return if (score >= 3) {
-            EvaluationResult.Blocked(
-                category = BlockCategory.VISIBLE_CONTEXT,
-                layer = "On-Screen Context Shield"
-            )
-        } else {
-            EvaluationResult.Clean
-        }
-    }
+    fun normalizeForMatching(value: String): String =
+        java.text.Normalizer.normalize(value.take(8192), java.text.Normalizer.Form.NFKC)
+            .filterNot { it == '\u200B' || it == '\u200C' || it == '\u200D' ||
+                it == '\u2060' || it == '\uFEFF' }
+            .trim()
+            .lowercase(Locale.ROOT)
 
     /**
      * Checks if a domain or any of its parent domains match the adult blocklist.
@@ -221,7 +203,7 @@ object AdultContentEvaluator {
      */
     fun isBrowserPackage(packageName: String): Boolean {
         val lower = packageName.lowercase(Locale.ROOT)
-        return BROWSER_PACKAGES.contains(lower) ||
+        return BROWSER_PACKAGES.contains(lower) || lower.startsWith("com.opera.") ||
                 lower.contains("browser") ||
                 lower.contains("chrome") ||
                 lower.contains("firefox") ||
@@ -229,11 +211,4 @@ object AdultContentEvaluator {
                 lower.contains("searchbox")
     }
 
-    /**
-     * Checks if a domain is a known search engine.
-     */
-    fun isSearchEngine(domain: String): Boolean {
-        val lower = domain.lowercase(Locale.ROOT)
-        return SEARCH_ENGINES.any { lower.contains(it) }
-    }
 }

@@ -1,7 +1,13 @@
 package com.example.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Security
@@ -23,14 +29,14 @@ sealed class Screen(
 ) {
     data object Dashboard : Screen(
         route = "dashboard",
-        title = "Dashboard",
+        title = "Home",
         selectedIcon = Icons.Filled.Dashboard,
         unselectedIcon = Icons.Outlined.Dashboard
     )
 
     data object Apps : Screen(
         route = "apps",
-        title = "Apps",
+        title = "Block",
         selectedIcon = Icons.Filled.Apps,
         unselectedIcon = Icons.Outlined.Apps
     )
@@ -47,6 +53,13 @@ sealed class Screen(
         title = "18+ Shield",
         selectedIcon = Icons.Filled.Shield,
         unselectedIcon = Icons.Outlined.Shield
+    )
+
+    data object Onboarding : Screen(
+        route = "onboarding",
+        title = "Welcome",
+        selectedIcon = Icons.Filled.AccountCircle,
+        unselectedIcon = Icons.Outlined.AccountCircle
     )
 
     data object Permissions : Screen(
@@ -77,8 +90,50 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.Security
     )
 
+    data object Paywall : Screen(
+        route = "paywall",
+        title = "Pro",
+        selectedIcon = Icons.Filled.AutoAwesome,
+        unselectedIcon = Icons.Outlined.AutoAwesome
+    )
+
+    data object Account : Screen(
+        route = "account",
+        title = "Account",
+        selectedIcon = Icons.Filled.AccountCircle,
+        unselectedIcon = Icons.Outlined.AccountCircle
+    )
+
+    data object Insights : Screen(
+        route = "insights",
+        title = "Insights",
+        selectedIcon = Icons.Filled.BarChart,
+        unselectedIcon = Icons.Outlined.BarChart
+    )
+
+    data object Progress : Screen(
+        route = "progress",
+        title = "Progress",
+        selectedIcon = Icons.Filled.BarChart,
+        unselectedIcon = Icons.Outlined.BarChart
+    )
+
+    data object BlockerCustomization : Screen(
+        route = "blocker_customization",
+        title = "Block screen",
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings
+    )
+
+    data object OwnerConsole : Screen(
+        route = "owner_console",
+        title = "Owner console",
+        selectedIcon = Icons.Filled.Security,
+        unselectedIcon = Icons.Outlined.Security
+    )
+
     companion object {
         val navItems: List<Screen>
-            get() = listOf(Dashboard, Apps, Schedules, AdultProtection, Settings)
+            get() = listOf(Dashboard, Apps, Progress, Paywall, Settings)
     }
 }
