@@ -189,6 +189,11 @@ class SettingsPreferences(private val context: Context) {
     val adultUnlockNotBeforeFlow: Flow<Long> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] ?: 0L }
     val adultUnlockVerifiedFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.ADULT_UNLOCK_VERIFIED] ?: false }
     val adultCooldownSecondsFlow: Flow<Int> = context.dataStore.data.map { it[PreferencesKeys.ADULT_COOLDOWN_SECONDS] ?: 60 }
+    val blockIncognitoEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] ?: false }
+    val forceSafeSearchEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] ?: false }
+    val dnsFilterEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.DNS_FILTER_ENABLED] ?: false }
+    val customDnsPrimaryFlow: Flow<String> = context.dataStore.data.map { it[PreferencesKeys.CUSTOM_DNS_PRIMARY] ?: "family-filter-dns.cleanbrowsing.org" }
+    val customDnsSecondaryFlow: Flow<String> = context.dataStore.data.map { it[PreferencesKeys.CUSTOM_DNS_SECONDARY] ?: "" }
 
     val adultBlocksCountFlow: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ADULT_BLOCKS_COUNT] ?: 0
@@ -459,9 +464,37 @@ class SettingsPreferences(private val context: Context) {
             it[PreferencesKeys.ADULT_PROTECTION_ENABLED] = enabled
             it[PreferencesKeys.STRICT_ADULT_MODE] = false
             it[PreferencesKeys.ADULT_UNLOCK_NOT_BEFORE] = 0L
-            it[PreferencesKeys.DNS_FILTER_ENABLED] = false
-            it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = false
         }
+    }
+
+    suspend fun setBlockIncognitoEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.BLOCK_INCOGNITO_ENABLED] = enabled }
+    }
+
+    suspend fun setForceSafeSearchEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.FORCE_SAFESEARCH_ENABLED] = enabled }
+    }
+
+    suspend fun setDnsFilterEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.DNS_FILTER_ENABLED] = enabled }
+    }
+
+    suspend fun setCustomDnsPrimary(hostname: String) {
+        val clean = hostname.trim().lowercase(java.util.Locale.ROOT)
+        require(clean.length <= 253 && !clean.contains(' ') &&
+            (clean.isEmpty() || clean.matches(Regex("^[a-z0-9.-]+$")))) {
+            "Enter a valid Private DNS provider hostname."
+        }
+        context.dataStore.edit { it[PreferencesKeys.CUSTOM_DNS_PRIMARY] = clean }
+    }
+
+    suspend fun setCustomDnsSecondary(hostname: String) {
+        val clean = hostname.trim().lowercase(java.util.Locale.ROOT)
+        require(clean.length <= 253 && !clean.contains(' ') &&
+            (clean.isEmpty() || clean.matches(Regex("^[a-z0-9.-]+$")))) {
+            "Enter a valid secondary DNS hostname."
+        }
+        context.dataStore.edit { it[PreferencesKeys.CUSTOM_DNS_SECONDARY] = clean }
     }
 
     suspend fun requestAdultProtectionDisable(delayMinutes: Int = 10) {
