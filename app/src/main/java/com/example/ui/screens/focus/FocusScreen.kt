@@ -330,7 +330,7 @@ private fun TimerPanel(
                     justCompleted -> "COMPLETED"
                     else -> "MINUTES"
                 },
-                compact = modifier == Modifier
+                compact = false
             )
 
             if (!isRunning && !isPaused) {
