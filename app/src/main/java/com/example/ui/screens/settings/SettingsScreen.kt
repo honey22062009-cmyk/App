@@ -42,11 +42,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.backup.BackupManager
+import com.example.data.preferences.LocalUserProfileStore
+import com.example.data.preferences.LocalProfileAuthStore
+import com.example.ui.components.BunnyCompanion
+import com.example.ui.components.BunnyMood
 import com.example.data.repository.AppBlockerRepository
 import kotlinx.coroutines.launch
 
@@ -61,6 +68,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val localUsers = remember(context) { LocalUserProfileStore(context.applicationContext) }
+    val authStore = remember(context) { LocalProfileAuthStore(context.applicationContext) }
+    val localProfile by localUsers.profileFlow.collectAsState(initial = null)
     val themeMode by repository.settings.themeModeFlow.collectAsState(initial = "system")
     val profileName by repository.settings.profileNameFlow.collectAsState(initial = "")
     val isProtectionEnabled by repository.settings.isProtectionEnabledFlow.collectAsState(initial = true)
@@ -68,6 +78,11 @@ fun SettingsScreen(
     var editableName by remember(profileName) { mutableStateOf(profileName) }
     var message by remember { mutableStateOf<String?>(null) }
     var importUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
@@ -99,7 +114,34 @@ fun SettingsScreen(
         }
 
         item {
-            SettingsCard(title = "Your profile", icon = Icons.Default.Person) {
+            SettingsCard(title = "Profile and sign-in", icon = Icons.Default.Person) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BunnyCompanion(size = 78.dp, mood = BunnyMood.Resting)
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("DEVICE PROFILE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            localProfile?.displayName?.takeIf { it.isNotBlank() } ?: profileName.ifBlank { "Your profile" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text("Private profile · stored on this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            localProfile?.let { "Profile database: active" } ?: "Profile database: waiting for setup",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = editableName,
                     onValueChange = { editableName = it.take(40) },
@@ -109,11 +151,28 @@ fun SettingsScreen(
                     placeholder = { Text("What should the app call you?") }
                 )
                 Button(
-                    onClick = { scope.launch { repository.settings.setProfileName(editableName); message = "Your local profile is saved." } },
-                    enabled = editableName.trim().isNotEmpty()
-                ) { Text("Save profile") }
+                    onClick = {
+                        scope.launch {
+                            repository.settings.setProfileName(editableName.trim())
+                            localUsers.saveProfile(editableName.trim(), localProfile?.avatarId ?: "bunny")
+                            message = "Your local profile has been saved."
+                        }
+                    },
+                    enabled = editableName.trim().length >= 2,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Save profile changes") }
+                OutlinedButton(
+                    onClick = {
+                        currentPin = ""
+                        newPin = ""
+                        confirmPin = ""
+                        pinError = null
+                        showPinDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Change 6-digit PIN") }
                 Text(
-                    "This is a local profile, not a cloud account. Your name stays on this device; no login server is configured in this build.",
+                    "The app keeps a local profile record in Room and a salted PIN verifier on this device. There is no remote account or shared user database.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -201,12 +260,12 @@ fun SettingsScreen(
 
         item {
             SettingsCard(title = "About Strict Blocker", icon = Icons.Default.Info) {
-                Text("Strict Blocker 2.1.1", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Strict Blocker 2.3.0", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text("A local-first Android focus and app-scheduling tool.", style = MaterialTheme.typography.bodyMedium)
                 AboutRow("App scheduling", "Choose apps and recurring allowed time windows. A local Accessibility Service checks app launches.")
                 AboutRow("Focus", "Run a distraction-free timer with saved sessions, daily goals and focus history.")
-                AboutRow("Progress", "Track a private personal goal with day counts, check-ins, milestones and notes.")
-                AboutRow("Storage", "Schedules and app records use a local Room database; preferences and progress use on-device DataStore files.")
+                AboutRow("Progress", "Track a private, self-reported personal goal with timestamp-based runs, milestones and a history graph.")
+                AboutRow("Storage", "Schedules and app records use Room; the device profile is stored in a separate local Room database; preferences and progress stay in DataStore.")
                 AboutRow("Backups", "Export a ZIP or import supported 1.8 JSON backups. Legacy JSON does not contain the Room app-list/schedule database. Backups may contain private activity and should be stored securely.")
                 AboutRow("Network", "No DNS filtering or local VPN service is included. This build does not require a cloud account for its core features.")
                 AboutRow("Limitations", "Android can stop background work, revoke permissions or uninstall regular apps. Scheduled enforcement depends on the permissions remaining enabled.")
@@ -223,6 +282,66 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
         }
+    }
+
+    if (showPinDialog) {
+        AlertDialog(
+            onDismissRequest = { showPinDialog = false },
+            title = { Text("Change your PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = currentPin,
+                        onValueChange = { currentPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("Current PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    OutlinedTextField(
+                        value = newPin,
+                        onValueChange = { newPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("New 6-digit PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    OutlinedTextField(
+                        value = confirmPin,
+                        onValueChange = { confirmPin = it.filter(Char::isDigit).take(6); pinError = null },
+                        label = { Text("Confirm new PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (pinError != null) {
+                        Text(pinError.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when {
+                        authStore.remainingLockoutSeconds() > 0L ->
+                            pinError = "Try again in ${authStore.remainingLockoutSeconds()} seconds."
+                        !authStore.verifyPin(currentPin) ->
+                            pinError = if (authStore.remainingLockoutSeconds() > 0L)
+                                "Too many attempts. Wait ${authStore.remainingLockoutSeconds()} seconds."
+                            else "Current PIN is incorrect."
+                        newPin.length != 6 -> pinError = "The new PIN must contain 6 digits."
+                        newPin != confirmPin -> pinError = "The new PINs do not match."
+                        else -> {
+                            authStore.savePin(newPin)
+                            showPinDialog = false
+                            message = "Your PIN has been updated."
+                        }
+                    }
+                }) { Text("Update PIN") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPinDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (message != null) {
