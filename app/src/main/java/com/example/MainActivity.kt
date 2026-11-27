@@ -9,11 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.compose.runtime.SideEffect
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.tween
@@ -252,8 +255,17 @@ fun MainAppScaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                if (currentScreen != Screen.Onboarding && currentScreen != Screen.Permissions &&
-                    !dataEntryVisible && !keyboardVisible) {
+                val showDock = isInitialRouteResolved &&
+                    currentScreen in Screen.navItems &&
+                    !dataEntryVisible &&
+                    !keyboardVisible
+                AnimatedVisibility(
+                    visible = showDock,
+                    enter = if (reduceMotion) fadeIn(tween(0)) else
+                        slideInVertically(tween(250)) { it } + fadeIn(tween(250)),
+                    exit = if (reduceMotion) fadeOut(tween(0)) else
+                        slideOutVertically(tween(180)) { it } + fadeOut(tween(180))
+                ) {
                     FloatingGlassDock(
                         currentScreen = currentScreen,
                         onSelect = { screen -> currentScreen = screen },
