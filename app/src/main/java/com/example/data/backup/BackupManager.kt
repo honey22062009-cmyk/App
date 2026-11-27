@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream
 import android.database.sqlite.SQLiteDatabase
 import com.example.data.db.AppDatabase
 import com.example.data.preferences.FocusSessionPreferences
+import com.example.data.preferences.LocalUserDatabase
 import com.example.data.preferences.PersonalProgressPreferences
 import com.example.data.preferences.SettingsPreferences
 import com.example.data.repository.AppBlockerRepository
@@ -24,6 +25,9 @@ object BackupManager {
         "strict_blocker.db",
         "strict_blocker.db-wal",
         "strict_blocker.db-shm",
+        "strict_blocker_users.db",
+        "strict_blocker_users.db-wal",
+        "strict_blocker_users.db-shm",
         "strict_blocker_settings.preferences_pb",
         "strict_blocker_focus.preferences_pb",
         "strict_blocker_habits.preferences_pb"
@@ -34,11 +38,17 @@ object BackupManager {
             repository.database.openHelper.writableDatabase
                 .query("PRAGMA wal_checkpoint(FULL)")
                 .use { it.moveToFirst() }
-            // Checkpoint WAL before snapshotting; keep Room open so the live app container remains valid.
+            LocalUserDatabase.getInstance(context).openHelper.writableDatabase
+                .query("PRAGMA wal_checkpoint(FULL)")
+                .use { it.moveToFirst() }
+            // Checkpoint both local Room databases before snapshotting; keep them open for the live app.
             val candidates = listOf(
                 context.getDatabasePath("strict_blocker.db"),
                 File(context.getDatabasePath("strict_blocker.db").path + "-wal"),
                 File(context.getDatabasePath("strict_blocker.db").path + "-shm"),
+                context.getDatabasePath("strict_blocker_users.db"),
+                File(context.getDatabasePath("strict_blocker_users.db").path + "-wal"),
+                File(context.getDatabasePath("strict_blocker_users.db").path + "-shm"),
                 File(context.filesDir, "datastore/strict_blocker_settings.preferences_pb"),
                 File(context.filesDir, "datastore/strict_blocker_focus.preferences_pb"),
                 File(context.filesDir, "datastore/strict_blocker_habits.preferences_pb")
@@ -124,25 +134,32 @@ object BackupManager {
             }
             require(imported > 0) { "This file does not contain a supported Strict Blocker backup." }
 
-            // Basic SQLite integrity check before replacing the active local database.
-            val stagedDb = File(staging, "strict_blocker.db")
-            if (stagedDb.exists()) {
-                val check = SQLiteDatabase.openDatabase(stagedDb.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-                try {
-                    check.rawQuery("PRAGMA quick_check", null).use { cursor ->
-                        require(cursor.moveToFirst() && cursor.getString(0) == "ok") { "The database in this backup is damaged." }
+            // Validate every staged SQLite database before replacing live files.
+            listOf("strict_blocker.db", "strict_blocker_users.db").forEach { databaseName ->
+                val stagedDb = File(staging, databaseName)
+                if (stagedDb.exists()) {
+                    val check = SQLiteDatabase.openDatabase(stagedDb.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+                    try {
+                        check.rawQuery("PRAGMA quick_check", null).use { cursor ->
+                            require(cursor.moveToFirst() && cursor.getString(0) == "ok") {
+                                "The $databaseName database in this backup is damaged."
+                            }
+                        }
+                    } finally {
+                        check.close()
                     }
-                } finally {
-                    check.close()
                 }
             }
 
             AppDatabase.closeInstance()
+            LocalUserDatabase.closeInstance()
             val databaseDir = context.getDatabasePath("strict_blocker.db").parentFile!!.apply { mkdirs() }
             val dataStoreDir = File(context.filesDir, "datastore").apply { mkdirs() }
             staging.listFiles()?.forEach { file ->
                 val target = when (file.name) {
-                    "strict_blocker.db", "strict_blocker.db-wal", "strict_blocker.db-shm" -> File(databaseDir, file.name)
+                    "strict_blocker.db", "strict_blocker.db-wal", "strict_blocker.db-shm",
+                    "strict_blocker_users.db", "strict_blocker_users.db-wal", "strict_blocker_users.db-shm" ->
+                        File(databaseDir, file.name)
                     else -> File(dataStoreDir, file.name)
                 }
                 file.copyTo(target, overwrite = true)
