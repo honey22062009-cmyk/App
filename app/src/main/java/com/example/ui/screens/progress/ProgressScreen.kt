@@ -365,91 +365,155 @@ private fun StreakLineChart(
     val gridColor = MaterialTheme.colorScheme.outlineVariant
 
     val rangeStart = range.days?.let { nowMillis - it * HabitStreakCalculator.DAY_MILLIS }
-        ?: (runs.minOfOrNull { it.startAtMillis } ?: (nowMillis - 7L * HabitStreakCalculator.DAY_MILLIS))
+        ?: (runs.minOfOrNull { it.startAtMillis } ?: nowMillis - 7L * HabitStreakCalculator.DAY_MILLIS)
     val chartEnd = maxOf(nowMillis, rangeStart + 1L)
     val visibleSegments = remember(runs, rangeStart, nowMillis) {
         buildGraphSegments(runs, rangeStart, nowMillis)
     }
     val historicalMaximum = visibleSegments.flatMap { it.points }.maxOfOrNull { it.streakDays } ?: 0
-    val chartMax = maxOf(7, currentDays, previousBestDays, historicalMaximum)
-        .let { ((it + 6) / 7) * 7 }
+    val rawMaximum = maxOf(5, currentDays, previousBestDays, historicalMaximum)
+    val chartMaximum = (((rawMaximum + 4) / 5) * 5).coerceAtLeast(5)
+    val yLabels = (4 downTo 0).map { chartMaximum * it / 4 }
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(214.dp)) {
-        val left = 12.dp.toPx()
-        val right = 12.dp.toPx()
-        val top = 12.dp.toPx()
-        val bottom = 14.dp.toPx()
-        val plotWidth = (size.width - left - right).coerceAtLeast(1f)
-        val plotHeight = (size.height - top - bottom).coerceAtLeast(1f)
-
-        for (tick in 0..4) {
-            val ratio = tick / 4f
-            val y = top + plotHeight * (1f - ratio)
-            drawLine(
-                color = gridColor.copy(alpha = 0.58f),
-                start = androidx.compose.ui.geometry.Offset(left, y),
-                end = androidx.compose.ui.geometry.Offset(left + plotWidth, y),
-                strokeWidth = 1.dp.toPx()
-            )
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f))
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("CURRENT RUN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("$currentDays days", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = currentColor)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("PERSONAL BEST", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("$previousBestDays days", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = bestColor)
+            }
         }
 
-        fun xFor(timestamp: Long): Float {
-            val ratio = ((timestamp - rangeStart).toDouble() / (chartEnd - rangeStart).toDouble())
-                .toFloat().coerceIn(0f, 1f)
-            return left + plotWidth * ratio
-        }
-
-        fun yFor(days: Int): Float {
-            val ratio = (days.toFloat() / chartMax.toFloat()).coerceIn(0f, 1f)
-            return top + plotHeight * (1f - ratio)
-        }
-
-        if (previousBestDays > 0) {
-            val recordY = yFor(previousBestDays)
-            drawLine(
-                color = bestColor,
-                start = androidx.compose.ui.geometry.Offset(left, recordY),
-                end = androidx.compose.ui.geometry.Offset(left + plotWidth, recordY),
-                strokeWidth = 2.5.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
-            )
-        }
-
-        visibleSegments.forEach { segment ->
-            val points = segment.points
-            if (points.size < 2) return@forEach
-            val path = Path().apply {
-                moveTo(xFor(points.first().timestampMillis), yFor(points.first().streakDays))
-                points.drop(1).forEach { point ->
-                    lineTo(xFor(point.timestampMillis), yFor(point.streakDays))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.width(30.dp).height(220.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End
+            ) {
+                yLabels.forEach { value ->
+                    Text(
+                        value.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-            drawPath(
-                path = path,
-                color = if (segment.isCurrent) currentColor else historyColor,
-                style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
-            )
-        }
 
-        val lastCurrent = visibleSegments.lastOrNull { it.isCurrent }
-            ?.points
-            ?.lastOrNull { it.timestampMillis == nowMillis && it.streakDays == currentDays }
-        if (lastCurrent != null) {
-            drawCircle(
-                color = currentColor,
-                radius = 4.5.dp.toPx(),
-                center = androidx.compose.ui.geometry.Offset(xFor(nowMillis), yFor(currentDays))
-            )
-        }
-    }
+            Column(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val left = 5.dp.toPx()
+                        val right = 7.dp.toPx()
+                        val top = 8.dp.toPx()
+                        val bottom = 8.dp.toPx()
+                        val plotWidth = (size.width - left - right).coerceAtLeast(1f)
+                        val plotHeight = (size.height - top - bottom).coerceAtLeast(1f)
 
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(
-            if (range == StreakGraphRange.ALL_TIME) "First saved run" else range.label + " ago",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text("Now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fun xFor(timestamp: Long): Float {
+                            val ratio = ((timestamp - rangeStart).toDouble() /
+                                (chartEnd - rangeStart).toDouble()).toFloat().coerceIn(0f, 1f)
+                            return left + plotWidth * ratio
+                        }
+
+                        fun yFor(days: Int): Float {
+                            val ratio = (days.toFloat() / chartMaximum.toFloat()).coerceIn(0f, 1f)
+                            return top + plotHeight * (1f - ratio)
+                        }
+
+                        for (tick in 0..4) {
+                            val y = top + plotHeight * tick / 4f
+                            drawLine(
+                                color = gridColor.copy(alpha = if (tick == 4) 0.66f else 0.38f),
+                                start = androidx.compose.ui.geometry.Offset(left, y),
+                                end = androidx.compose.ui.geometry.Offset(left + plotWidth, y),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                        }
+
+                        if (previousBestDays > 0) {
+                            val bestY = yFor(previousBestDays)
+                            drawLine(
+                                color = bestColor.copy(alpha = 0.9f),
+                                start = androidx.compose.ui.geometry.Offset(left, bestY),
+                                end = androidx.compose.ui.geometry.Offset(left + plotWidth, bestY),
+                                strokeWidth = 2.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 6.dp.toPx()))
+                            )
+                        }
+
+                        visibleSegments.forEach { segment ->
+                            val points = segment.points
+                            if (points.size >= 2) {
+                                val path = Path().apply {
+                                    moveTo(xFor(points.first().timestampMillis), yFor(points.first().streakDays))
+                                    points.drop(1).forEach { point ->
+                                        lineTo(xFor(point.timestampMillis), yFor(point.streakDays))
+                                    }
+                                }
+                                drawPath(
+                                    path = path,
+                                    color = if (segment.isCurrent) currentColor else historyColor,
+                                    style = Stroke(width = 3.4.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                            }
+                            val endpoint = points.lastOrNull()
+                            if (endpoint != null && !segment.isCurrent) {
+                                drawCircle(
+                                    color = historyColor,
+                                    radius = 3.5.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(
+                                        xFor(endpoint.timestampMillis), yFor(endpoint.streakDays)
+                                    )
+                                )
+                            }
+                        }
+
+                        drawCircle(
+                            color = currentColor.copy(alpha = 0.18f),
+                            radius = 11.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(xFor(nowMillis), yFor(currentDays))
+                        )
+                        drawCircle(
+                            color = currentColor,
+                            radius = 5.5.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(xFor(nowMillis), yFor(currentDays))
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        if (range == StreakGraphRange.ALL_TIME) "First run" else range.label + " ago",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text("Today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 
@@ -458,13 +522,12 @@ private fun buildGraphSegments(
     rangeStart: Long,
     nowMillis: Long
 ): List<GraphSegment> {
-    val result = mutableListOf<GraphSegment>()
-    runs.forEach { run ->
+    return runs.sortedBy { it.startAtMillis }.mapNotNull { run ->
         val runEnd = minOf(run.endAtMillis ?: nowMillis, nowMillis)
-        if (runEnd < rangeStart || run.startAtMillis > nowMillis) return@forEach
+        if (runEnd < rangeStart || run.startAtMillis > nowMillis) return@mapNotNull null
 
-        val points = mutableListOf<GraphPoint>()
         val firstVisible = maxOf(run.startAtMillis, rangeStart)
+        val points = mutableListOf<GraphPoint>()
         points += GraphPoint(
             timestampMillis = firstVisible,
             streakDays = HabitStreakCalculator.elapsedDays(firstVisible, run.startAtMillis)
@@ -472,7 +535,7 @@ private fun buildGraphSegments(
 
         var sampleAt = run.startAtMillis + HabitStreakCalculator.DAY_MILLIS
         while (sampleAt < runEnd) {
-            if (sampleAt >= rangeStart) {
+            if (sampleAt > firstVisible) {
                 points += GraphPoint(
                     timestampMillis = sampleAt,
                     streakDays = HabitStreakCalculator.elapsedDays(sampleAt, run.startAtMillis)
@@ -481,17 +544,16 @@ private fun buildGraphSegments(
             sampleAt += HabitStreakCalculator.DAY_MILLIS
         }
 
-        val endDays = HabitStreakCalculator.elapsedDays(runEnd, run.startAtMillis)
-        if (runEnd >= rangeStart) {
-            points += GraphPoint(runEnd, endDays)
-            if (run.endAtMillis != null) {
-                // Same x coordinate produces the vertical drop at the reset moment.
-                points += GraphPoint(runEnd, 0)
-            }
+        points += GraphPoint(
+            timestampMillis = runEnd,
+            streakDays = HabitStreakCalculator.elapsedDays(runEnd, run.startAtMillis)
+        )
+        if (run.endAtMillis != null && runEnd >= rangeStart) {
+            // The vertical drop is the exact timestamp at which a user logged a reset.
+            points += GraphPoint(timestampMillis = runEnd, streakDays = 0)
         }
-        if (points.isNotEmpty()) result += GraphSegment(points, isCurrent = run.endAtMillis == null)
+        GraphSegment(points.distinctBy { it.timestampMillis to it.streakDays }, isCurrent = run.endAtMillis == null)
     }
-    return result
 }
 
 @Composable
