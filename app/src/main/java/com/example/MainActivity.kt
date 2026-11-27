@@ -11,7 +11,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -48,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +61,7 @@ import com.example.core.system.PermissionHelper
 import com.example.data.repository.AppBlockerRepository
 import com.example.data.preferences.LocalProfileAuthStore
 import com.example.data.preferences.PersonalProgressPreferences
+import com.example.data.preferences.LocalUserProfileStore
 import com.example.ui.navigation.Screen
 import com.example.ui.components.StrictBlockerLogo
 import com.example.ui.screens.adult.AdultProtectionScreen
@@ -150,6 +155,7 @@ private fun LocalProfileEntryGate(
     val context = LocalContext.current
     val authStore = remember(context) { LocalProfileAuthStore(context.applicationContext) }
     val progressStore = remember(context) { PersonalProgressPreferences(context.applicationContext) }
+    val localUsers = remember(context) { LocalUserProfileStore(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var savedName by remember { mutableStateOf("") }
     var hasPin by remember { mutableStateOf(false) }
@@ -158,8 +164,11 @@ private fun LocalProfileEntryGate(
 
     LaunchedEffect(repository) {
         hasPin = authStore.hasPin()
-        if (hasPin) progressStore.ensureInitialized()
         savedName = repository.settings.profileNameFlow.first()
+        val storedProfile = localUsers.profileFlow.first()
+        if (savedName.isBlank()) savedName = storedProfile?.displayName.orEmpty()
+        if (savedName.isNotBlank()) localUsers.ensureProfile(savedName)
+        if (hasPin) progressStore.ensureInitialized()
         isReady = true
     }
 
@@ -178,13 +187,20 @@ private fun LocalProfileEntryGate(
                     repository.settings.setProfileName(name)
                     progressStore.setProfileName(name)
                     progressStore.ensureInitialized()
+                    localUsers.saveProfile(name)
                     savedName = name
                     hasPin = true
                     isAuthenticated = true
                 }
             },
             onUnlock = authStore::verifyPin,
-            onAuthenticated = { isAuthenticated = true }
+            onAuthenticated = {
+                scope.launch {
+                    localUsers.markSignedIn()
+                    isAuthenticated = true
+                }
+            },
+            onLockoutRemainingSeconds = authStore::remainingLockoutSeconds
         )
 
         else -> content()
@@ -281,9 +297,18 @@ fun MainAppScaffold(
                             enabled = currentScreen != Screen.Permissions || isSelected,
                             onClick = { currentScreen = screen },
                             icon = {
+                                val iconScale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.12f else 1f,
+                                    animationSpec = tween(240),
+                                    label = "tablet_nav_scale_${screen.route}"
+                                )
                                 Icon(
                                     imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                    contentDescription = screen.title
+                                    contentDescription = screen.title,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    }
                                 )
                             },
                             label = {
@@ -309,8 +334,8 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(240)) { it / 18 }) togetherWith
+                                (fadeOut(tween(150)) + slideOutHorizontally(tween(180)) { -it / 24 })
                         },
                         label = "tablet_screen_transition"
                     ) { targetScreen ->
@@ -345,9 +370,18 @@ fun MainAppScaffold(
                                 enabled = currentScreen != Screen.Permissions || isSelected,
                                 onClick = { currentScreen = screen },
                                 icon = {
+                                    val iconScale by animateFloatAsState(
+                                        targetValue = if (isSelected) 1.12f else 1f,
+                                        animationSpec = tween(240),
+                                        label = "phone_nav_scale_${screen.route}"
+                                    )
                                     Icon(
                                         imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                        contentDescription = screen.title
+                                        contentDescription = screen.title,
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        }
                                     )
                                 },
                                 label = {
@@ -379,8 +413,8 @@ fun MainAppScaffold(
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.992f)) togetherWith
-                                (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.996f))
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(240)) { it / 18 }) togetherWith
+                                (fadeOut(tween(150)) + slideOutHorizontally(tween(180)) { -it / 24 })
                         },
                         label = "phone_screen_transition"
                     ) { targetScreen ->
