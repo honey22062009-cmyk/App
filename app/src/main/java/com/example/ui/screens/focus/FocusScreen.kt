@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -252,51 +254,57 @@ private fun TimerPanel(
 ) {
     AppSurface(
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp),
         backgroundColor = MaterialTheme.colorScheme.surface,
         borderColor = MaterialTheme.colorScheme.outlineVariant
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                Box(
+                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(15.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
                         when {
                             justCompleted -> "Session complete"
-                            isRunning -> "Stay with this task"
-                            isPaused -> "Your session is paused"
-                            else -> "Set your focus time"
+                            isRunning -> "You're in focus mode"
+                            isPaused -> "Focus is paused"
+                            else -> "Build your focus session"
                         },
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         when {
-                            justCompleted -> "A full session has been added to your progress"
-                            isRunning -> "The timer is saved on this device"
-                            isPaused -> "Resume whenever you are ready"
-                            else -> "A quiet stretch, one task at a time"
+                            justCompleted -> "Your completed time has been saved"
+                            isRunning -> "Stay with one task. The timer is saved locally."
+                            isPaused -> "Pick up where you left off"
+                            else -> "A calm workspace for one thing at a time"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("What are you working on?", style = MaterialTheme.typography.titleSmall)
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("YOUR TASK", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 OutlinedTextField(
                     value = snapshot.selectedTask,
                     onValueChange = onTaskChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("Add a task or chapter") },
-                    enabled = !isRunning
+                    placeholder = { Text("e.g. Biology · Human Physiology") },
+                    enabled = !isRunning && !isPaused,
+                    shape = RoundedCornerShape(16.dp)
                 )
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -306,47 +314,32 @@ private fun TimerPanel(
                         FilterChip(
                             selected = snapshot.activityCategory == category,
                             onClick = { onCategoryChange(category) },
-                            enabled = !isRunning,
+                            enabled = !isRunning && !isPaused,
                             label = { Text(category) }
                         )
                     }
                 }
             }
 
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier.size(206.dp),
-                    strokeWidth = 8.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        timerText,
-                        fontSize = 48.sp,
-                        lineHeight = 54.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.testTag("focus_timer_value")
-                    )
-                    Text(
-                        when {
-                            isRunning -> "remaining"
-                            isPaused -> "paused"
-                            justCompleted -> "complete"
-                            else -> "minutes"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            FocusTimerVisual(
+                progress = progress,
+                timerText = timerText,
+                status = when {
+                    isRunning -> "TIME REMAINING"
+                    isPaused -> "PAUSED"
+                    justCompleted -> "COMPLETED"
+                    else -> "MINUTES"
+                },
+                compact = modifier == Modifier
+            )
 
             if (!isRunning && !isPaused) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Session length", style = MaterialTheme.typography.titleSmall)
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("SESSION LENGTH", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.weight(1f))
+                        Text("${snapshot.selectedMinutes} minutes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -355,7 +348,7 @@ private fun TimerPanel(
                             FilterChip(
                                 selected = snapshot.selectedMinutes == value,
                                 onClick = { onSelectMinutes(value) },
-                                label = { Text("${value}m") }
+                                label = { Text("${value} min") }
                             )
                         }
                     }
@@ -363,15 +356,19 @@ private fun TimerPanel(
             }
 
             if (justCompleted) {
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(15.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(9.dp))
                         Text(
-                            "Well done. Your time was recorded.",
+                            "Nicely done. Your focus time is in your history.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -379,36 +376,97 @@ private fun TimerPanel(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                when {
-                    isRunning -> {
-                        Button(onClick = onPause, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Pause, contentDescription = null)
-                            Spacer(Modifier.width(7.dp))
-                            Text("Pause")
-                        }
-                        OutlinedButton(onClick = onReset) {
-                            Icon(Icons.Default.Replay, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("End")
-                        }
+            when {
+                isRunning -> {
+                    Button(onClick = onPause, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp)) {
+                        Icon(Icons.Default.Pause, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Pause session")
                     }
-                    isPaused -> {
-                        Button(onClick = onResume, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(7.dp))
-                            Text("Resume")
-                        }
-                        OutlinedButton(onClick = onReset) { Text("Reset") }
-                    }
-                    else -> {
-                        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Start focus session")
-                        }
+                    OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                        Icon(Icons.Default.Replay, contentDescription = null)
+                        Spacer(Modifier.width(7.dp))
+                        Text("End session")
                     }
                 }
+                isPaused -> {
+                    Button(onClick = onResume, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp)) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Resume session")
+                    }
+                    OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                        Text("End session")
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = onStart,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(17.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(9.dp))
+                        Text("Start focus session", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FocusTimerVisual(
+    progress: Float,
+    timerText: String,
+    status: String,
+    compact: Boolean
+) {
+    val ringSize = if (compact) 224.dp else 252.dp
+    Box(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.05f)
+                    )
+                )
+            )
+            .padding(vertical = 18.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.size(ringSize).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                progress = progress,
+                modifier = Modifier.size(ringSize - 16.dp),
+                strokeWidth = 11.dp,
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    status,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    timerText,
+                    fontSize = if (compact) 42.sp else 50.sp,
+                    lineHeight = 56.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("focus_timer_value")
+                )
+                Text("one thing at a time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
