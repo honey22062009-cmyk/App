@@ -6,6 +6,7 @@ Strict Blocker is a native Android app for scheduled app blocking, focus session
 
 - Replaced the green-heavy interface with a plum, rose and warm-ivory theme.
 - Added a new bunny-and-shield launcher mark, used across the splash screen, dashboard, tablet rail and Focus companion panel.
+- Added a true native OpenGL ES 2 bunny companion on Home and Focus, with depth-tested geometry, articulated movement, idle animations, rotation and touch interactions.
 - Removed the DNS controls, DNS preferences, VPN service registration, reboot startup and unused DNS tunnel implementation. Browser Guard now describes its supported on-device browser checks and their limitations honestly.
 - Added a dedicated local Room profile database for the device profile, with editable display name and saved profile metadata; no remote account or central database is used.
 - Added a guided first-run tour with five short steps and a replay action in Settings.
